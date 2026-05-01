@@ -23,10 +23,22 @@ export const loadMmdModel = async (
         }
     });
 
+    // Split path to handle rootUrl and sceneFilename correctly for texture resolution
+    let rootUrl = "";
+    let sceneFilename = "";
+
+    if (typeof pmxPath === "string") {
+        const lastSlashIndex = pmxPath.lastIndexOf("/");
+        rootUrl = pmxPath.substring(0, lastSlashIndex + 1);
+        sceneFilename = pmxPath.substring(lastSlashIndex + 1);
+    } else {
+        sceneFilename = pmxPath;
+    }
+
     const mmdMesh = await SceneLoader.ImportMeshAsync(
         undefined,
-        typeof pmxPath === "string" ? pmxPath : "",
-        typeof pmxPath === "string" ? "" : pmxPath,
+        rootUrl,
+        sceneFilename,
         scene,
         onProgress,
         ".pmx"

@@ -1,4 +1,4 @@
-import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager } from "@babylonjs/core";
+import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager, WebXRState } from "@babylonjs/core";
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
     try {
@@ -6,29 +6,28 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             uiOptions: {
                 sessionMode: "immersive-ar",
                 referenceSpaceType: "local-floor"
+            },
+            optionalFeatures: ["image-tracking"]
+        });
+
+        // Add error listener for session entry failures
+        xr.baseExperience.onStateChangedObservable.add((state) => {
+            if (state === WebXRState.NOT_IN_XR) {
+                // If we were trying to enter and it failed
+                const lastError = (xr.baseExperience as any).lastSessionError;
+                if (lastError) {
+                    alert("AR開始エラー: " + lastError);
+                }
             }
         });
 
         const featuresManager = xr.baseExperience.featuresManager;
 
-        // Preload the image to ensure it's valid and accessible before passing to WebXR
-        const markerImage = new Image();
-        markerImage.crossOrigin = "anonymous";
-        markerImage.src = "assets/marker_qr.png";
-        
-        await new Promise((resolve, reject) => {
-            markerImage.onload = resolve;
-            markerImage.onerror = () => reject(new Error("マーカー画像の読み込みに失敗しました"));
-        });
-
-        // WebXR expects string | ImageBitmap. Converting to ImageBitmap prevents runtime parsing errors.
-        const markerBitmap = await createImageBitmap(markerImage);
-
         // Image Tracking Configuration
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
                 {
-                    src: markerBitmap, // Pass the parsed ImageBitmap
+                    src: "assets/marker_qr.png", // Path to the QR code marker
                     estimatedRealWorldWidth: 0.15 // 15cm
                 }
             ]

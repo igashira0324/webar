@@ -38,8 +38,13 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 const hit = hitTest.lastHitTestResults[0];
                 meshes.forEach(mesh => {
                     mesh.isVisible = true;
+                    // Preserving the current scaling while updating position and rotation
+                    const currentScale = mesh.scaling.clone();
                     hit.transformationMatrix.decompose(undefined, mesh.rotationQuaternion!, mesh.position);
+                    mesh.scaling.copyFrom(currentScale);
                 });
+                // Ensure music and animation keep playing
+                audioPlayer.play();
             }
         };
 

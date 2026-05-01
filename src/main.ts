@@ -31,8 +31,8 @@ async function init() {
         currentModel = await loadMmdModel(
             scene, 
             mmdRuntime, 
-            "/assets/model/miku/602e_V_Miku/pmx/602e_V_Miku_mmd/V_Miku/V_Miku_602e_v1.0.pmx", 
-            "/assets/motion/dance.vmd",
+            "assets/model/miku.pmx", 
+            "assets/motion/dance.vmd",
             shadowGenerator,
             undefined,
             (event) => {
@@ -105,7 +105,7 @@ async function init() {
     const setupAudio = async () => {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
-            audioPlayer.source = "/assets/audio/music.mp3";
+            audioPlayer.source = "assets/audio/music.mp3";
         } catch (e) {
             console.warn("Audio failed to load", e);
         }

@@ -8,7 +8,7 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import "@babylonjs/core/Audio/audioSceneComponent";
 
 async function init() {
-    console.log("App Initialization - Version 1.9");
+    console.log("App Initialization - Version 2.1");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -18,6 +18,7 @@ async function init() {
 
     // 2. Initialize MMD Runtime
     const mmdRuntime = createMmdRuntime(scene);
+    (scene as any).mmdRootRuntime = mmdRuntime; // Explicitly store for AR access
 
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);

@@ -16,8 +16,8 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
                 {
-                    src: "assets/marker.png", // Path to the generated marker
-                    estimatedRealWorldWidth: 0.2 // Estimated width in meters (20cm)
+                    src: "assets/marker_qr.png", // Path to the QR code marker
+                    estimatedRealWorldWidth: 0.15 // Estimated width in meters (15cm for a typical screen/print)
                 }
             ]
         };

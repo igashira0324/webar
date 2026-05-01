@@ -1,4 +1,4 @@
-import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3 } from "@babylonjs/core";
+import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager } from "@babylonjs/core";
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
     try {
@@ -39,10 +39,16 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             console.log("WebXR Image Tracking Enabled");
         } catch (featureError) {
             console.warn("Image tracking could not be enabled", featureError);
-            alert("画像認識機能がサポートされていません。通常のARとして起動します。");
         }
 
-        console.log("WebXR Initialized. Waiting for user to press AR button.");
+        // Explicitly check if immersive-ar is supported on this specific device/browser
+        const isSupported = await WebXRSessionManager.IsSessionSupportedAsync("immersive-ar");
+        if (!isSupported) {
+            console.warn("immersive-ar is not supported on this device/browser.");
+            alert("お使いの端末（またはブラウザ）はAR機能（WebXR）に対応していません。\nスマホ（AndroidのChrome）で開き、Google Playで「Google Play 開発者サービス(AR)」がインストールされているか確認してください。");
+        } else {
+            console.log("WebXR Initialized. Waiting for user to press AR button.");
+        }
 
         return xr;
     } catch (e: any) {

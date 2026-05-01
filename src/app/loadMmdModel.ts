@@ -2,7 +2,7 @@ import { Scene, ShadowGenerator, SceneLoader } from "@babylonjs/core";
 import { MmdRuntime, VmdLoader } from "babylon-mmd";
 
 // Ensure side effects are loaded
-// @ts-ignore
+import "@babylonjs/core/Audio/audioSceneComponent";
 import "@babylonjs/loaders/glTF";
 import "babylon-mmd/esm/Loader/pmxLoader";
 import "babylon-mmd/esm/Loader/vmdLoader";

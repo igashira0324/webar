@@ -5,8 +5,10 @@ import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
+import "@babylonjs/core/Audio/audioSceneComponent";
 
 async function init() {
+    console.log("App Initialization - Version 1.2");
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
 
@@ -106,6 +108,7 @@ async function init() {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
             audioPlayer.source = "assets/audio/music.mp3";
+            console.log("Audio player initialized successfully.");
         } catch (e) {
             console.warn("Audio failed to load", e);
         }

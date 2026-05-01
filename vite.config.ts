@@ -11,7 +11,16 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true,
   },
+  worker: {
+    format: 'es',
+    plugins: () => []
+  },
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 });

@@ -1,0 +1,21 @@
+
+> webar@1.0.0 build
+> tsc && vite build
+
+vite v6.4.2 building for production...
+transforming...
+✓ 2064 modules transformed.
+✗ Build failed in 13.35s
+error during build:
+[commonjs--resolver] Invalid value "iife" for option "worker.format" - UMD and IIFE output formats are not supported for code-splitting builds.
+file: /home/nttdmse/aipf/webar/node_modules/babylon-mmd/esm/Runtime/Optimized/wasm/mr/snippets/wasm-bindgen-rayon-38edf6e439f6d70d/src/workerHelpers.js
+    at getRollupError (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/parseAst.js:406:41)
+    at error (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/parseAst.js:402:42)
+    at validateOptionsForMultiChunkOutput (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/node-entry.js:21156:16)
+    at Bundle.generate (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/node-entry.js:21011:17)
+    at async file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/node-entry.js:23968:27
+    at async catchUnfinishedHookActions (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/node-entry.js:23335:16)
+    at async bundleWorkerEntry (file:///home/nttdmse/aipf/webar/node_modules/vite/dist/node/chunks/dep-Dq2t6Dq0.js:39969:9)
+    at async workerFileToUrl (file:///home/nttdmse/aipf/webar/node_modules/vite/dist/node/chunks/dep-Dq2t6Dq0.js:40038:25)
+    at async Object.handler (file:///home/nttdmse/aipf/webar/node_modules/vite/dist/node/chunks/dep-Dq2t6Dq0.js:41346:28)
+    at async transform (file:///home/nttdmse/aipf/webar/node_modules/rollup/dist/es/shared/node-entry.js:21671:16)

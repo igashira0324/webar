@@ -1,34 +1,45 @@
 import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager, WebXRState } from "@babylonjs/core";
+import "@babylonjs/core/Audio/audioSceneComponent";
+
+// Global Error Listeners for Debugging
+window.addEventListener("error", (e) => {
+    alert("Global Error: " + e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+    alert("Unhandled Rejection: " + e.reason);
+});
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
+    console.log("Setting up WebXR...");
     try {
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-ar",
-                referenceSpaceType: "local-floor"
+                referenceSpaceType: "local" // Changed from local-floor for better compatibility
             },
             optionalFeatures: ["image-tracking"]
         });
 
         // Add error listener for session entry failures
         xr.baseExperience.onStateChangedObservable.add((state) => {
+            console.log("WebXR State Changed:", state);
             if (state === WebXRState.NOT_IN_XR) {
-                // If we were trying to enter and it failed
                 const lastError = (xr.baseExperience as any).lastSessionError;
                 if (lastError) {
-                    alert("AR開始エラー: " + lastError);
+                    alert("AR開始エラー (State): " + lastError);
                 }
             }
         });
 
         const featuresManager = xr.baseExperience.featuresManager;
 
-        // Image Tracking Configuration
+        // Image Tracking Configuration - Use absolute URL
+        const markerUrl = window.location.origin + "/assets/marker_qr.png";
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
                 {
-                    src: "assets/marker_qr.png", // Path to the QR code marker
-                    estimatedRealWorldWidth: 0.15 // 15cm
+                    src: markerUrl,
+                    estimatedRealWorldWidth: 0.15
                 }
             ]
         };
@@ -47,23 +58,21 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
                     mesh.rotate(Vector3.Right(), -Math.PI / 2);
                 });
             });
-            console.log("WebXR Image Tracking Enabled");
-        } catch (featureError) {
+            console.log("WebXR Image Tracking Feature Enabled");
+        } catch (featureError: any) {
             console.warn("Image tracking could not be enabled", featureError);
+            alert("画像認識機能の有効化に失敗: " + featureError.message);
         }
 
         const isSupported = await WebXRSessionManager.IsSessionSupportedAsync("immersive-ar");
         if (!isSupported) {
-            console.warn("immersive-ar is not supported on this device/browser.");
-            alert("お使いの端末（またはブラウザ）はAR機能（WebXR）に対応していません。\nスマホ（AndroidのChrome）で開き、Google Playで「Google Play 開発者サービス(AR)」がインストールされているか確認してください。");
-        } else {
-            console.log("WebXR Initialized. Waiting for user to press AR button.");
+            alert("このブラウザはAR(immersive-ar)をサポートしていません。");
         }
 
         return xr;
     } catch (e: any) {
-        console.error("WebXR not supported", e);
-        alert("WebXR初期化エラー: " + (e.message || e));
+        console.error("WebXR Setup Failed", e);
+        alert("WebXRセットアップ失敗: " + (e.message || e));
         return null;
     }
 };

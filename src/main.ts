@@ -48,9 +48,9 @@ async function init() {
             }
         );
         if (currentModel) {
-            // Adjust scale and position for AR (0.1 is about 20cm tall)
-            currentModel.mesh.scaling.setAll(0.1); 
-            currentModel.mesh.position.set(0, 0, 0); // Position at the tracked marker origin
+            // Adjust scale and position for AR (0.08 is about 15cm tall)
+            currentModel.mesh.scaling.setAll(0.08); 
+            currentModel.mesh.position.set(0, 0, 0); 
             
             // Start animation immediately
             mmdRuntime.playAnimation();

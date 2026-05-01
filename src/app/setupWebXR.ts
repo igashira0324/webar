@@ -6,23 +6,33 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-ar",
-                referenceSpaceType: "local"
+                referenceSpaceType: "local-floor" // Reverting to local-floor for better grounding
             },
-            optionalFeatures: ["image-tracking"]
+            optionalFeatures: ["image-tracking", "hit-test"]
         });
 
+        // Audio and Animation Resume on Enter
         xr.baseExperience.onStateChangedObservable.add((state) => {
-            console.log("WebXR State Changed:", state);
+            console.log("WebXR State:", state);
+            if (state === WebXRState.IN_XR) {
+                // Resume audio context which is often suspended by the browser
+                if (scene.getEngine().getAudioContext()) {
+                    scene.getEngine().getAudioContext()?.resume();
+                }
+                // Ensure meshes are visible
+                meshes.forEach(m => m.isVisible = true);
+            }
         });
 
         const featuresManager = xr.baseExperience.featuresManager;
-        const markerUrl = window.location.origin + "/assets/marker_qr.png";
         
+        // Image Tracking Configuration
+        const markerUrl = window.location.origin + "/assets/marker_qr.png";
         const imageTrackingOptions: any = {
             images: [
                 {
                     src: markerUrl,
-                    estimatedRealWorldWidth: 0.15 // 15cm (QR code size)
+                    estimatedRealWorldWidth: 0.15
                 }
             ]
         };
@@ -37,23 +47,20 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             imageTracking.onTrackedImageUpdatedObservable.add((image: any) => {
                 meshes.forEach(mesh => {
                     mesh.isVisible = true;
-                    // Apply position and rotation from the tracked image
                     image.getWorldMatrix().decompose(mesh.scaling, mesh.rotationQuaternion!, mesh.position);
-                    // Adjust rotation if needed (depends on marker orientation)
                     mesh.rotate(Vector3.Right(), -Math.PI / 2);
                 });
             });
-            console.log("WebXR Image Tracking Feature Enabled");
         } catch (featureError: any) {
-            console.warn("Image tracking could not be enabled", featureError);
+            console.warn("Image tracking not supported, falling back to basic AR", featureError);
         }
-
-        const isSupported = await WebXRSessionManager.IsSessionSupportedAsync("immersive-ar");
-        console.log("WebXR Initialized. Immersive-AR Supported:", isSupported);
 
         return xr;
     } catch (e: any) {
-        console.error("WebXR Setup Failed:", e.message || e);
-        return null;
+        console.error("WebXR Setup Failed", e);
+        // Fallback to basic setup if the above fails
+        return await scene.createDefaultXRExperienceAsync({
+            uiOptions: { sessionMode: "immersive-ar" }
+        });
     }
 };

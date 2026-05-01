@@ -25,7 +25,7 @@ export const loadMmdModel = async (
 
     // Split path to handle rootUrl and sceneFilename correctly for texture resolution
     let rootUrl = "";
-    let sceneFilename = "";
+    let sceneFilename: string | File = "";
 
     if (typeof pmxPath === "string") {
         const lastSlashIndex = pmxPath.lastIndexOf("/");

@@ -191,6 +191,20 @@
         display: none !important;
       }
 
+      .modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 100;
+      }
+
       #marker-modal {
         justify-content: flex-end;
         padding-right: 40px;
@@ -380,14 +394,17 @@
 
         <!-- AR Marker Modal -->
         <div id="marker-modal" class="modal hidden">
-          <div class="modal-content glass-panel">
-            <h3>AR起動用 QRマーカー</h3>
-            <p>1. スマホの標準カメラでこのQRをスキャンしてサイトを開きます。<br>2. サイトが開いたら、画面右下に表示される「メガネ型のARアイコン」を押します。<br>3. そのままカメラをこのQRコードに向けるとミクが現れます。</p>
-            <div class="marker-container">
-              <img src="assets/marker_qr.png" alt="AR Marker" style="width: 100%; max-width: 300px; border: 5px solid white; border-radius: 10px;" />
+          <div class="modal-content glass-panel" style="text-align: center; max-width: 450px;">
+            <h3 style="margin-bottom: 5px;">AR起動用 QRマーカー</h3>
+            <div class="marker-container" style="margin: 10px 0;">
+              <img src="assets/marker_qr.png" alt="AR Marker" style="width: 100%; max-width: 350px; border: 10px solid white; border-radius: 10px;" />
             </div>
-            <p style="font-size: 0.8em; margin-top: 10px;">別のデバイスに表示するか、印刷してご使用ください。</p>
-            <div class="modal-buttons">
+            <div style="text-align: left; font-size: 0.9em; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;">
+              <p style="margin: 0 0 5px 0;">1. スマホの標準カメラでこのQRをスキャン。</p>
+              <p style="margin: 0 0 5px 0;">2. サイトが開いたら、画面右下の「メガネ型アイコン」をタップ。</p>
+              <p style="margin: 0;">3. そのままカメラをこのQRに向けるとミクが登場！</p>
+            </div>
+            <div class="modal-buttons" style="justify-content: center; margin-top: 15px;">
               <button id="closeMarkerBtn" class="secondary-btn">閉じる</button>
             </div>
           </div>

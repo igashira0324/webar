@@ -1,4 +1,4 @@
-import { Scene, AbstractMesh, WebXRSessionManager, WebXRState, WebXRFeatureName, Vector3 } from "@babylonjs/core";
+import { Scene, AbstractMesh, WebXRSessionManager, WebXRFeatureName, Vector3 } from "@babylonjs/core";
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
     console.log("Setting up WebXR...");

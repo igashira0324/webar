@@ -1,4 +1,4 @@
-import { Scene, AbstractMesh, WebXRState, WebXRFeatureName, Quaternion, Vector3 } from "@babylonjs/core";
+import { Scene, AbstractMesh, WebXRState, WebXRFeatureName, Vector3 } from "@babylonjs/core";
 import { StreamAudioPlayer } from "babylon-mmd";
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlayer: StreamAudioPlayer) => {

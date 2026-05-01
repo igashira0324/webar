@@ -98,7 +98,8 @@ async function init() {
     const arStartBtn = document.getElementById("arStartBtn") as HTMLButtonElement;
     arStartBtn.addEventListener("click", async () => {
         if (currentModel) {
-            await setupWebXR(scene, currentModel.mesh);
+            const meshesToTrack = [currentModel.mesh as any];
+            await setupWebXR(scene, meshesToTrack);
         } else {
             alert("Model not loaded yet.");
         }

@@ -1,6 +1,6 @@
-import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager, WebXRState } from "@babylonjs/core";
+import { Scene, AbstractMesh, WebXRSessionManager, WebXRState } from "@babylonjs/core";
 
-export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
+export const setupWebXR = async (scene: Scene, _meshes: AbstractMesh[]) => {
     console.log("Setting up WebXR...");
     try {
         const xr = await scene.createDefaultXRExperienceAsync({

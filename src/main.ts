@@ -5,10 +5,16 @@ import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { AudioEngine } from "@babylonjs/core/Audio/audioEngine";
+import { Sound } from "@babylonjs/core/Audio/sound";
 import "@babylonjs/core/Audio/audioSceneComponent";
 
 async function init() {
-    console.log("App Initialization - Version 1.2");
+    console.log("App Initialization - Version 1.3");
+    // Force reference to ensure they are not tree-shaken
+    (window as any).BABYLON_AUDIO = { AudioEngine, Sound, Engine };
+    
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
 

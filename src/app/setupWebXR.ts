@@ -21,11 +21,14 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             markerImage.onerror = () => reject(new Error("マーカー画像の読み込みに失敗しました"));
         });
 
+        // WebXR expects string | ImageBitmap. Converting to ImageBitmap prevents runtime parsing errors.
+        const markerBitmap = await createImageBitmap(markerImage);
+
         // Image Tracking Configuration
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
                 {
-                    src: markerImage, // Pass the loaded image element directly
+                    src: markerBitmap, // Pass the parsed ImageBitmap
                     estimatedRealWorldWidth: 0.15 // 15cm
                 }
             ]

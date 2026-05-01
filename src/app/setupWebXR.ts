@@ -11,12 +11,22 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
 
         const featuresManager = xr.baseExperience.featuresManager;
 
+        // Preload the image to ensure it's valid and accessible before passing to WebXR
+        const markerImage = new Image();
+        markerImage.crossOrigin = "anonymous";
+        markerImage.src = "assets/marker_qr.png";
+        
+        await new Promise((resolve, reject) => {
+            markerImage.onload = resolve;
+            markerImage.onerror = () => reject(new Error("マーカー画像の読み込みに失敗しました"));
+        });
+
         // Image Tracking Configuration
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
                 {
-                    src: "assets/marker_qr.png", // Path to the QR code marker
-                    estimatedRealWorldWidth: 0.15 // Estimated width in meters (15cm)
+                    src: markerImage, // Pass the loaded image element directly
+                    estimatedRealWorldWidth: 0.15 // 15cm
                 }
             ]
         };
@@ -28,7 +38,6 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
                 imageTrackingOptions
             ) as any;
 
-            // When a tracked image is found or updated
             imageTracking.onTrackedImageUpdatedObservable.add((image: any) => {
                 meshes.forEach(mesh => {
                     mesh.isVisible = true;
@@ -41,7 +50,6 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             console.warn("Image tracking could not be enabled", featureError);
         }
 
-        // Explicitly check if immersive-ar is supported on this specific device/browser
         const isSupported = await WebXRSessionManager.IsSessionSupportedAsync("immersive-ar");
         if (!isSupported) {
             console.warn("immersive-ar is not supported on this device/browser.");

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebAR MMD Viewer</title>
+    <style>
+      :root {
+        --primary-color: #00e5ff;
+        --secondary-color: #ff00ff;
+        --bg-color: rgba(0, 0, 0, 0.6);
+        --text-color: #ffffff;
+        --glass-bg: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.2);
+      }
+
+      body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #111;
+        color: var(--text-color);
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #renderCanvas {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        outline: none;
+      }
+
+      #ui-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
+      #stats-panel {
+        align-self: flex-start;
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-family: monospace;
+      }
+
+      #control-panel {
+        pointer-events: auto;
+        align-self: flex-start;
+        width: 80%;
+        max-width: 320px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(15px);
+        border: 1px solid var(--glass-border);
+        padding: 20px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 20px;
+        margin-left: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .panel-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .vertical-buttons {
+        flex-direction: column;
+      }
+
+      button {
+        padding: 12px 20px;
+        border-radius: 10px;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+        flex: 1;
+      }
+
+      .primary-btn {
+        background: linear-gradient(135deg, var(--primary-color), #00a8ff);
+        color: #000;
+      }
+
+      .primary-btn:active {
+        transform: scale(0.95);
+      }
+
+      .secondary-btn {
+        background: var(--glass-bg);
+        color: #fff;
+        border: 1px solid var(--glass-border);
+      }
+
+      .secondary-btn:hover {
+        background: var(--glass-border);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        cursor: pointer;
+      }
+
+      .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+
+      #file-modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 100;
+      }
+
+      .modal-content {
+        background: #222;
+        padding: 30px;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 500px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        border: 1px solid var(--glass-border);
+      }
+
+      .file-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      #control-panel {
+        transition: transform 0.3s ease, opacity 0.3s ease;
+      }
+
+      #control-panel.collapsed {
+        transform: translateX(-120%);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .panel-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: var(--primary-color);
+      }
+
+      .icon-btn {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 5px;
+        line-height: 1;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .icon-btn:hover {
+        color: var(--primary-color);
+      }
+
+      .floating-btn {
+        position: absolute;
+        bottom: 40px;
+        left: 20px;
+        pointer-events: auto;
+        z-index: 50;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        padding: 10px 20px;
+        border-radius: 12px;
+        width: auto;
+      }
+
+      #ar-unsupported {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 0, 0, 0.7);
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      #loading-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #111;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.5s;
+      }
+
+      .loader {
+        border: 4px solid var(--glass-border);
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="renderCanvas"></canvas>
+      
+      <div id="ui-container">
+        <div id="stats-panel">
+          <div id="fps">FPS: --</div>
+        </div>
+
+        <div id="control-panel">
+          <div class="panel-header">
+            <h3>設定</h3>
+            <button id="minimizeBtn" class="icon-btn" title="最小化">×</button>
+          </div>
+          <div class="panel-section vertical-buttons">
+            <button id="playPauseBtn" class="primary-btn">再生 / 一時停止</button>
+            <button id="arStartBtn" class="primary-btn">AR 開始</button>
+          </div>
+
+          <div class="panel-section">
+            <label for="scaleSlider">モデルスケール: <span id="scaleVal">1.0</span></label>
+            <input type="range" id="scaleSlider" min="0.1" max="10" step="0.1" value="1.0" />
+          </div>
+
+          <div class="panel-section">
+            <label for="yPosSlider">Y 位置調整: <span id="yPosVal">0.0</span></label>
+            <input type="range" id="yPosSlider" min="-10" max="10" step="0.1" value="0.0" />
+          </div>
+
+          <div class="panel-section">
+            <label for="seekSlider">再生位置: <span id="seekVal">0</span> / <span id="durationVal">0</span></label>
+            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" />
+          </div>
+
+          <div class="panel-section">
+            <label class="toggle-switch">
+              <input type="checkbox" id="physicsToggle" />
+              <span class="slider"></span>
+              物理演算
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="shadowToggle" />
+              <span class="slider"></span>
+              影
+            </label>
+          </div>
+
+          <div class="panel-section">
+            <button id="fileSelectToggle" class="secondary-btn">ファイル選択を表示</button>
+          </div>
+        </div>
+
+        <button id="showSettingsBtn" class="primary-btn hidden floating-btn">設定を開く</button>
+
+        <div id="file-modal" class="hidden">
+          <div class="modal-content">
+            <h3>アセット選択</h3>
+            <div class="file-input-group">
+              <label>PMXファイル:</label>
+              <input type="file" id="pmxInput" accept=".pmx" />
+            </div>
+            <div class="file-input-group">
+              <label>VMDファイル:</label>
+              <input type="file" id="vmdInput" accept=".vmd" />
+            </div>
+            <div class="file-input-group">
+              <label>テクスチャフォルダ:</label>
+              <input type="file" id="textureDirInput" webkitdirectory multiple />
+            </div>
+            <button id="loadFilesBtn" class="primary-btn">読み込み</button>
+            <button id="closeModalBtn" class="secondary-btn">閉じる</button>
+          </div>
+        </div>
+
+        <div id="ar-unsupported" class="hidden">
+          この端末はWebXR ARに対応していません。
+        </div>
+
+        <div id="loading-screen">
+          <div class="loader"></div>
+          <p>アセット読み込み中...<br><span id="loading-status">0%</span></p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

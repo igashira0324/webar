@@ -1,0 +1,108 @@
+import { createScene } from './app/createScene';
+import { createMmdRuntime } from './app/mmdRuntime';
+import { loadMmdModel, loadMmdModelFromFiles } from './app/loadMmdModel';
+import { setupUI } from './app/setupUI';
+import { setupWebXR } from './app/setupWebXR';
+import { setupPerformanceControls } from './app/performance';
+import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
+
+async function init() {
+    const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+    if (!canvas) return;
+
+    // 1. Initialize Scene
+    const { scene, shadowGenerator } = await createScene(canvas);
+
+    // 2. Initialize MMD Runtime
+    const mmdRuntime = createMmdRuntime(scene);
+
+    // 2.1 Initialize Audio Player
+    const audioPlayer = new StreamAudioPlayer(scene);
+
+    let currentModel: MmdModel | null = null;
+
+    // Helper to get current model for UI
+    const getCurrentModel = () => currentModel;
+
+    // 3. Load Default Model (Phase 2)
+    const loadingScreen = document.getElementById("loading-screen") as HTMLDivElement;
+    const loadingStatus = document.getElementById("loading-status") as HTMLSpanElement;
+    try {
+        currentModel = await loadMmdModel(
+            scene, 
+            mmdRuntime, 
+            "/assets/model/miku/602e_V_Miku/pmx/602e_V_Miku_mmd/V_Miku/V_Miku_602e_v1.0.pmx", 
+            "/assets/motion/dance.vmd",
+            shadowGenerator,
+            undefined,
+            (event) => {
+                if (event.lengthComputable) {
+                    const percentage = Math.floor((event.loaded / event.total) * 100);
+                    if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
+                }
+            }
+        );
+        if (currentModel) {
+            currentModel.mesh.scaling.setAll(0.7);
+            currentModel.mesh.position.y = -5.0;
+        }
+    } catch (e) {
+        console.warn("Default assets not found. Please check paths.", e);
+    } finally {
+        // Hide loading screen
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "0";
+            setTimeout(() => loadingScreen.classList.add("hidden"), 500);
+        }
+    }
+
+    // 4. Setup UI
+    setupUI(
+        scene, 
+        mmdRuntime, 
+        audioPlayer,
+        getCurrentModel,
+        async (pmx, vmd, textures) => {
+            // Clean up old model if exists
+            if (currentModel) {
+                mmdRuntime.destroyMmdModel(currentModel);
+                currentModel.mesh.dispose();
+            }
+            // Load new model from files
+            currentModel = await loadMmdModelFromFiles(
+                scene,
+                mmdRuntime,
+                pmx,
+                vmd,
+                textures,
+                shadowGenerator
+            );
+        }
+    );
+
+    // 5. Performance Controls
+    setupPerformanceControls(scene, mmdRuntime, shadowGenerator);
+
+    // 6. WebXR AR
+    const arStartBtn = document.getElementById("arStartBtn") as HTMLButtonElement;
+    arStartBtn.addEventListener("click", async () => {
+        if (currentModel) {
+            await setupWebXR(scene, currentModel.mesh);
+        } else {
+            alert("Model not loaded yet.");
+        }
+    });
+
+    // 7. Initialize Audio Player Sync and Source (Non-blocking)
+    const setupAudio = async () => {
+        try {
+            await mmdRuntime.setAudioPlayer(audioPlayer);
+            audioPlayer.source = "/assets/audio/music.mp3";
+        } catch (e) {
+            console.warn("Audio failed to load", e);
+        }
+    };
+    setupAudio();
+}
+
+init();

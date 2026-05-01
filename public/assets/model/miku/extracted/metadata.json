@@ -1,0 +1,5 @@
+{
+  "name": "AI Dance Challenge",
+  "description": "VRMアバターとMediaPipeを使った、歌詞アニメーション付きリズムゲーム",
+  "requestFramePermissions": ["camera"]
+}

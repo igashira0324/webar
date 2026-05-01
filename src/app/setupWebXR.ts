@@ -1,30 +1,47 @@
-import { Scene, AbstractMesh, WebXRState } from "@babylonjs/core";
+import { Scene, AbstractMesh, WebXRState, WebXRFeatureName } from "@babylonjs/core";
+import { StreamAudioPlayer } from "babylon-mmd";
 
-export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
+export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlayer: StreamAudioPlayer) => {
     console.log("Setting up WebXR...");
     try {
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-ar",
                 referenceSpaceType: "local-floor"
-            }
+            },
+            optionalFeatures: ["hit-test"]
         });
 
-        // Audio and Animation Resume on Enter
+        // Hit-test for floor placement
+        const featuresManager = xr.baseExperience.featuresManager;
+        const hitTest = featuresManager.enableFeature(WebXRFeatureName.HIT_TEST, "latest") as any;
+
         xr.baseExperience.onStateChangedObservable.add((state) => {
             if (state === WebXRState.IN_XR) {
-                // Resume audio context and ensure playback starts
+                // Resume audio and play
                 const engine = scene.getEngine();
                 if (engine.getAudioContext()) {
                     engine.getAudioContext()?.resume().then(() => {
-                        // We use the runtime already initialized in the scene
-                        (scene as any).mmdRootRuntime?.playAnimation();
+                        audioPlayer.play();
                     });
                 }
-                // Ensure meshes are visible
-                meshes.forEach(m => m.isVisible = true);
+                // Initial placement hint
+                console.log("AR Session Started. Tap the floor to place Miku.");
+                // Hide meshes until tapped
+                meshes.forEach(m => m.isVisible = false);
             }
         });
+
+        // Tap to place Miku
+        scene.onPointerDown = () => {
+            if (xr.baseExperience.state === WebXRState.IN_XR && hitTest.lastHitTestResults.length > 0) {
+                const hit = hitTest.lastHitTestResults[0];
+                meshes.forEach(mesh => {
+                    mesh.isVisible = true;
+                    hit.transformationMatrix.decompose(undefined, mesh.rotationQuaternion!, mesh.position);
+                });
+            }
+        };
 
         return xr;
     } catch (e: any) {

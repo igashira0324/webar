@@ -56,7 +56,7 @@ async function init() {
             mmdRuntime.playAnimation();
 
             // Initialize WebXR Native UI immediately
-            setupWebXR(scene, [currentModel.mesh as any]);
+            setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
         }
     } catch (e: any) {
         console.error("Default assets loading failed:", e);

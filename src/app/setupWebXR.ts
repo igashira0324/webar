@@ -1,13 +1,4 @@
 import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3, WebXRSessionManager, WebXRState } from "@babylonjs/core";
-import "@babylonjs/core/Audio/audioSceneComponent";
-
-// Global Error Listeners for Debugging
-window.addEventListener("error", (e) => {
-    alert("Global Error: " + e.message);
-});
-window.addEventListener("unhandledrejection", (e) => {
-    alert("Unhandled Rejection: " + e.reason);
-});
 
 export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
     console.log("Setting up WebXR...");
@@ -15,25 +6,23 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-ar",
-                referenceSpaceType: "local" // Changed from local-floor for better compatibility
-            },
-            optionalFeatures: ["image-tracking"]
+                referenceSpaceType: "local"
+            }
         });
 
-        // Add error listener for session entry failures
         xr.baseExperience.onStateChangedObservable.add((state) => {
             console.log("WebXR State Changed:", state);
             if (state === WebXRState.NOT_IN_XR) {
                 const lastError = (xr.baseExperience as any).lastSessionError;
                 if (lastError) {
-                    alert("AR開始エラー (State): " + lastError);
+                    console.error("AR開始エラー (State):", lastError);
                 }
             }
         });
 
+        /* 
+        // Temporarily disabled for basic AR testing
         const featuresManager = xr.baseExperience.featuresManager;
-
-        // Image Tracking Configuration - Use absolute URL
         const markerUrl = window.location.origin + "/assets/marker_qr.png";
         const imageTrackingOptions: IWebXRImageTrackingOptions = {
             images: [
@@ -61,18 +50,15 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             console.log("WebXR Image Tracking Feature Enabled");
         } catch (featureError: any) {
             console.warn("Image tracking could not be enabled", featureError);
-            alert("画像認識機能の有効化に失敗: " + featureError.message);
         }
+        */
 
         const isSupported = await WebXRSessionManager.IsSessionSupportedAsync("immersive-ar");
-        if (!isSupported) {
-            alert("このブラウザはAR(immersive-ar)をサポートしていません。");
-        }
+        console.log("WebXR Initialized. Immersive-AR Supported:", isSupported);
 
         return xr;
     } catch (e: any) {
-        console.error("WebXR Setup Failed", e);
-        alert("WebXRセットアップ失敗: " + (e.message || e));
+        console.error("WebXR Setup Failed:", e.message || e);
         return null;
     }
 };

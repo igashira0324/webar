@@ -7,8 +7,37 @@ import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import "@babylonjs/core/Audio/audioSceneComponent";
 
+// Global Error Listeners for Debugging
+const debugLog = (msg: string) => {
+    const logEl = document.getElementById("debug-log");
+    if (logEl) {
+        logEl.innerHTML += msg + "<br>";
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+    console.log("DEBUG:", msg);
+};
+
+window.addEventListener("error", (e) => {
+    debugLog("Global Error: " + e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+    debugLog("Unhandled Rejection: " + e.reason);
+});
+
+// Override console.log
+const oldLog = console.log;
+console.log = (...args) => {
+    oldLog(...args);
+    debugLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(" "));
+};
+const oldError = console.error;
+console.error = (...args) => {
+    oldError(...args);
+    debugLog("ERROR: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(" "));
+};
+
 async function init() {
-    console.log("App Initialization - Version 1.5");
+    console.log("App Initialization - Version 1.7");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;

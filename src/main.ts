@@ -8,7 +8,7 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import "@babylonjs/core/Audio/audioSceneComponent";
 
 async function init() {
-    console.log("App Initialization - Version 1.4");
+    console.log("App Initialization - Version 1.5");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -50,6 +50,9 @@ async function init() {
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.7);
             currentModel.mesh.position.y = -5.0;
+
+            // Initialize WebXR Native UI immediately
+            setupWebXR(scene, [currentModel.mesh as any]);
         }
     } catch (e: any) {
         console.error("Default assets loading failed:", e);
@@ -94,16 +97,8 @@ async function init() {
     // 5. Performance Controls
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);
 
-    // 6. WebXR AR
-    const arStartBtn = document.getElementById("arStartBtn") as HTMLButtonElement;
-    arStartBtn.addEventListener("click", async () => {
-        if (currentModel) {
-            const meshesToTrack = [currentModel.mesh as any];
-            await setupWebXR(scene, meshesToTrack);
-        } else {
-            alert("Model not loaded yet.");
-        }
-    });
+    // 6. WebXR AR (Now handled via native UI initialized above)
+
 
     // 7. Initialize Audio Player Sync and Source (Non-blocking)
     const setupAudio = async () => {

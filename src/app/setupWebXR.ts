@@ -17,7 +17,7 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
             images: [
                 {
                     src: "assets/marker_qr.png", // Path to the QR code marker
-                    estimatedRealWorldWidth: 0.15 // Estimated width in meters (15cm for a typical screen/print)
+                    estimatedRealWorldWidth: 0.15 // Estimated width in meters (15cm)
                 }
             ]
         };
@@ -30,26 +30,18 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
 
         // When a tracked image is found or updated
         imageTracking.onTrackedImageUpdatedObservable.add((image: any) => {
-            // image.transformationMatrix contains the position and rotation
             meshes.forEach(mesh => {
                 mesh.isVisible = true;
                 image.getWorldMatrix().decompose(mesh.scaling, mesh.rotationQuaternion!, mesh.position);
-                
-                // Adjust: MMD models usually need some scaling and rotation adjustment
-                // The marker is on the floor, so we might need to rotate the model to stand upright
                 mesh.rotate(Vector3.Right(), -Math.PI / 2);
             });
         });
 
-        console.log("WebXR Image Tracking Enabled");
-
-        // Enter AR immediately
-        await xr.baseExperience.enterXRAsync("immersive-ar", "local-floor");
+        console.log("WebXR Initialized. Waiting for user to press AR button.");
 
         return xr;
     } catch (e) {
         console.error("WebXR not supported", e);
-        document.getElementById("ar-unsupported")?.classList.remove("hidden");
         return null;
     }
 };

@@ -159,21 +159,32 @@
       }
 
       .modal-content {
-        background: #222;
-        padding: 30px;
-        border-radius: 20px;
         width: 90%;
-        max-width: 500px;
+        max-width: 400px;
+        padding: 30px;
+        border-radius: 30px;
+        color: white;
         display: flex;
         flex-direction: column;
         gap: 20px;
         border: 1px solid var(--glass-border);
       }
 
-      .file-input-group {
+      .marker-container {
+        display: flex;
+        justify-content: center;
+        margin: 20px 0;
+      }
+
+      .input-group {
         display: flex;
         flex-direction: column;
         gap: 5px;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 10px;
       }
 
       .hidden {
@@ -334,25 +345,47 @@
           </div>
         </div>
 
-        <button id="showSettingsBtn" class="primary-btn hidden floating-btn">設定を開く</button>
+        <button id="showSettingsBtn" class="glass-btn hidden floating-btn">
+          <i class="fas fa-cog"></i> ⚙️ 設定を表示
+        </button>
+        <button id="showMarkerBtn" class="glass-btn floating-btn" style="bottom: 100px; pointer-events: auto;">
+          <i class="fas fa-qrcode"></i> 📷 マーカーを表示
+        </button>
 
-        <div id="file-modal" class="hidden">
-          <div class="modal-content">
-            <h3>アセット選択</h3>
-            <div class="file-input-group">
-              <label>PMXファイル:</label>
+        <div id="file-modal" class="modal hidden">
+          <div class="modal-content glass-panel">
+            <h3>MMDファイルをロード</h3>
+            <div class="input-group">
+              <label>PMX (モデル):</label>
               <input type="file" id="pmxInput" accept=".pmx" />
             </div>
-            <div class="file-input-group">
-              <label>VMDファイル:</label>
+            <div class="input-group">
+              <label>VMD (モーション):</label>
               <input type="file" id="vmdInput" accept=".vmd" />
             </div>
-            <div class="file-input-group">
-              <label>テクスチャフォルダ:</label>
-              <input type="file" id="textureDirInput" webkitdirectory multiple />
+            <div class="input-group">
+              <label>テクスチャ (フォルダごと):</label>
+              <input type="file" id="textureDirInput" webkitdirectory directory />
             </div>
-            <button id="loadFilesBtn" class="primary-btn">読み込み</button>
-            <button id="closeModalBtn" class="secondary-btn">閉じる</button>
+            <div class="modal-buttons">
+              <button id="loadFilesBtn" class="primary-btn">ロード開始</button>
+              <button id="closeModalBtn" class="secondary-btn">閉じる</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AR Marker Modal -->
+        <div id="marker-modal" class="modal hidden">
+          <div class="modal-content glass-panel">
+            <h3>ARマーカー</h3>
+            <p>スマホカメラで以下の画像を映すとミクが現れます。</p>
+            <div class="marker-container">
+              <img src="assets/marker.png" alt="AR Marker" style="width: 100%; max-width: 300px; border: 5px solid white; border-radius: 10px;" />
+            </div>
+            <p style="font-size: 0.8em; margin-top: 10px;">別のデバイスに表示するか、印刷してご使用ください。</p>
+            <div class="modal-buttons">
+              <button id="closeMarkerBtn" class="secondary-btn">閉じる</button>
+            </div>
           </div>
         </div>
 

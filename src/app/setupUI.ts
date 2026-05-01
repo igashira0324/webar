@@ -31,6 +31,9 @@ export const setupUI = (
     const controlPanel = document.getElementById("control-panel") as HTMLDivElement;
     const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement;
     const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement;
+    const showMarkerBtn = document.getElementById("showMarkerBtn") as HTMLButtonElement;
+    const markerModal = document.getElementById("marker-modal") as HTMLDivElement;
+    const closeMarkerBtn = document.getElementById("closeMarkerBtn") as HTMLButtonElement;
 
     const S_BASE = 0.7;
     const Y_BASE = -5.0;
@@ -141,6 +144,10 @@ export const setupUI = (
         controlPanel.classList.remove("collapsed");
         showSettingsBtn.classList.add("hidden");
     });
+
+    // Marker Modal
+    showMarkerBtn.addEventListener("click", () => markerModal.classList.remove("hidden"));
+    closeMarkerBtn.addEventListener("click", () => markerModal.classList.add("hidden"));
 
     // Initial Duration Update
     setTimeout(updateDuration, 1000);

@@ -1,33 +1,47 @@
-import { Scene, WebXRState, Vector3, Quaternion, AbstractMesh } from "@babylonjs/core";
+import { Scene, WebXRFeatureName, IWebXRImageTrackingOptions, AbstractMesh, Vector3 } from "@babylonjs/core";
 
-export const setupWebXR = async (scene: Scene, modelMesh: AbstractMesh) => {
+export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
     try {
         const xr = await scene.createDefaultXRExperienceAsync({
             uiOptions: {
                 sessionMode: "immersive-ar",
-                referenceSpaceType: "local-floor"
+                referenceSpaceType: "local"
             },
             optionalFeatures: true
         });
 
-        const featureManager = xr.baseExperience.featuresManager;
-        
-        // Hit Test (Optional but useful)
-        featureManager.enableFeature("xr-hit-test", "latest");
+        const featuresManager = xr.baseExperience.featuresManager;
 
-        xr.baseExperience.onStateChangedObservable.add((state) => {
-            if (state === WebXRState.IN_XR) {
-                console.log("Entered AR");
+        // Image Tracking Configuration
+        const imageTrackingOptions: IWebXRImageTrackingOptions = {
+            images: [
+                {
+                    src: "assets/marker.png", // Path to the generated marker
+                    estimatedRealWorldWidth: 0.2 // Estimated width in meters (20cm)
+                }
+            ]
+        };
+
+        const imageTracking = featuresManager.enableFeature(
+            WebXRFeatureName.IMAGE_TRACKING,
+            "latest",
+            imageTrackingOptions
+        ) as any;
+
+        // When a tracked image is found or updated
+        imageTracking.onTrackedImageUpdatedObservable.add((image: any) => {
+            // image.transformationMatrix contains the position and rotation
+            meshes.forEach(mesh => {
+                mesh.isVisible = true;
+                image.getWorldMatrix().decompose(mesh.scaling, mesh.rotationQuaternion!, mesh.position);
                 
-                // Position model 2m in front of the camera initially if not using hit test
-                // Or set it to a default position
-                modelMesh.position = new Vector3(0, 0, 2);
-                modelMesh.rotationQuaternion = Quaternion.FromEulerAngles(0, Math.PI, 0);
-            }
+                // Adjust: MMD models usually need some scaling and rotation adjustment
+                // The marker is on the floor, so we might need to rotate the model to stand upright
+                mesh.rotate(Vector3.Right(), -Math.PI / 2);
+            });
         });
 
-        // If hit test is enabled, we could use it to place the model
-        // For now, keep it simple as per requirements (2m ahead)
+        console.log("WebXR Image Tracking Enabled");
 
         // Enter AR immediately
         await xr.baseExperience.enterXRAsync("immersive-ar", "local-floor");

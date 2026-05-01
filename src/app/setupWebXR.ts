@@ -13,9 +13,13 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[]) => {
         // Audio and Animation Resume on Enter
         xr.baseExperience.onStateChangedObservable.add((state) => {
             if (state === WebXRState.IN_XR) {
-                // Resume audio context
-                if (scene.getEngine().getAudioContext()) {
-                    scene.getEngine().getAudioContext()?.resume();
+                // Resume audio context and ensure playback starts
+                const engine = scene.getEngine();
+                if (engine.getAudioContext()) {
+                    engine.getAudioContext()?.resume().then(() => {
+                        // We use the runtime already initialized in the scene
+                        (scene as any).mmdRootRuntime?.playAnimation();
+                    });
                 }
                 // Ensure meshes are visible
                 meshes.forEach(m => m.isVisible = true);

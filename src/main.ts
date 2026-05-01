@@ -48,8 +48,8 @@ async function init() {
             }
         );
         if (currentModel) {
-            // Adjust scale and position for AR (0.08 is about 15cm tall)
-            currentModel.mesh.scaling.setAll(0.08); 
+            // Adjust scale and position for AR (0.04 is a very safe tabletop size)
+            currentModel.mesh.scaling.setAll(0.04); 
             currentModel.mesh.position.set(0, 0, 0); 
             
             // Start animation immediately
@@ -95,6 +95,9 @@ async function init() {
                 textures,
                 shadowGenerator
             );
+            if (currentModel) {
+                currentModel.mesh.scaling.setAll(0.04);
+            }
         }
     );
 

@@ -8,14 +8,18 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import "@babylonjs/core/Audio/audioSceneComponent";
 
 // Global Error Listeners for Debugging
+const logEl = document.getElementById("debug-log");
 const debugLog = (msg: string) => {
-    const logEl = document.getElementById("debug-log");
     if (logEl) {
-        logEl.innerHTML += msg + "<br>";
+        const div = document.createElement("div");
+        div.textContent = msg;
+        logEl.appendChild(div);
         logEl.scrollTop = logEl.scrollHeight;
     }
-    console.log("DEBUG:", msg);
 };
+
+const oldLog = console.log;
+const oldError = console.error;
 
 window.addEventListener("error", (e) => {
     debugLog("Global Error: " + e.message);
@@ -24,20 +28,18 @@ window.addEventListener("unhandledrejection", (e) => {
     debugLog("Unhandled Rejection: " + e.reason);
 });
 
-// Override console.log
-const oldLog = console.log;
 console.log = (...args) => {
-    oldLog(...args);
-    debugLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(" "));
+    oldLog.apply(console, args);
+    debugLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "));
 };
-const oldError = console.error;
+
 console.error = (...args) => {
-    oldError(...args);
-    debugLog("ERROR: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(" "));
+    oldError.apply(console, args);
+    debugLog("ERROR: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "));
 };
 
 async function init() {
-    console.log("App Initialization - Version 1.7");
+    console.log("App Initialization - Version 1.8");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;

@@ -7,39 +7,8 @@ import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import "@babylonjs/core/Audio/audioSceneComponent";
 
-// Global Error Listeners for Debugging
-const logEl = document.getElementById("debug-log");
-const debugLog = (msg: string) => {
-    if (logEl) {
-        const div = document.createElement("div");
-        div.textContent = msg;
-        logEl.appendChild(div);
-        logEl.scrollTop = logEl.scrollHeight;
-    }
-};
-
-const oldLog = console.log;
-const oldError = console.error;
-
-window.addEventListener("error", (e) => {
-    debugLog("Global Error: " + e.message);
-});
-window.addEventListener("unhandledrejection", (e) => {
-    debugLog("Unhandled Rejection: " + e.reason);
-});
-
-console.log = (...args) => {
-    oldLog.apply(console, args);
-    debugLog(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "));
-};
-
-console.error = (...args) => {
-    oldError.apply(console, args);
-    debugLog("ERROR: " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" "));
-};
-
 async function init() {
-    console.log("App Initialization - Version 1.8");
+    console.log("App Initialization - Version 1.9");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -79,8 +48,12 @@ async function init() {
             }
         );
         if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.7);
-            currentModel.mesh.position.y = -5.0;
+            // Adjust scale and position for AR (0.1 is about 20cm tall)
+            currentModel.mesh.scaling.setAll(0.1); 
+            currentModel.mesh.position.set(0, 0, 0); // Position at the tracked marker origin
+            
+            // Start animation immediately
+            mmdRuntime.playAnimation();
 
             // Initialize WebXR Native UI immediately
             setupWebXR(scene, [currentModel.mesh as any]);

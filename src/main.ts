@@ -36,9 +36,11 @@ async function init() {
             shadowGenerator,
             undefined,
             (event) => {
-                if (event.lengthComputable) {
+                if (event.lengthComputable && event.total > 0) {
                     const percentage = Math.floor((event.loaded / event.total) * 100);
                     if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
+                } else {
+                    if (loadingStatus) loadingStatus.textContent = "読み込み中...";
                 }
             }
         );
@@ -46,8 +48,14 @@ async function init() {
             currentModel.mesh.scaling.setAll(0.7);
             currentModel.mesh.position.y = -5.0;
         }
-    } catch (e) {
-        console.warn("Default assets not found. Please check paths.", e);
+    } catch (e: any) {
+        console.error("Default assets loading failed:", e);
+        if (loadingStatus) {
+            loadingStatus.style.color = "#ff4444";
+            loadingStatus.textContent = `エラー: ${e.message || "ファイルの読み込みに失敗しました"}`;
+        }
+        // Return early to keep the error visible
+        return;
     } finally {
         // Hide loading screen
         if (loadingScreen) {

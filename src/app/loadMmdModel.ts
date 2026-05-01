@@ -35,6 +35,8 @@ export const loadMmdModel = async (
         sceneFilename = pmxPath;
     }
 
+    console.log("Loading MMD Model:", { rootUrl, sceneFilename });
+
     const mmdMesh = await SceneLoader.ImportMeshAsync(
         undefined,
         rootUrl,

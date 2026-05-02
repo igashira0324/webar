@@ -56,8 +56,8 @@ async function init() {
             currentModel.mesh.scaling.setAll(0.04); 
             currentModel.mesh.position.set(0, 0, 0); 
             
-            // Start animation immediately
-            mmdRuntime.playAnimation();
+            // Start animation only after user interaction (handled by UI)
+            // mmdRuntime.playAnimation();
 
             // Initialize WebXR Native UI immediately
             setupWebXR(scene, [currentModel.mesh as any], audioPlayer);

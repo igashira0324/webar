@@ -6,7 +6,8 @@ export const createMmdRuntime = (scene: Scene) => {
     mmdRuntime.register(scene);
     
     // Initial settings
-    mmdRuntime.playAnimation();
+    // Do not autoplay animation so it starts perfectly synced with audio when user clicks play
+    // mmdRuntime.playAnimation();
     
     return mmdRuntime;
 };

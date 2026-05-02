@@ -312,11 +312,28 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+
+      #ar-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        pointer-events: auto;
+        z-index: 10;
+      }
+
+      #ar-overlay.active {
+        display: block;
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <canvas id="renderCanvas"></canvas>
+      <div id="ar-overlay"></div>
       
       <div id="ui-container">
         <div id="stats-panel">

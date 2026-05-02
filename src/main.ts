@@ -11,7 +11,7 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 // due to Vite code-splitting breaking the AudioV2 module chain.
 
 async function init() {
-    console.log("App Initialization - Version 2.3");
+    console.log("App Initialization - Version 2.4");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -47,13 +47,12 @@ async function init() {
                     const percentage = Math.floor((event.loaded / event.total) * 100);
                     if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
                 } else {
-                    if (loadingStatus) loadingStatus.textContent = "読み込み中... (v2.3)";
+                    if (loadingStatus) loadingStatus.textContent = "読み込み中... (v2.4)";
                 }
             }
         );
         if (currentModel) {
-            // Adjust scale and position for AR (0.04 is a very safe tabletop size)
-            currentModel.mesh.scaling.setAll(0.04); 
+            // currentModel.mesh.scaling.setAll(0.04); // Managed by arRoot in setupWebXR
             currentModel.mesh.position.set(0, 0, 0); 
             
             // Start animation only after user interaction (handled by UI)
@@ -100,7 +99,7 @@ async function init() {
                 shadowGenerator
             );
             if (currentModel) {
-                currentModel.mesh.scaling.setAll(0.04);
+                // currentModel.mesh.scaling.setAll(0.04); // Managed by arRoot in setupWebXR
             }
         }
     );

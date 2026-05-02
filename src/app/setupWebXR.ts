@@ -15,7 +15,7 @@ export const setupWebXR = async (
   const runtime = (scene as any).mmdRootRuntime;
 
   const arRoot = new TransformNode("arRoot", scene);
-  const baseScale = 0.04;
+  const baseScale = 0.2;
   arRoot.scaling.setAll(baseScale);
   arRoot.setEnabled(false);
 
@@ -88,6 +88,7 @@ export const setupWebXR = async (
     let activeTouches = new Map<number, { x: number, y: number }>();
     let gestureMode: "none" | "rotate" | "pinch" = "none";
     let lastSingleX = 0;
+    let lastSingleY = 0;
     let initialPinchDist = 0;
     let initialScale = baseScale;
     let touchStartTime = 0;
@@ -97,8 +98,6 @@ export const setupWebXR = async (
 
     overlay.addEventListener("touchstart", (e: TouchEvent) => {
       if (!inXR) return;
-      // We don't call preventDefault here to allow tap events to flow if needed,
-      // but we manage our own tap logic.
       
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
@@ -109,6 +108,7 @@ export const setupWebXR = async (
         const t = Array.from(activeTouches.values())[0];
         gestureMode = "rotate";
         lastSingleX = t.x;
+        lastSingleY = t.y;
         touchStartTime = Date.now();
         movedDistance = 0;
       } else if (activeTouches.size === 2) {
@@ -134,10 +134,16 @@ export const setupWebXR = async (
       if (gestureMode === "rotate" && activeTouches.size === 1) {
         const t = Array.from(activeTouches.values())[0];
         const dx = t.x - lastSingleX;
+        const dy = t.y - lastSingleY;
         lastSingleX = t.x;
-        movedDistance += Math.abs(dx);
+        lastSingleY = t.y;
+        movedDistance += Math.abs(dx) + Math.abs(dy);
+
         if (movedDistance > TAP_MAX_MOVE) {
-          arRoot.rotate(Vector3.Up(), dx * -0.005);
+          // 横ドラッグ -> Y軸回転 (LOCAL)
+          arRoot.rotate(Vector3.Up(), dx * -0.005, 1);
+          // 縦ドラッグ -> X軸回転 (LOCAL)
+          arRoot.rotate(Vector3.Right(), dy * -0.005, 1);
         }
       } else if (gestureMode === "pinch" && activeTouches.size >= 2) {
         const pts = Array.from(activeTouches.values());
@@ -146,7 +152,7 @@ export const setupWebXR = async (
         const dist = Math.hypot(dx, dy);
         if (initialPinchDist > 10) {
           const ratio = dist / initialPinchDist;
-          const next = Math.min(0.5, Math.max(0.005, initialScale * ratio));
+          const next = Math.min(2.0, Math.max(0.005, initialScale * ratio));
           if (Number.isFinite(next)) arRoot.scaling.setAll(next);
         }
       }

@@ -35,7 +35,7 @@ export const setupUI = (
     const markerModal = document.getElementById("marker-modal") as HTMLDivElement;
     const closeMarkerBtn = document.getElementById("closeMarkerBtn") as HTMLButtonElement;
 
-    const S_BASE = 0.7;
+    const S_BASE = 1.0;
     const Y_BASE = -5.0;
 
     // Play/Pause (with audio sync)

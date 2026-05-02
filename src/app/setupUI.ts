@@ -38,11 +38,28 @@ export const setupUI = (
     const S_BASE = 0.7;
     const Y_BASE = -5.0;
 
-    // Play/Pause
+    // Play/Pause (with audio sync)
     playPauseBtn.addEventListener("click", () => {
+        // Prevent toggling during AR session (taps are for placement, not pause)
+        const xr = (scene as any)._xrExperience;
+        if (xr && xr.baseExperience && xr.baseExperience.state === 2 /* WebXRState.IN_XR */) {
+            return;
+        }
+
         if (mmdRuntime.isAnimationPlaying) {
             mmdRuntime.pauseAnimation();
+            audioPlayer.pause();
         } else {
+            // Resume audio context first (required for mobile)
+            const engine = scene.getEngine();
+            const audioContext = engine.getAudioContext();
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    audioPlayer.play();
+                });
+            } else {
+                audioPlayer.play();
+            }
             mmdRuntime.playAnimation();
         }
     });

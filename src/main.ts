@@ -11,7 +11,7 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 // due to Vite code-splitting breaking the AudioV2 module chain.
 
 async function init() {
-    console.log("App Initialization - Version 2.1");
+    console.log("App Initialization - Version 2.2");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;

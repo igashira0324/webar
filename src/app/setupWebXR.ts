@@ -25,6 +25,22 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
         // Store the XR reference on scene so UI can check AR state
         (scene as any)._xrExperience = xr;
 
+        // Continuously rotate Miku to face the camera every frame while in AR
+        scene.onBeforeRenderObservable.add(() => {
+            if (xr.baseExperience.state === WebXRState.IN_XR && modelPlaced) {
+                const camera = xr.baseExperience.camera;
+                meshes.forEach(mesh => {
+                    if (!mesh.isVisible) return;
+                    // Calculate vector from mesh to camera
+                    const diff = camera.position.subtract(mesh.position);
+                    // Angle from +Z to diff vector
+                    const angle = Math.atan2(diff.x, diff.z);
+                    // Miku faces +Z locally. Rotating by 'angle' points +Z towards camera
+                    mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle, 0);
+                });
+            }
+        });
+
 
 
         xr.baseExperience.onStateChangedObservable.add((state) => {
@@ -55,7 +71,12 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
         // Tap handler in AR:
         // - Before placement: tap on a surface to place Miku
         // - After placement: toggle play/pause
+        let lastTapTime = 0;
         scene.onPointerDown = () => {
+            const now = Date.now();
+            if (now - lastTapTime < 300) return; // Debounce double-fires from WebXR transient pointers
+            lastTapTime = now;
+
             if (xr.baseExperience.state !== WebXRState.IN_XR) return;
 
             if (!modelPlaced) {

@@ -1,7 +1,7 @@
-import { Scene, AbstractMesh, WebXRState, WebXRFeatureName, Quaternion, PointerDragBehavior, MultiPointerScaleBehavior, Vector3 } from "@babylonjs/core";
+import { Scene, AbstractMesh, WebXRState, WebXRFeatureName, Quaternion, Vector3 } from "@babylonjs/core";
 import { StreamAudioPlayer } from "babylon-mmd";
 
-export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlayer: StreamAudioPlayer) => {
+export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], _audioPlayer: StreamAudioPlayer) => {
     console.log("Setting up WebXR...");
     const controlPanel = document.getElementById("control-panel");
     const showSettingsBtn = document.getElementById("showSettingsBtn");
@@ -14,18 +14,49 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
         if ((mesh as any)._hasManualTransform) return;
         (mesh as any)._hasManualTransform = true;
 
-        // Pinch to scale
-        const scaleBehavior = new MultiPointerScaleBehavior();
-        mesh.addBehavior(scaleBehavior);
+        let touchStartX = 0;
+        let isDragging = false;
+        let initialPinchDist = 0;
+        let initialScale = Vector3.One();
 
-        // 1-finger drag on the mesh to rotate around Y axis
-        const rotateBehavior = new PointerDragBehavior({ dragAxis: new Vector3(1, 0, 0) });
-        rotateBehavior.moveAttached = false; // Don't move position
-        rotateBehavior.onDragObservable.add((event) => {
-            // event.delta.x is horizontal screen movement. Rotate around Y axis.
-            mesh.rotate(Vector3.Up(), event.delta.x * -2);
-        });
-        mesh.addBehavior(rotateBehavior);
+        document.addEventListener("touchstart", (e) => {
+            if ((scene as any)._xrExperience?.baseExperience.state !== WebXRState.IN_XR) return;
+            if (e.touches.length === 1) {
+                isDragging = true;
+                touchStartX = e.touches[0].clientX;
+            } else if (e.touches.length === 2) {
+                isDragging = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialPinchDist = Math.sqrt(dx * dx + dy * dy);
+                initialScale = mesh.scaling.clone();
+            }
+        }, { passive: true });
+
+        document.addEventListener("touchmove", (e) => {
+            if ((scene as any)._xrExperience?.baseExperience.state !== WebXRState.IN_XR) return;
+            
+            if (e.touches.length === 1 && isDragging) {
+                // 1 Finger Drag -> Rotate
+                const currentX = e.touches[0].clientX;
+                const deltaX = currentX - touchStartX;
+                touchStartX = currentX;
+                mesh.rotate(Vector3.Up(), deltaX * -0.01);
+            } else if (e.touches.length === 2) {
+                // 2 Finger Pinch -> Scale
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (initialPinchDist > 0) {
+                    const scaleRatio = dist / initialPinchDist;
+                    mesh.scaling.copyFrom(initialScale.scale(scaleRatio));
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener("touchend", (e) => {
+            if (e.touches.length < 1) isDragging = false;
+        }, { passive: true });
     };
 
     try {
@@ -51,10 +82,10 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
 
                 // Start playback when entering AR
                 try {
-                    audioPlayer.play();
+                    // Do NOT call audioPlayer.play() manually, it conflicts with MmdRuntime
                     runtime?.playAnimation();
                 } catch (e) {
-                    console.warn("Audio play failed:", e);
+                    console.warn("Animation play failed:", e);
                 }
 
                 // Hide meshes until first tap
@@ -118,11 +149,9 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
             });
 
             modelPlaced = true;
-
-            // Ensure animation is playing
-            if (runtime && !runtime.isAnimationPlaying) {
-                runtime.playAnimation();
-            }
+            
+            // We removed the runtime.playAnimation() here to avoid freezing issues.
+            // The animation plays automatically when entering AR.
         };
 
         return xr;

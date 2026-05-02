@@ -53,14 +53,13 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 if (controlPanel) controlPanel.style.display = "none";
                 if (showSettingsBtn) showSettingsBtn.style.display = "none";
 
-                // Resume audio context (required for mobile)
-                const engine = scene.getEngine();
-                if (engine.getAudioContext()) {
-                    engine.getAudioContext()?.resume().then(() => {
-                        // Start playback when entering AR
-                        audioPlayer.play();
-                        runtime?.playAnimation();
-                    });
+                // Start playback when entering AR
+                // StreamAudioPlayer uses HTML Audio - no AudioContext needed
+                try {
+                    audioPlayer.play();
+                    runtime?.playAnimation();
+                } catch (e) {
+                    console.warn("Audio play failed:", e);
                 }
 
                 // Hide meshes until tapped
@@ -104,10 +103,12 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 modelPlaced = true;
 
                 // Ensure audio + animation are playing after placement
-                const engine = scene.getEngine();
-                engine.getAudioContext()?.resume().then(() => {
+                // Ensure audio is playing after placement
+                try {
                     audioPlayer.play();
-                });
+                } catch (e) {
+                    console.warn("Audio play failed:", e);
+                }
                 if (runtime && !runtime.isAnimationPlaying) {
                     runtime.playAnimation();
                 }

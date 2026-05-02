@@ -1,0 +1,10 @@
+{
+  "name": "MMD WebAR Player",
+  "short_name": "MMD WebAR",
+  "description": "ブラウザだけで楽しめる、高精細WebAR MMDプレイヤー",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#00e5ff",
+  "icons": []
+}

@@ -5,7 +5,10 @@ import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
-import "@babylonjs/core/Audio/audioSceneComponent";
+// Note: Do NOT import @babylonjs/core/Audio/audioSceneComponent
+// babylon-mmd's StreamAudioPlayer uses HTML Audio elements, not Babylon.js AudioV2.
+// Importing audioSceneComponent causes "Class extends value undefined" errors
+// due to Vite code-splitting breaking the AudioV2 module chain.
 
 async function init() {
     console.log("App Initialization - Version 2.1");

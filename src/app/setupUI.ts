@@ -50,16 +50,8 @@ export const setupUI = (
             mmdRuntime.pauseAnimation();
             audioPlayer.pause();
         } else {
-            // Resume audio context first (required for mobile)
-            const engine = scene.getEngine();
-            const audioContext = engine.getAudioContext();
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume().then(() => {
-                    audioPlayer.play();
-                });
-            } else {
-                audioPlayer.play();
-            }
+            // StreamAudioPlayer uses HTML Audio - no AudioContext needed
+            audioPlayer.play();
             mmdRuntime.playAnimation();
         }
     });

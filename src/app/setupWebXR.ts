@@ -32,16 +32,24 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 meshes.forEach(mesh => {
                     if (!mesh.isVisible) return;
 
-                    // Calculate the direction from model to camera on the XZ plane
-                    const cameraPos = camera.position.clone();
-                    cameraPos.y = mesh.position.y; // Only rotate around Y axis
+                    // Use the camera's forward direction projected onto XZ plane.
+                    // This works correctly at all angles (including looking straight down).
+                    const forward = camera.getForwardRay().direction;
+                    const dx = forward.x;
+                    const dz = forward.z;
+                    const len = Math.sqrt(dx * dx + dz * dz);
 
-                    // Use atan2 to get the angle on the Y axis
-                    const diff = cameraPos.subtract(mesh.position);
-                    const angle = Math.atan2(diff.x, diff.z);
+                    let angle: number;
+                    if (len > 0.001) {
+                        // Project camera forward direction onto XZ plane
+                        angle = Math.atan2(dx / len, dz / len);
+                    } else {
+                        // Camera pointing straight down — fall back to position-based
+                        const diff = camera.position.subtract(mesh.position);
+                        angle = Math.atan2(diff.x, diff.z);
+                    }
 
-                    // Apply rotation: atan2 gives angle facing camera,
-                    // add Math.PI because MMD models face -Z by default
+                    // MMD faces +Z, we want Miku facing the camera (opposite of forward)
                     mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle + Math.PI, 0);
                 });
             }
@@ -54,7 +62,6 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 if (showSettingsBtn) showSettingsBtn.style.display = "none";
 
                 // Start playback when entering AR
-                // StreamAudioPlayer uses HTML Audio - no AudioContext needed
                 try {
                     audioPlayer.play();
                     runtime?.playAnimation();
@@ -62,7 +69,7 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                     console.warn("Audio play failed:", e);
                 }
 
-                // Hide meshes until tapped
+                // Hide meshes until first tap
                 modelPlaced = false;
                 meshes.forEach(m => m.isVisible = false);
             } else if (state === WebXRState.NOT_IN_XR) {
@@ -73,44 +80,49 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
             }
         });
 
-        // Tap to place Miku
+        // Tap handler in AR:
+        // - Before placement: tap on a surface to place Miku
+        // - After placement: toggle play/pause
         scene.onPointerDown = () => {
-            if (xr.baseExperience.state === WebXRState.IN_XR && hitTest.lastHitTestResults.length > 0) {
+            if (xr.baseExperience.state !== WebXRState.IN_XR) return;
+
+            if (!modelPlaced) {
+                // --- PLACEMENT: first tap on a detected surface ---
+                if (hitTest.lastHitTestResults.length === 0) return;
+
                 const hit = hitTest.lastHitTestResults[0];
                 const camera = xr.baseExperience.camera;
 
                 meshes.forEach(mesh => {
                     mesh.isVisible = true;
 
-                    // Save current scale
                     const currentScale = mesh.scaling.clone();
-
-                    // Get position from hit test result
                     const tmpQuat = new Quaternion();
                     hit.transformationMatrix.decompose(undefined, tmpQuat, mesh.position);
-
-                    // Restore scale (decompose may overwrite it)
                     mesh.scaling.copyFrom(currentScale);
 
-                    // Face the camera (will be continuously updated by the onBeforeRender above)
-                    const cameraPos = camera.position.clone();
-                    cameraPos.y = mesh.position.y;
-                    const diff = cameraPos.subtract(mesh.position);
+                    // Initial facing (onBeforeRender will keep it updated)
+                    const diff = camera.position.subtract(mesh.position);
                     const angle = Math.atan2(diff.x, diff.z);
                     mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle + Math.PI, 0);
                 });
 
                 modelPlaced = true;
 
-                // Ensure audio + animation are playing after placement
-                // Ensure audio is playing after placement
-                try {
-                    audioPlayer.play();
-                } catch (e) {
-                    console.warn("Audio play failed:", e);
-                }
+                try { audioPlayer.play(); } catch (e) { console.warn("Audio play failed:", e); }
                 if (runtime && !runtime.isAnimationPlaying) {
                     runtime.playAnimation();
+                }
+            } else {
+                // --- PLAY/PAUSE TOGGLE: subsequent taps ---
+                if (runtime) {
+                    if (runtime.isAnimationPlaying) {
+                        runtime.pauseAnimation();
+                        audioPlayer.pause();
+                    } else {
+                        runtime.playAnimation();
+                        try { audioPlayer.play(); } catch (e) { console.warn(e); }
+                    }
                 }
             }
         };

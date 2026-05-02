@@ -25,35 +25,7 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
         // Store the XR reference on scene so UI can check AR state
         (scene as any)._xrExperience = xr;
 
-        // Continuously rotate Miku to face the camera every frame while in AR
-        scene.onBeforeRenderObservable.add(() => {
-            if (xr.baseExperience.state === WebXRState.IN_XR && modelPlaced) {
-                const camera = xr.baseExperience.camera;
-                meshes.forEach(mesh => {
-                    if (!mesh.isVisible) return;
 
-                    // Use the camera's forward direction projected onto XZ plane.
-                    // This works correctly at all angles (including looking straight down).
-                    const forward = camera.getForwardRay().direction;
-                    const dx = forward.x;
-                    const dz = forward.z;
-                    const len = Math.sqrt(dx * dx + dz * dz);
-
-                    let angle: number;
-                    if (len > 0.001) {
-                        // Project camera forward direction onto XZ plane
-                        angle = Math.atan2(dx / len, dz / len);
-                    } else {
-                        // Camera pointing straight down — fall back to position-based
-                        const diff = camera.position.subtract(mesh.position);
-                        angle = Math.atan2(diff.x, diff.z);
-                    }
-
-                    // MMD faces +Z, we want Miku facing the camera (opposite of forward)
-                    mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle + Math.PI, 0);
-                });
-            }
-        });
 
         xr.baseExperience.onStateChangedObservable.add((state) => {
             if (state === WebXRState.IN_XR) {
@@ -101,15 +73,14 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                     hit.transformationMatrix.decompose(undefined, tmpQuat, mesh.position);
                     mesh.scaling.copyFrom(currentScale);
 
-                    // Initial facing (onBeforeRender will keep it updated)
+                    // Initial facing: calculate angle to look at camera
                     const diff = camera.position.subtract(mesh.position);
                     const angle = Math.atan2(diff.x, diff.z);
-                    mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle + Math.PI, 0);
+                    mesh.rotationQuaternion = Quaternion.FromEulerAngles(0, angle, 0);
                 });
 
                 modelPlaced = true;
 
-                try { audioPlayer.play(); } catch (e) { console.warn("Audio play failed:", e); }
                 if (runtime && !runtime.isAnimationPlaying) {
                     runtime.playAnimation();
                 }
@@ -118,10 +89,8 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], audioPlay
                 if (runtime) {
                     if (runtime.isAnimationPlaying) {
                         runtime.pauseAnimation();
-                        audioPlayer.pause();
                     } else {
                         runtime.playAnimation();
-                        try { audioPlayer.play(); } catch (e) { console.warn(e); }
                     }
                 }
             }

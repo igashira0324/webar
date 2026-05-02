@@ -9,22 +9,57 @@ export const setupWebXR = async (
   meshes: AbstractMesh[],
   _audioPlayer: StreamAudioPlayer
 ) => {
-  console.log("Setting up WebXR... (v2.4)");
+  console.log("Setting up WebXR... (v2.5)");
   const controlPanel = document.getElementById("control-panel");
   const showSettingsBtn = document.getElementById("showSettingsBtn");
   const runtime = (scene as any).mmdRootRuntime;
 
-  // ARコンテナ（親ノード）を1つ作り、ミクをその子にする
+  // ARコンテナ（親ノード）。中身の付け替えは AR 突入/退出 時に行う
   const arRoot = new TransformNode("arRoot", scene);
   const baseScale = 0.04;
   arRoot.scaling.setAll(baseScale);
+  arRoot.setEnabled(false); // 通常画面では非表示扱い
 
-  meshes.forEach((m) => {
-    m.parent = arRoot;
-    m.position.set(0, 0, 0);   // 子なのでローカル原点に
-    m.scaling.setAll(1);       // スケールは親で管理
-    if (!m.rotationQuaternion) m.rotationQuaternion = Quaternion.Identity();
-  });
+  // 元の親・スケール・位置を保存しておくマップ
+  const originalState = new Map<AbstractMesh, {
+    parent: any, scaling: Vector3, position: Vector3, rotationQuaternion: Quaternion | null
+  }>();
+
+  const attachToArRoot = () => {
+    meshes.forEach((m) => {
+      // 現在の状態をバックアップ
+      originalState.set(m, {
+        parent: m.parent,
+        scaling: m.scaling.clone(),
+        position: m.position.clone(),
+        rotationQuaternion: m.rotationQuaternion ? m.rotationQuaternion.clone() : null,
+      });
+      m.parent = arRoot;
+      m.position.set(0, 0, 0);
+      m.scaling.setAll(1);
+      if (!m.rotationQuaternion) m.rotationQuaternion = Quaternion.Identity();
+    });
+  };
+
+  const detachFromArRoot = () => {
+    meshes.forEach((m) => {
+      const s = originalState.get(m);
+      m.parent = s ? s.parent : null;
+      if (s) {
+        m.scaling.copyFrom(s.scaling);
+        m.position.copyFrom(s.position);
+        if (s.rotationQuaternion) m.rotationQuaternion = s.rotationQuaternion;
+      } else {
+        // フォールバック
+        m.scaling.setAll(1);
+        m.position.set(0, 0, 0);
+      }
+      m.setEnabled(true);
+      m.isVisible = true;
+    });
+    originalState.clear();
+    arRoot.setEnabled(false);
+  };
 
   let modelPlaced = false;
   let inXR = false;
@@ -58,14 +93,12 @@ export const setupWebXR = async (
       const currentX = e.touches[0].clientX;
       const deltaX = currentX - touchStartX;
       touchStartX = currentX;
-      // 親ノードを回転（MMDの内部状態を壊さない）
       arRoot.rotate(upVector, deltaX * -0.005);
     } else if (e.touches.length === 2 && initialPinchDist > 0) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.hypot(dx, dy);
       const ratio = dist / initialPinchDist;
-      // 安全側に値域を制限（NaN・極端値ガード）
       const next = Math.min(0.5, Math.max(0.005, initialScaleY * ratio));
       if (Number.isFinite(next)) arRoot.scaling.setAll(next);
     }
@@ -76,7 +109,6 @@ export const setupWebXR = async (
     if (e.touches.length < 2) initialPinchDist = 0;
   };
 
-  // 一度だけ登録
   document.addEventListener("touchstart", onTouchStart, { passive: true });
   document.addEventListener("touchmove", onTouchMove, { passive: true });
   document.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -105,12 +137,16 @@ export const setupWebXR = async (
         if (showSettingsBtn) showSettingsBtn.style.display = "none";
         try { runtime?.playAnimation(); } catch (e) { console.warn(e); }
         modelPlaced = false;
-        arRoot.setEnabled(false); // メッシュ単位ではなく親ごと非表示
+        
+        attachToArRoot();
+        arRoot.setEnabled(false);
       } else if (state === WebXRState.NOT_IN_XR) {
         inXR = false;
         if (controlPanel) controlPanel.style.display = "block";
         if (showSettingsBtn) showSettingsBtn.style.display = "block";
         modelPlaced = false;
+
+        detachFromArRoot();
       }
     });
 
@@ -121,21 +157,23 @@ export const setupWebXR = async (
       lastTapTime = now;
       if (!inXR) return;
 
-      // ミク自身をタップしたら移動しない（ジェスチャーに任せる）
       if (
-        pickInfo.hit &&
-        pickInfo.pickedMesh &&
+        pickInfo.hit && pickInfo.pickedMesh &&
         meshes.includes(pickInfo.pickedMesh as AbstractMesh)
       ) return;
 
-      if (!hitTest.lastHitTestResults?.length) return;
-
-      const hit = hitTest.lastHitTestResults[0];
+      arRoot.setEnabled(true);
       const camera = xr.baseExperience.camera;
 
-      // 親ノードだけ動かす（MMDの位置/回転には触らない）
-      arRoot.setEnabled(true);
-      hit.transformationMatrix.decompose(undefined, tmpQuat, arRoot.position);
+      if (hitTest.lastHitTestResults?.length) {
+        const hit = hitTest.lastHitTestResults[0];
+        hit.transformationMatrix.decompose(undefined, tmpQuat, arRoot.position);
+      } else {
+        // フォールバック：床が検出できなくてもカメラ前方1.5m・少し下に配置
+        const forward = camera.getForwardRay().direction;
+        arRoot.position.copyFrom(camera.position).addInPlace(forward.scale(1.5));
+        arRoot.position.y -= 0.8; 
+      }
 
       if (!modelPlaced) {
         const diff = camera.position.subtract(arRoot.position);
@@ -143,7 +181,6 @@ export const setupWebXR = async (
         arRoot.rotationQuaternion = Quaternion.FromEulerAngles(0, angle, 0);
         modelPlaced = true;
       }
-      // 2回目以降はユーザーの回転を保持（何もしない）
     };
 
     return xr;
@@ -152,4 +189,5 @@ export const setupWebXR = async (
     return null;
   }
 };
+
 

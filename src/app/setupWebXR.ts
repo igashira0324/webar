@@ -18,6 +18,7 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], _audioPla
         let isDragging = false;
         let initialPinchDist = 0;
         let initialScale = Vector3.One();
+        const upVector = Vector3.Up();
 
         document.addEventListener("touchstart", (e) => {
             if ((scene as any)._xrExperience?.baseExperience.state !== WebXRState.IN_XR) return;
@@ -41,7 +42,7 @@ export const setupWebXR = async (scene: Scene, meshes: AbstractMesh[], _audioPla
                 const currentX = e.touches[0].clientX;
                 const deltaX = currentX - touchStartX;
                 touchStartX = currentX;
-                mesh.rotate(Vector3.Up(), deltaX * -0.01);
+                mesh.rotate(upVector, deltaX * -0.01);
             } else if (e.touches.length === 2) {
                 // 2 Finger Pinch -> Scale
                 const dx = e.touches[0].clientX - e.touches[1].clientX;

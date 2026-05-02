@@ -11,7 +11,7 @@ import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 // due to Vite code-splitting breaking the AudioV2 module chain.
 
 async function init() {
-    console.log("App Initialization - Version 2.2");
+    console.log("App Initialization - Version 2.3");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -47,7 +47,7 @@ async function init() {
                     const percentage = Math.floor((event.loaded / event.total) * 100);
                     if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
                 } else {
-                    if (loadingStatus) loadingStatus.textContent = "読み込み中...";
+                    if (loadingStatus) loadingStatus.textContent = "読み込み中... (v2.3)";
                 }
             }
         );

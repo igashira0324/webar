@@ -1,6 +1,6 @@
 import {
   Scene, AbstractMesh, WebXRState, WebXRFeatureName,
-  Quaternion, Vector3, TransformNode
+  Quaternion, Vector3, TransformNode, PointerEventTypes
 } from "@babylonjs/core";
 import { StreamAudioPlayer } from "babylon-mmd";
 
@@ -9,25 +9,22 @@ export const setupWebXR = async (
   meshes: AbstractMesh[],
   _audioPlayer: StreamAudioPlayer
 ) => {
-  console.log("Setting up WebXR... (v2.5)");
+  console.log("Setting up WebXR... (v2.6)");
   const controlPanel = document.getElementById("control-panel");
   const showSettingsBtn = document.getElementById("showSettingsBtn");
   const runtime = (scene as any).mmdRootRuntime;
 
-  // ARコンテナ（親ノード）。中身の付け替えは AR 突入/退出 時に行う
   const arRoot = new TransformNode("arRoot", scene);
   const baseScale = 0.04;
   arRoot.scaling.setAll(baseScale);
-  arRoot.setEnabled(false); // 通常画面では非表示扱い
+  arRoot.setEnabled(false);
 
-  // 元の親・スケール・位置を保存しておくマップ
   const originalState = new Map<AbstractMesh, {
     parent: any, scaling: Vector3, position: Vector3, rotationQuaternion: Quaternion | null
   }>();
 
   const attachToArRoot = () => {
     meshes.forEach((m) => {
-      // 現在の状態をバックアップ
       originalState.set(m, {
         parent: m.parent,
         scaling: m.scaling.clone(),
@@ -49,10 +46,6 @@ export const setupWebXR = async (
         m.scaling.copyFrom(s.scaling);
         m.position.copyFrom(s.position);
         if (s.rotationQuaternion) m.rotationQuaternion = s.rotationQuaternion;
-      } else {
-        // フォールバック
-        m.scaling.setAll(1);
-        m.position.set(0, 0, 0);
       }
       m.setEnabled(true);
       m.isVisible = true;
@@ -63,56 +56,7 @@ export const setupWebXR = async (
 
   let modelPlaced = false;
   let inXR = false;
-
-  // ジェスチャー用の状態（リスナーは1度だけ登録）
-  let isDragging = false;
-  let touchStartX = 0;
-  let initialPinchDist = 0;
-  let initialScaleY = baseScale;
-  const upVector = Vector3.Up();
   const tmpQuat = new Quaternion();
-
-  const onTouchStart = (e: TouchEvent) => {
-    if (!inXR || !modelPlaced) return;
-    if (e.touches.length === 1) {
-      isDragging = true;
-      touchStartX = e.touches[0].clientX;
-    } else if (e.touches.length === 2) {
-      isDragging = false;
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      initialPinchDist = Math.hypot(dx, dy);
-      initialScaleY = arRoot.scaling.y;
-    }
-  };
-
-  const onTouchMove = (e: TouchEvent) => {
-    if (!inXR || !modelPlaced) return;
-
-    if (e.touches.length === 1 && isDragging) {
-      const currentX = e.touches[0].clientX;
-      const deltaX = currentX - touchStartX;
-      touchStartX = currentX;
-      arRoot.rotate(upVector, deltaX * -0.005);
-    } else if (e.touches.length === 2 && initialPinchDist > 0) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      const ratio = dist / initialPinchDist;
-      const next = Math.min(0.5, Math.max(0.005, initialScaleY * ratio));
-      if (Number.isFinite(next)) arRoot.scaling.setAll(next);
-    }
-  };
-
-  const onTouchEnd = (e: TouchEvent) => {
-    if (e.touches.length < 1) isDragging = false;
-    if (e.touches.length < 2) initialPinchDist = 0;
-  };
-
-  document.addEventListener("touchstart", onTouchStart, { passive: true });
-  document.addEventListener("touchmove", onTouchMove, { passive: true });
-  document.addEventListener("touchend", onTouchEnd, { passive: true });
-  document.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
   try {
     const xr = await scene.createDefaultXRExperienceAsync({
@@ -130,38 +74,18 @@ export const setupWebXR = async (
 
     (scene as any)._xrExperience = xr;
 
-    xr.baseExperience.onStateChangedObservable.add((state) => {
-      if (state === WebXRState.IN_XR) {
-        inXR = true;
-        if (controlPanel) controlPanel.style.display = "none";
-        if (showSettingsBtn) showSettingsBtn.style.display = "none";
-        try { runtime?.playAnimation(); } catch (e) { console.warn(e); }
-        modelPlaced = false;
-        
-        attachToArRoot();
-        arRoot.setEnabled(false);
-      } else if (state === WebXRState.NOT_IN_XR) {
-        inXR = false;
-        if (controlPanel) controlPanel.style.display = "block";
-        if (showSettingsBtn) showSettingsBtn.style.display = "block";
-        modelPlaced = false;
+    // ===== ジェスチャー操作（Babylon Pointer Observable版）=====
+    const activePointers = new Map<number, { x: number, y: number }>();
+    let gestureMode: "none" | "rotate" | "pinch" = "none";
+    let lastSingleX = 0;
+    let initialPinchDist = 0;
+    let initialScale = baseScale;
+    const TAP_MOVE_THRESHOLD = 10;
+    let pointerDownTime = 0;
+    let movedDistance = 0;
 
-        detachFromArRoot();
-      }
-    });
-
-    let lastTapTime = 0;
-    scene.onPointerDown = (_evt, pickInfo) => {
-      const now = Date.now();
-      if (now - lastTapTime < 300) return;
-      lastTapTime = now;
+    const handleTapPlace = (_evt: PointerEvent) => {
       if (!inXR) return;
-
-      if (
-        pickInfo.hit && pickInfo.pickedMesh &&
-        meshes.includes(pickInfo.pickedMesh as AbstractMesh)
-      ) return;
-
       arRoot.setEnabled(true);
       const camera = xr.baseExperience.camera;
 
@@ -169,18 +93,112 @@ export const setupWebXR = async (
         const hit = hitTest.lastHitTestResults[0];
         hit.transformationMatrix.decompose(undefined, tmpQuat, arRoot.position);
       } else {
-        // フォールバック：床が検出できなくてもカメラ前方1.5m・少し下に配置
         const forward = camera.getForwardRay().direction;
         arRoot.position.copyFrom(camera.position).addInPlace(forward.scale(1.5));
-        arRoot.position.y -= 0.8; 
+        arRoot.position.y -= 0.8;
       }
 
       if (!modelPlaced) {
         const diff = camera.position.subtract(arRoot.position);
         const angle = Math.atan2(diff.x, diff.z);
-        arRoot.rotationQuaternion = Quaternion.FromEulerAngles(0, angle, 0);
+        // 180度回転を加えて正面をカメラに向ける
+        arRoot.rotationQuaternion = Quaternion.FromEulerAngles(0, angle + Math.PI, 0);
         modelPlaced = true;
       }
+    };
+
+    scene.onPointerObservable.add((pointerInfo) => {
+      if (!inXR || !modelPlaced) return;
+
+      const evt = pointerInfo.event as PointerEvent;
+      const pid = evt.pointerId;
+
+      switch (pointerInfo.type) {
+        case PointerEventTypes.POINTERDOWN: {
+          activePointers.set(pid, { x: evt.clientX, y: evt.clientY });
+          if (activePointers.size === 1) {
+            gestureMode = "rotate";
+            lastSingleX = evt.clientX;
+            pointerDownTime = Date.now();
+            movedDistance = 0;
+          } else if (activePointers.size === 2) {
+            gestureMode = "pinch";
+            const pts = Array.from(activePointers.values());
+            const dx = pts[0].x - pts[1].x;
+            const dy = pts[0].y - pts[1].y;
+            initialPinchDist = Math.hypot(dx, dy);
+            initialScale = arRoot.scaling.y;
+          }
+          break;
+        }
+        case PointerEventTypes.POINTERMOVE: {
+          if (!activePointers.has(pid)) break;
+          activePointers.set(pid, { x: evt.clientX, y: evt.clientY });
+          if (gestureMode === "rotate" && activePointers.size === 1) {
+            const dx = evt.clientX - lastSingleX;
+            lastSingleX = evt.clientX;
+            movedDistance += Math.abs(dx);
+            if (movedDistance > TAP_MOVE_THRESHOLD) {
+              arRoot.rotate(Vector3.Up(), dx * -0.005);
+            }
+          } else if (gestureMode === "pinch" && activePointers.size >= 2) {
+            const pts = Array.from(activePointers.values());
+            const dx = pts[0].x - pts[1].x;
+            const dy = pts[0].y - pts[1].y;
+            const dist = Math.hypot(dx, dy);
+            if (initialPinchDist > 10) {
+              const ratio = dist / initialPinchDist;
+              const next = Math.min(0.5, Math.max(0.005, initialScale * ratio));
+              if (Number.isFinite(next)) arRoot.scaling.setAll(next);
+            }
+          }
+          break;
+        }
+        case PointerEventTypes.POINTERUP: {
+          activePointers.delete(pid);
+          const elapsed = Date.now() - pointerDownTime;
+          const wasTap = gestureMode === "rotate" && activePointers.size === 0 && elapsed < 500 && movedDistance < TAP_MOVE_THRESHOLD;
+          if (wasTap) {
+            handleTapPlace(evt);
+          }
+          if (activePointers.size === 0) gestureMode = "none";
+          else if (activePointers.size === 1) {
+            gestureMode = "rotate";
+            const remaining = Array.from(activePointers.values())[0];
+            lastSingleX = remaining.x;
+            movedDistance = 999;
+          }
+          break;
+        }
+      }
+    });
+
+    xr.baseExperience.onStateChangedObservable.add((state) => {
+      if (state === WebXRState.IN_XR) {
+        inXR = true;
+        if (controlPanel) controlPanel.style.display = "none";
+        if (showSettingsBtn) showSettingsBtn.style.display = "none";
+        try { runtime?.playAnimation(); } catch (e) { console.warn(e); }
+        modelPlaced = false;
+        attachToArRoot();
+        arRoot.setEnabled(false);
+      } else if (state === WebXRState.NOT_IN_XR) {
+        inXR = false;
+        if (controlPanel) controlPanel.style.display = "block";
+        if (showSettingsBtn) showSettingsBtn.style.display = "block";
+        modelPlaced = false;
+        detachFromArRoot();
+      }
+    });
+
+    let lastTapTime = 0;
+    scene.onPointerDown = (_evt, pickInfo) => {
+      if (!inXR || modelPlaced) return;
+      const now = Date.now();
+      if (now - lastTapTime < 300) return;
+      lastTapTime = now;
+      if (pickInfo.hit && pickInfo.pickedMesh && meshes.includes(pickInfo.pickedMesh as AbstractMesh)) return;
+      handleTapPlace(_evt as any);
     };
 
     return xr;
@@ -189,5 +207,6 @@ export const setupWebXR = async (
     return null;
   }
 };
+
 
 

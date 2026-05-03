@@ -15,7 +15,7 @@ export const createScene = async (canvas: HTMLCanvasElement) => {
         -Math.PI / 2, 
         Math.PI / 2.4, // Slightly from above
         4.5,           // Distance
-        new Vector3(0, 0.3, 0), // Lower target moves model UP in viewport
+        new Vector3(0, -0.3, 0), // Lowering target further moves model even higher
         scene
     );
     camera.attachControl(canvas, true);

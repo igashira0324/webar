@@ -6,7 +6,8 @@ export const setupUI = (
     mmdRuntime: MmdRuntime, 
     audioPlayer: StreamAudioPlayer,
     getCurrentModel: () => MmdModel | null,
-    onLoadFiles: (pmx: File, vmd: File, textures: FileList) => void
+    onLoadFiles: (pmx: File, vmd: File, textures: FileList) => void,
+    onPresetSelect: (presetId: string) => void
 ) => {
     // null許容で取得
     const playPauseBtn = document.getElementById("playPauseBtn") as HTMLButtonElement | null;
@@ -117,6 +118,13 @@ export const setupUI = (
     fileSelectToggle?.addEventListener("click", () => fileModal?.classList.remove("hidden"));
     closeModalBtn?.addEventListener("click", () => fileModal?.classList.add("hidden"));
     
+    const presetModelSelect = document.getElementById("presetModelSelect") as HTMLSelectElement | null;
+    presetModelSelect?.addEventListener("change", () => {
+        const val = presetModelSelect.value;
+        onPresetSelect(val);
+        fileModal?.classList.add("hidden");
+    });
+
     loadFilesBtn?.addEventListener("click", () => {
         const pmx = pmxInput?.files?.[0];
         const vmd = vmdInput?.files?.[0];

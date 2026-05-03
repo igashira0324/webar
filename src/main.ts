@@ -174,6 +174,50 @@ async function init() {
             if (expressionCleanup) (expressionCleanup as any)();
             expressionCleanup = setupExpressions(scene, currentModel);
         }
+    }, async (presetId) => {
+        const presets: Record<string, string> = {
+            "original": "assets/model/miku.pmx",
+            "takosanp": "assets/model/takosanp/Takosan P's DIVA FT Style Models 第一弾/配布用 DIVAFT マジカルミライ 2015/たこさんP式DIVAFT風 初音ミク マジカルミライ 2015.pmx",
+            "sour_snow": "assets/model/sour_snow/Sour式改変雪ミクVer.1.02/★改変雪ミク.pmx",
+            "onasu": "assets/model/onasu/おナス式初音ミクver0.4(桜ミク風)/おナス式初音ミクver0.4(桜ミク).pmx",
+            "riverside": "assets/model/riverside/リバーサイド式ミク_Ver2.02.pmx"
+        };
+        const pmxPath = presets[presetId];
+        if (!pmxPath) return;
+
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "1";
+            loadingScreen.classList.remove("hidden");
+        }
+
+        if (currentModel) {
+            mmdRuntime.destroyMmdModel(currentModel);
+            currentModel.mesh.dispose();
+        }
+
+        currentModel = await loadMmdModel(
+            scene, mmdRuntime, 
+            pmxPath, "assets/motion/dance.vmd",
+            shadowGenerator, undefined,
+            (event) => {
+                if (event.lengthComputable && event.total > 0) {
+                    const percentage = Math.floor((event.loaded / event.total) * 100);
+                    if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
+                }
+            }
+        );
+
+        if (currentModel) {
+            currentModel.mesh.scaling.setAll(0.07);
+            currentModel.mesh.position.set(0, 0, 0); 
+            if (expressionCleanup) (expressionCleanup as any)();
+            expressionCleanup = setupExpressions(scene, currentModel);
+        }
+
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "0";
+            setTimeout(() => loadingScreen.classList.add("hidden"), 500);
+        }
     });
 
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);

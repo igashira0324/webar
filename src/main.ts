@@ -110,7 +110,7 @@ async function init() {
     // 6. WebXR AR (Now handled via native UI initialized above)
 
 
-    // 7. Initialize Audio Player Sync and Source (Non-blocking)
+    // 7. Initialize Audio Player Sync and Source
     const setupAudio = async () => {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
@@ -120,42 +120,40 @@ async function init() {
             console.warn("Audio failed to load", e);
         }
     };
-    setupAudio();
+    await setupAudio();
 
-    // ===== 音声アンロック（ブラウザの自動再生ポリシー対策）=====
-    const unlockAudio = () => {
+    // ===== ユーザー初回操作で BGM＋アニメ 自動スタート =====
+    let bgmStarted = false;
+    const startPlayback = () => {
+        if (bgmStarted) return;
+        bgmStarted = true;
+
         try {
-            // HTMLAudio を取り出して短く再生→停止することで unlock
-            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
-            if (internalAudio) {
-                internalAudio.muted = true;
-                const playPromise = internalAudio.play();
-                if (playPromise && typeof playPromise.then === "function") {
-                    playPromise.then(() => {
-                        internalAudio.pause();
-                        internalAudio.currentTime = 0;
-                        internalAudio.muted = false;
-                        console.log("Audio unlocked via interaction");
-                    }).catch((err) => {
-                        console.warn("Audio unlock failed:", err);
-                    });
-                }
-            }
-            // Babylon側のAudioContextも resume
+            // AudioContext を resume
             const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-            if (ctx && ctx.state === "suspended") {
-                ctx.resume();
+            if (ctx && ctx.state === "suspended") ctx.resume();
+
+            // ★ 実際の再生を開始
+            const result = audioPlayer.play();
+            mmdRuntime.playAnimation();
+            console.log("Playback started (audio + animation)");
+            
+            // Promiseを返す場合のデバッグ
+            if (result && typeof (result as any).then === "function") {
+                (result as any).then(() => console.log("✅ Audio playing"))
+                               .catch((err: any) => console.error("❌ Audio play error:", err));
             }
         } catch (e) {
-            console.warn("Audio unlock error:", e);
+            console.warn("Playback start failed:", e);
+            bgmStarted = false; // 失敗したら次のクリックで再試行
         }
-        // 一度実行したら解除
-        document.removeEventListener("click", unlockAudio);
-        document.removeEventListener("touchstart", unlockAudio);
+
+        document.removeEventListener("click", startPlayback);
+        document.removeEventListener("touchstart", startPlayback);
     };
 
-    document.addEventListener("click", unlockAudio);
-    document.addEventListener("touchstart", unlockAudio);
+    document.addEventListener("click", startPlayback);
+    document.addEventListener("touchstart", startPlayback);
 }
 
 // ===== UIモーダル制御（init とは独立して登録）=====

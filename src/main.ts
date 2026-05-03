@@ -121,6 +121,41 @@ async function init() {
         }
     };
     setupAudio();
+
+    // ===== 音声アンロック（ブラウザの自動再生ポリシー対策）=====
+    const unlockAudio = () => {
+        try {
+            // HTMLAudio を取り出して短く再生→停止することで unlock
+            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
+            if (internalAudio) {
+                internalAudio.muted = true;
+                const playPromise = internalAudio.play();
+                if (playPromise && typeof playPromise.then === "function") {
+                    playPromise.then(() => {
+                        internalAudio.pause();
+                        internalAudio.currentTime = 0;
+                        internalAudio.muted = false;
+                        console.log("Audio unlocked via interaction");
+                    }).catch((err) => {
+                        console.warn("Audio unlock failed:", err);
+                    });
+                }
+            }
+            // Babylon側のAudioContextも resume
+            const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
+            if (ctx && ctx.state === "suspended") {
+                ctx.resume();
+            }
+        } catch (e) {
+            console.warn("Audio unlock error:", e);
+        }
+        // 一度実行したら解除
+        document.removeEventListener("click", unlockAudio);
+        document.removeEventListener("touchstart", unlockAudio);
+    };
+
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("touchstart", unlockAudio);
 }
 
 // ===== UIモーダル制御（init とは独立して登録）=====
@@ -137,6 +172,14 @@ function setupModals() {
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
+    // ★ AR起動と同時に音声アンロックを試みる
+    try {
+        const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
+        if (ctx && ctx.state === "suspended") {
+            ctx.resume();
+        }
+    } catch (e) {}
+
     const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement | null;
     if (xrBtn) {
       xrBtn.click();

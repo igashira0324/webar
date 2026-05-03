@@ -8,161 +8,148 @@ export const setupUI = (
     getCurrentModel: () => MmdModel | null,
     onLoadFiles: (pmx: File, vmd: File, textures: FileList) => void
 ) => {
-    const playPauseBtn = document.getElementById("playPauseBtn") as HTMLButtonElement;
-    const scaleSlider = document.getElementById("scaleSlider") as HTMLInputElement;
-    const scaleVal = document.getElementById("scaleVal") as HTMLSpanElement;
-    const yPosSlider = document.getElementById("yPosSlider") as HTMLInputElement;
-    const yPosVal = document.getElementById("yPosVal") as HTMLSpanElement;
-    const fpsDiv = document.getElementById("fps") as HTMLDivElement;
+    // null許容で取得
+    const playPauseBtn = document.getElementById("playPauseBtn") as HTMLButtonElement | null;
+    const scaleSlider = document.getElementById("scaleSlider") as HTMLInputElement | null;
+    const scaleVal = document.getElementById("scaleVal") as HTMLSpanElement | null;
+    const yPosSlider = document.getElementById("yPosSlider") as HTMLInputElement | null;
+    const yPosVal = document.getElementById("yPosVal") as HTMLSpanElement | null;
+    const fpsDiv = document.getElementById("fps") as HTMLDivElement | null;
     
-    const fileSelectToggle = document.getElementById("fileSelectToggle") as HTMLButtonElement;
-    const fileModal = document.getElementById("file-modal") as HTMLDivElement;
-    const closeModalBtn = document.getElementById("closeModalBtn") as HTMLButtonElement;
-    const loadFilesBtn = document.getElementById("loadFilesBtn") as HTMLButtonElement;
+    const fileSelectToggle = document.getElementById("fileSelectToggle") as HTMLButtonElement | null;
+    const fileModal = document.getElementById("file-modal") as HTMLDivElement | null;
+    const closeModalBtn = document.getElementById("closeModalBtn") as HTMLButtonElement | null;
+    const loadFilesBtn = document.getElementById("loadFilesBtn") as HTMLButtonElement | null;
     
-    const pmxInput = document.getElementById("pmxInput") as HTMLInputElement;
-    const vmdInput = document.getElementById("vmdInput") as HTMLInputElement;
-    const textureDirInput = document.getElementById("textureDirInput") as HTMLInputElement;
+    const pmxInput = document.getElementById("pmxInput") as HTMLInputElement | null;
+    const vmdInput = document.getElementById("vmdInput") as HTMLInputElement | null;
+    const textureDirInput = document.getElementById("textureDirInput") as HTMLInputElement | null;
 
-    const seekSlider = document.getElementById("seekSlider") as HTMLInputElement;
-    const seekVal = document.getElementById("seekVal") as HTMLSpanElement;
-    const durationVal = document.getElementById("durationVal") as HTMLSpanElement;
+    const seekSlider = document.getElementById("seekSlider") as HTMLInputElement | null;
+    const seekVal = document.getElementById("seekVal") as HTMLSpanElement | null;
+    const durationVal = document.getElementById("durationVal") as HTMLSpanElement | null;
 
-    const controlPanel = document.getElementById("control-panel") as HTMLDivElement;
-    const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement;
-    const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement;
-    const showMarkerBtn = document.getElementById("showMarkerBtn") as HTMLButtonElement;
-    const markerModal = document.getElementById("marker-modal") as HTMLDivElement;
-    const closeMarkerBtn = document.getElementById("closeMarkerBtn") as HTMLButtonElement;
+    const controlPanel = document.getElementById("control-panel") as HTMLDivElement | null;
+    const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement | null;
+    const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement | null;
+    const showMarkerBtn = document.getElementById("showMarkerBtn") as HTMLButtonElement | null;
+    // ★ marker-modal は qr-modal にリネームされた
+    const markerModal = document.getElementById("qr-modal") as HTMLDivElement | null;
+    const closeMarkerBtn = document.getElementById("closeQrBtn") as HTMLButtonElement | null;
 
     const S_BASE = 1.0;
     const Y_BASE = -5.0;
 
-    // Play/Pause (with audio sync)
-    playPauseBtn.addEventListener("click", () => {
-        // Prevent toggling during AR session (taps are for placement, not pause)
+    // ===== Play/Pause =====
+    playPauseBtn?.addEventListener("click", () => {
         const xr = (scene as any)._xrExperience;
-        if (xr && xr.baseExperience && xr.baseExperience.state === 2 /* WebXRState.IN_XR */) {
+        if (xr && xr.baseExperience && xr.baseExperience.state === 2) {
             return;
         }
-
         if (mmdRuntime.isAnimationPlaying) {
             mmdRuntime.pauseAnimation();
             audioPlayer.pause();
         } else {
-            // StreamAudioPlayer uses HTML Audio - no AudioContext needed
             audioPlayer.play();
             mmdRuntime.playAnimation();
         }
     });
 
-    // Scale
-    scaleSlider.addEventListener("input", () => {
+    // ===== Scale =====
+    scaleSlider?.addEventListener("input", () => {
         const val = parseFloat(scaleSlider.value);
-        scaleVal.textContent = val.toFixed(1);
+        if (scaleVal) scaleVal.textContent = val.toFixed(2);
         const model = getCurrentModel();
-        if (model) {
-            // Normalize: val 1.0 -> scale 0.7
-            model.mesh.scaling.setAll(val * S_BASE);
-        }
+        if (model) model.mesh.scaling.setAll(val * S_BASE);
     });
 
-    // Y Position
-    yPosSlider.addEventListener("input", () => {
+    // ===== Y Position =====
+    yPosSlider?.addEventListener("input", () => {
         const val = parseFloat(yPosSlider.value);
-        yPosVal.textContent = val.toFixed(1);
+        if (yPosVal) yPosVal.textContent = val.toFixed(1);
         const model = getCurrentModel();
-        if (model) {
-            // Normalize: val 0.0 -> Y -5.0
-            model.mesh.position.y = val + Y_BASE;
-        }
+        if (model) model.mesh.position.y = val + Y_BASE;
     });
 
-    // Seek
+    // ===== Seek =====
     let isSeeking = false;
-    seekSlider.addEventListener("input", () => {
-        isSeeking = true;
-        const frame = parseFloat(seekSlider.value);
-        seekVal.textContent = Math.floor(frame).toString();
-    });
+    if (seekSlider) {
+        seekSlider.addEventListener("input", () => {
+            isSeeking = true;
+            const frame = parseFloat(seekSlider.value);
+            if (seekVal) seekVal.textContent = Math.floor(frame).toString();
+        });
+        seekSlider.addEventListener("change", () => {
+            const frame = parseFloat(seekSlider.value);
+            mmdRuntime.seekAnimation(frame, true);
+            isSeeking = false;
+        });
+    }
 
-    seekSlider.addEventListener("change", () => {
-        const frame = parseFloat(seekSlider.value);
-        mmdRuntime.seekAnimation(frame, true);
-        isSeeking = false;
-    });
-
-    // Update duration and seek bar
+    // ===== Duration =====
     const updateDuration = () => {
         let duration = mmdRuntime.animationFrameTimeDuration;
-        
-        // If runtime duration is 0, try to get it from audio player as fallback
         if (duration <= 0 && mmdRuntime.audioPlayer) {
-            duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30; // seconds to 30fps frames
+            duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30;
         }
-
         if (duration > 0) {
-            durationVal.textContent = Math.floor(duration).toString();
-            seekSlider.max = duration.toString();
+            if (durationVal) durationVal.textContent = Math.floor(duration).toString();
+            if (seekSlider) seekSlider.max = duration.toString();
         }
     };
 
     mmdRuntime.onAnimationDurationChangedObservable.add(updateDuration);
-
     audioPlayer.onDurationChangedObservable.add(updateDuration);
 
     scene.onBeforeRenderObservable.add(() => {
-        if (!isSeeking) {
+        if (!isSeeking && seekSlider) {
             const currentFrame = mmdRuntime.currentFrameTime;
             const duration = mmdRuntime.animationFrameTimeDuration;
-            
-            // Fallback for duration update
             if (duration > 0 && parseFloat(seekSlider.max) === 0) {
                 updateDuration();
             }
-
             seekSlider.value = currentFrame.toString();
-            seekVal.textContent = Math.floor(currentFrame).toString();
+            if (seekVal) seekVal.textContent = Math.floor(currentFrame).toString();
         }
     });
 
-    // File Modal
-    fileSelectToggle.addEventListener("click", () => fileModal.classList.remove("hidden"));
-    closeModalBtn.addEventListener("click", () => fileModal.classList.add("hidden"));
+    // ===== File Modal =====
+    fileSelectToggle?.addEventListener("click", () => fileModal?.classList.remove("hidden"));
+    closeModalBtn?.addEventListener("click", () => fileModal?.classList.add("hidden"));
     
-    loadFilesBtn.addEventListener("click", () => {
-        const pmx = pmxInput.files?.[0];
-        const vmd = vmdInput.files?.[0];
-        const textures = textureDirInput.files;
-        
+    loadFilesBtn?.addEventListener("click", () => {
+        const pmx = pmxInput?.files?.[0];
+        const vmd = vmdInput?.files?.[0];
+        const textures = textureDirInput?.files;
         if (pmx && vmd && textures) {
             onLoadFiles(pmx, vmd, textures);
-            fileModal.classList.add("hidden");
+            fileModal?.classList.add("hidden");
         } else {
             alert("PMX, VMD, and Texture folder are required.");
         }
     });
 
-    // UI Toggle
-    minimizeBtn.addEventListener("click", () => {
-        controlPanel.classList.add("collapsed");
-        showSettingsBtn.classList.remove("hidden");
+    // ===== Old UI toggles (互換性のため残す。要素が無ければスキップ) =====
+    minimizeBtn?.addEventListener("click", () => {
+        controlPanel?.classList.add("collapsed");
+        showSettingsBtn?.classList.remove("hidden");
+    });
+    showSettingsBtn?.addEventListener("click", () => {
+        controlPanel?.classList.remove("collapsed");
+        showSettingsBtn?.classList.add("hidden");
     });
 
-    showSettingsBtn.addEventListener("click", () => {
-        controlPanel.classList.remove("collapsed");
-        showSettingsBtn.classList.add("hidden");
-    });
+    // ===== Marker (QR) Modal - 旧APIだがmain.ts側で再実装済みなのでスキップ可 =====
+    showMarkerBtn?.addEventListener("click", () => markerModal?.classList.remove("hidden"));
+    closeMarkerBtn?.addEventListener("click", () => markerModal?.classList.add("hidden"));
 
-    // Marker Modal
-    showMarkerBtn.addEventListener("click", () => markerModal.classList.remove("hidden"));
-    closeMarkerBtn.addEventListener("click", () => markerModal.classList.add("hidden"));
-
-    // Initial Duration Update
+    // ===== Initial Duration Update =====
     setTimeout(updateDuration, 1000);
 
-    // FPS
-    scene.getEngine().onBeginFrameObservable.add(() => {
-        fpsDiv.textContent = `FPS: ${scene.getEngine().getFps().toFixed(0)}`;
-    });
+    // ===== FPS =====
+    if (fpsDiv) {
+        scene.getEngine().onBeginFrameObservable.add(() => {
+            fpsDiv.textContent = `FPS: ${scene.getEngine().getFps().toFixed(0)}`;
+        });
+    }
 };

@@ -791,6 +791,40 @@
           </div>
         </div>
 
+        <!-- AR非対応モーダル -->
+        <div id="ar-unavailable-modal" class="modal hidden">
+          <div class="modal-content" style="text-align:center;">
+            <button class="close-x" id="closeArUnavailableBtn">×</button>
+            <div style="font-size:2.5rem; margin-bottom:8px;">📱</div>
+            <h3 style="color:var(--secondary);">AR 非対応の環境です</h3>
+            <p style="font-size:0.9rem; line-height:1.7; margin-top:12px;">
+              この端末・ブラウザでは <strong style="color:var(--primary);">WebXR AR</strong> をご利用いただけません。
+            </p>
+            <div style="
+              margin-top:16px;
+              padding:14px;
+              background: rgba(0, 229, 255, 0.08);
+              border: 1px solid var(--glass-border);
+              border-radius: 12px;
+              font-size: 0.85rem;
+              line-height: 1.7;
+              text-align:left;
+            ">
+              ✅ <strong style="color:var(--primary);">推奨環境</strong><br>
+              ・Android スマートフォン<br>
+              ・Google Chrome（最新版）<br>
+              ・ARCore 対応端末<br>
+              <br>
+              ⚠ <strong style="color:var(--secondary);">非対応環境</strong><br>
+              ・iPhone / iPad（Safari は WebXR 未対応）<br>
+              ・PC ブラウザ（カメラ AR 機能なし）
+            </div>
+            <p style="font-size:0.78rem; color:var(--text-dim); margin-top:14px;">
+              画面右上の <strong>📷 アイコン</strong>から QR コードを表示し、Android 端末でスキャンしてご体験ください。
+            </p>
+          </div>
+        </div>
+
         <!-- ファイル / マーカーモーダル（既存・隠し） -->
         <div id="file-modal" class="modal hidden">
           <div class="modal-content">

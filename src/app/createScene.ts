@@ -13,9 +13,9 @@ export const createScene = async (canvas: HTMLCanvasElement) => {
     const camera = new ArcRotateCamera(
         "camera", 
         -Math.PI / 2, 
-        Math.PI / 2.6, // Slightly from below
-        4.0,           // Closer distance
-        new Vector3(0, 1.5, 0), // Higher target
+        Math.PI / 2.4, // Slightly from above
+        4.5,           // Distance
+        new Vector3(0, 0.3, 0), // Lower target moves model UP in viewport
         scene
     );
     camera.attachControl(canvas, true);

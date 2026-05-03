@@ -141,7 +141,7 @@ function setupModals() {
     if (xrBtn) {
       xrBtn.click();
     } else {
-      alert("AR の準備ができていません。少し待ってからお試しください。");
+      open("ar-unavailable-modal");
     }
   });
 
@@ -159,6 +159,10 @@ function setupModals() {
   document.getElementById("qrFab")?.addEventListener("click", () => open("qr-modal"));
   document.getElementById("closeQrBtn")?.addEventListener("click", () => close("qr-modal"));
   bindBackdrop("qr-modal");
+
+  // AR非対応モーダル
+  document.getElementById("closeArUnavailableBtn")?.addEventListener("click", () => close("ar-unavailable-modal"));
+  bindBackdrop("ar-unavailable-modal");
 
   console.log("Modals initialized");
 }

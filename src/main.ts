@@ -52,7 +52,7 @@ async function init() {
             }
         );
         if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.2); // Default scale 0.2
+            currentModel.mesh.scaling.setAll(0.07); // Default scale 0.07 (approx 1/3 of original 0.2)
             currentModel.mesh.position.set(0, 0, 0); 
             
             // Start animation only after user interaction (handled by UI)
@@ -99,7 +99,7 @@ async function init() {
                 shadowGenerator
             );
             if (currentModel) {
-                currentModel.mesh.scaling.setAll(0.2); 
+                currentModel.mesh.scaling.setAll(0.07); 
             }
         }
     );
@@ -121,64 +121,53 @@ async function init() {
         }
     };
     setupAudio();
+}
 
-    // ===== カスタム ENTER AR ボタンと情報モーダルの連携 =====
-    const arLaunchBtn = document.getElementById("arLaunchBtn");
-    const infoFab = document.getElementById("infoFab");
-    const infoModal = document.getElementById("info-modal");
-    const closeInfoBtn = document.getElementById("closeInfoBtn");
+// ===== UIモーダル制御（init とは独立して登録）=====
+function setupModals() {
+  // 共通：モーダルの開閉ヘルパ
+  const open = (id: string) => document.getElementById(id)?.classList.remove("hidden");
+  const close = (id: string) => document.getElementById(id)?.classList.add("hidden");
+  const bindBackdrop = (id: string) => {
+    const m = document.getElementById(id);
+    m?.addEventListener("click", (e) => {
+      if (e.target === m) m.classList.add("hidden");
+    });
+  };
 
-    // ENTER AR ボタンで Babylon標準のAR起動ボタンをクリック
-    arLaunchBtn?.addEventListener("click", () => {
-        // Babylon が自動生成するXR入場ボタンを探してクリック
-        const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement;
-        if (xrBtn) {
-            xrBtn.click();
-        } else {
-            alert("AR の準備ができていません。少し待ってからお試しください。");
-        }
-    });
+  // ENTER AR ボタン
+  document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
+    const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement | null;
+    if (xrBtn) {
+      xrBtn.click();
+    } else {
+      alert("AR の準備ができていません。少し待ってからお試しください。");
+    }
+  });
 
-    // 情報モーダル
-    infoFab?.addEventListener("click", () => {
-        infoModal?.classList.remove("hidden");
-    });
-    closeInfoBtn?.addEventListener("click", () => {
-        infoModal?.classList.add("hidden");
-    });
-    infoModal?.addEventListener("click", (e) => {
-        if (e.target === infoModal) infoModal.classList.add("hidden");
-    });
+  // 情報モーダル
+  document.getElementById("infoFab")?.addEventListener("click", () => open("info-modal"));
+  document.getElementById("closeInfoBtn")?.addEventListener("click", () => close("info-modal"));
+  bindBackdrop("info-modal");
 
-    // ===== 設定モーダル =====
-    const settingsFab = document.getElementById("settingsFab");
-    const settingsModal = document.getElementById("settings-modal");
-    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+  // 設定モーダル
+  document.getElementById("settingsFab")?.addEventListener("click", () => open("settings-modal"));
+  document.getElementById("closeSettingsBtn")?.addEventListener("click", () => close("settings-modal"));
+  bindBackdrop("settings-modal");
 
-    settingsFab?.addEventListener("click", () => {
-        settingsModal?.classList.remove("hidden");
-    });
-    closeSettingsBtn?.addEventListener("click", () => {
-        settingsModal?.classList.add("hidden");
-    });
-    settingsModal?.addEventListener("click", (e) => {
-        if (e.target === settingsModal) settingsModal.classList.add("hidden");
-    });
+  // QRモーダル
+  document.getElementById("qrFab")?.addEventListener("click", () => open("qr-modal"));
+  document.getElementById("closeQrBtn")?.addEventListener("click", () => close("qr-modal"));
+  bindBackdrop("qr-modal");
 
-    // ===== QRモーダル =====
-    const qrFab = document.getElementById("qrFab");
-    const qrModal = document.getElementById("qr-modal");
-    const closeQrBtn = document.getElementById("closeQrBtn");
+  console.log("Modals initialized");
+}
 
-    qrFab?.addEventListener("click", () => {
-        qrModal?.classList.remove("hidden");
-    });
-    closeQrBtn?.addEventListener("click", () => {
-        qrModal?.classList.add("hidden");
-    });
-    qrModal?.addEventListener("click", (e) => {
-        if (e.target === qrModal) qrModal.classList.add("hidden");
-    });
+// DOMContentLoaded を待ってモーダル登録（init() より先でもOK）
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupModals);
+} else {
+  setupModals();
 }
 
 init();

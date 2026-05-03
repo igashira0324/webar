@@ -18,6 +18,11 @@ const EXPRESSIONS: Expression[] = [
   { name: "じと目",   intensity: 0.6, duration: 2000, fadeIn: 400, fadeOut: 500 },
   { name: "びっくり", intensity: 0.7, duration: 1200, fadeIn: 200, fadeOut: 400 },
   { name: "にこり",   intensity: 0.8, duration: 2500, fadeIn: 400, fadeOut: 600 },
+  // 新規追加パターン
+  { name: "怒り",     intensity: 0.8, duration: 2000, fadeIn: 300, fadeOut: 500 },
+  { name: "困る",     intensity: 0.7, duration: 2500, fadeIn: 400, fadeOut: 600 },
+  { name: "にやり",   intensity: 0.8, duration: 2000, fadeIn: 400, fadeOut: 500 },
+  { name: "にっこり", intensity: 0.9, duration: 2500, fadeIn: 400, fadeOut: 600 },
 ];
 
 /**
@@ -32,7 +37,6 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
 
   // 利用可能なモーフ名を一覧表示（開発デバッグ用）
   try {
-    // babylon-mmd の内部構造から利用可能なモーフ名を抽出
     const available = (morph as any)._morphTargets?.map((m: any) => m.name) ||
                       (morph as any).morphs?.map((m: any) => m.name) || [];
     console.log("MMD Available morphs:", available);
@@ -57,17 +61,13 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
       let weight = 0;
       
       if (elapsed < expr.fadeIn) {
-        // フェードイン
         weight = (elapsed / expr.fadeIn) * expr.intensity;
       } else if (elapsed < expr.fadeIn + expr.duration) {
-        // 維持
         weight = expr.intensity;
       } else if (elapsed < total) {
-        // フェードアウト
         const t = (elapsed - expr.fadeIn - expr.duration) / expr.fadeOut;
         weight = expr.intensity * (1 - t);
       } else {
-        // 終了
         setWeight(expr.name, 0);
         return;
       }
@@ -96,6 +96,31 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
     requestAnimationFrame(tick);
   };
 
+  // 口パク（喋っている雰囲気）
+  const playTalk = () => {
+    const vowels = ["あ", "い", "う", "え", "お"];
+    const start = performance.now();
+    const duration = 1500 + Math.random() * 1500; // 1.5〜3秒喋る
+    
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      if (elapsed > duration) {
+        vowels.forEach(v => setWeight(v, 0));
+        return;
+      }
+      
+      // 0.15秒ごとに母音を切り替える
+      const idx = Math.floor(elapsed / 150) % vowels.length;
+      vowels.forEach((v, i) => {
+        // 現在の母音をランダムな強さで設定
+        const weight = i === idx ? 0.2 + Math.random() * 0.4 : 0;
+        setWeight(v, weight);
+      });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
   // ランダムタイマー管理
   let blinkTimer: number;
   let exprTimer: number;
@@ -109,10 +134,15 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
   };
 
   const scheduleExpression = () => {
-    const wait = 5000 + Math.random() * 5000; // 5-10秒
+    const wait = 4000 + Math.random() * 5000; // 4-9秒
     exprTimer = window.setTimeout(() => {
-      const expr = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
-      playExpression(expr);
+      // 30%の確率で口パク、70%の確率で通常表情
+      if (Math.random() < 0.3) {
+        playTalk();
+      } else {
+        const expr = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
+        playExpression(expr);
+      }
       scheduleExpression();
     }, wait);
   };
@@ -120,7 +150,7 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
   scheduleBlink();
   scheduleExpression();
 
-  console.log("✨ Random expressions and blinking enabled for model");
+  console.log("✨ Enhanced random expressions, blinking and talk-sync enabled");
 
   // クリーンアップ関数を返す
   return () => {

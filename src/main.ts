@@ -149,6 +149,36 @@ async function init() {
     infoModal?.addEventListener("click", (e) => {
         if (e.target === infoModal) infoModal.classList.add("hidden");
     });
+
+    // ===== 設定モーダル =====
+    const settingsFab = document.getElementById("settingsFab");
+    const settingsModal = document.getElementById("settings-modal");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+
+    settingsFab?.addEventListener("click", () => {
+        settingsModal?.classList.remove("hidden");
+    });
+    closeSettingsBtn?.addEventListener("click", () => {
+        settingsModal?.classList.add("hidden");
+    });
+    settingsModal?.addEventListener("click", (e) => {
+        if (e.target === settingsModal) settingsModal.classList.add("hidden");
+    });
+
+    // ===== QRモーダル =====
+    const qrFab = document.getElementById("qrFab");
+    const qrModal = document.getElementById("qr-modal");
+    const closeQrBtn = document.getElementById("closeQrBtn");
+
+    qrFab?.addEventListener("click", () => {
+        qrModal?.classList.remove("hidden");
+    });
+    closeQrBtn?.addEventListener("click", () => {
+        qrModal?.classList.add("hidden");
+    });
+    qrModal?.addEventListener("click", (e) => {
+        if (e.target === qrModal) qrModal.classList.add("hidden");
+    });
 }
 
 init();

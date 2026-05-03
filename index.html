@@ -339,26 +339,45 @@
         background: rgba(255, 0, 170, 0.15);
       }
 
-      /* ===== Info FAB（情報ボタン） ===== */
-      .info-fab {
+      /* ===== 右上FABグループ ===== */
+      .fab-group {
         position: absolute;
         top: 16px;
         right: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: auto;
+        z-index: 5;
+      }
+
+      .fab-btn {
         width: 44px;
         height: 44px;
         border-radius: 50%;
         background: var(--glass-bg);
         backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--glass-border);
         color: var(--primary);
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         cursor: pointer;
-        pointer-events: auto;
         display: flex;
         align-items: center;
         justify-content: center;
         box-shadow: 0 0 16px rgba(0, 229, 255, 0.2);
-        z-index: 5;
+        transition: transform 0.2s, box-shadow 0.3s, background 0.3s;
+        font-family: inherit;
+      }
+
+      .fab-btn:hover {
+        background: rgba(0, 229, 255, 0.15);
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+        transform: scale(1.05);
+      }
+
+      .fab-btn:active {
+        transform: scale(0.95);
       }
 
       /* ===== モーダル共通 ===== */
@@ -435,6 +454,80 @@
       }
 
       .modal-content { position: relative; }
+
+      /* ===== 設定モーダル内の要素 ===== */
+      .settings-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.82rem;
+        color: var(--text-dim);
+        margin: 12px 0 6px;
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 1px;
+      }
+
+      .val-tag {
+        font-family: 'Orbitron', monospace;
+        color: var(--primary);
+        font-size: 0.78rem;
+        padding: 2px 8px;
+        background: rgba(0, 229, 255, 0.1);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 229, 255, 0.3);
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.85rem;
+        color: var(--text);
+        margin: 8px 0;
+        cursor: pointer;
+      }
+
+      .toggle-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+        cursor: pointer;
+      }
+
+      /* ネオン調レンジスライダー */
+      .neon-range {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        border-radius: 3px;
+        outline: none;
+        margin: 4px 0 8px;
+        box-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+      }
+
+      .neon-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #fff;
+        border: 2px solid var(--primary);
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 0 12px var(--primary);
+      }
+
+      .neon-range::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #fff;
+        border: 2px solid var(--primary);
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 0 12px var(--primary);
+      }
 
       /* ===== ボタン共通 ===== */
       button.primary-btn {
@@ -565,8 +658,12 @@
           </div>
         </header>
 
-        <!-- 情報FAB -->
-        <button id="infoFab" class="info-fab" title="このアプリについて">ℹ</button>
+        <!-- 右上FABグループ -->
+        <div class="fab-group">
+          <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
+          <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
+          <button id="qrFab" class="fab-btn" title="QRコード">📷</button>
+        </div>
 
         <!-- 中央：ガイド -->
         <div class="center-area">
@@ -597,26 +694,67 @@
           </div>
         </div>
 
-        <!-- 設定パネル（非表示） -->
-        <div id="control-panel" class="hidden">
-          <div class="panel-header">
-            <h3>設定</h3>
-            <button id="minimizeBtn" class="icon-btn">×</button>
+        <!-- 設定モーダル（新デザイン） -->
+        <div id="settings-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeSettingsBtn">×</button>
+            <h3>SETTINGS</h3>
+
+            <div class="section-title">PLAYBACK</div>
+            <button id="playPauseBtn" class="primary-btn" style="width:100%;">▶ 再生 / 一時停止</button>
+
+            <div class="section-title">MODEL</div>
+            <label class="settings-label">
+              モデルスケール <span class="val-tag" id="scaleVal">0.2</span>
+            </label>
+            <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.1" value="0.2" class="neon-range" />
+
+            <label class="settings-label">
+              Y 位置調整 <span class="val-tag" id="yPosVal">0.0</span>
+            </label>
+            <input type="range" id="yPosSlider" min="-10" max="10" step="0.1" value="0.0" class="neon-range" />
+
+            <label class="settings-label">
+              再生位置 <span class="val-tag"><span id="seekVal">0</span> / <span id="durationVal">0</span></span>
+            </label>
+            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" />
+
+            <div class="section-title">EFFECTS</div>
+            <label class="toggle-row">
+              <input type="checkbox" id="physicsToggle" />
+              <span>物理演算</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" id="shadowToggle" />
+              <span>影</span>
+            </label>
+
+            <div class="section-title">CUSTOM</div>
+            <button id="fileSelectToggle" class="secondary-btn" style="width:100%;">📁 MMDファイルをロード</button>
           </div>
-          <button id="playPauseBtn" class="primary-btn">再生 / 一時停止</button>
-          <label>モデルスケール: <span id="scaleVal">0.2</span></label>
-          <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.1" value="0.2" />
-          <label>Y 位置調整: <span id="yPosVal">0.0</span></label>
-          <input type="range" id="yPosSlider" min="-10" max="10" step="0.1" value="0.0" />
-          <label>再生位置: <span id="seekVal">0</span> / <span id="durationVal">0</span></label>
-          <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" />
-          <label><input type="checkbox" id="physicsToggle" /> 物理演算</label>
-          <label><input type="checkbox" id="shadowToggle" /> 影</label>
-          <button id="fileSelectToggle" class="secondary-btn">ファイル選択を表示</button>
         </div>
 
-        <button id="showSettingsBtn" class="hidden">⚙️</button>
-        <button id="showMarkerBtn" class="hidden">📷</button>
+        <!-- QRモーダル（新デザイン） -->
+        <div id="qr-modal" class="modal hidden">
+          <div class="modal-content" style="text-align:center;">
+            <button class="close-x" id="closeQrBtn">×</button>
+            <h3>AR QR CODE</h3>
+            <p>スマホの標準カメラでスキャンすると、このページが開きます。</p>
+            <div style="margin: 20px 0; display:flex; justify-content:center;">
+              <img src="assets/marker_qr.png" alt="QR Code"
+                   style="width:100%; max-width:280px; border:8px solid #fff; border-radius:12px; box-shadow:0 0 24px rgba(0,229,255,0.4);" />
+            </div>
+            <p style="font-size:0.78rem; color:var(--text-dim);">
+              📱 Android Chrome で開き、<strong style="color:var(--primary);">ENTER AR</strong> ボタンから AR を起動してください。
+            </p>
+          </div>
+        </div>
+
+        <!-- 隠し互換用（既存setupUI.tsが参照する可能性のあるDOM要素） -->
+        <div id="control-panel" class="hidden"></div>
+        <button id="showSettingsBtn" class="hidden"></button>
+        <button id="showMarkerBtn" class="hidden"></button>
+        <div id="minimizeBtn" class="hidden"></div>
 
         <!-- 情報モーダル -->
         <div id="info-modal" class="modal hidden">
@@ -668,15 +806,6 @@
           </div>
         </div>
 
-        <div id="marker-modal" class="modal hidden">
-          <div class="modal-content">
-            <h3>QRマーカー</h3>
-            <img src="assets/marker_qr.png" alt="QR" style="width:100%; max-width:300px; display:block; margin:10px auto;" />
-            <div class="modal-buttons">
-              <button id="closeMarkerBtn" class="secondary-btn">閉じる</button>
-            </div>
-          </div>
-        </div>
 
         <div id="ar-unsupported" class="hidden">
           この端末は WebXR AR に対応していません。

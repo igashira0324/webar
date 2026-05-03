@@ -5,6 +5,7 @@ import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
+import { setupExpressions } from './app/setupExpressions';
 
 async function init() {
     console.log("App Initialization - Version 2.15 (No Overlay)");
@@ -18,6 +19,9 @@ async function init() {
     // 2. Initialize MMD Runtime
     const mmdRuntime = createMmdRuntime(scene);
     (scene as any).mmdRootRuntime = mmdRuntime;
+
+    // 表情制御のクリーンアップ関数を保持
+    let expressionCleanup: (() => void) | null = null;
 
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);
@@ -106,6 +110,11 @@ async function init() {
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
             currentModel.mesh.position.set(0, 0, 0); 
+
+            // 表情制御を有効化
+            if (expressionCleanup) (expressionCleanup as any)();
+            expressionCleanup = setupExpressions(scene, currentModel);
+
             setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
         }
     } catch (e: any) {
@@ -159,7 +168,12 @@ async function init() {
             currentModel.mesh.dispose();
         }
         currentModel = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
-        if (currentModel) currentModel.mesh.scaling.setAll(0.07);
+        if (currentModel) {
+            currentModel.mesh.scaling.setAll(0.07);
+            // 表情制御を再設定
+            if (expressionCleanup) (expressionCleanup as any)();
+            expressionCleanup = setupExpressions(scene, currentModel);
+        }
     });
 
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);

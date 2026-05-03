@@ -10,7 +10,14 @@ export const createScene = async (canvas: HTMLCanvasElement) => {
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0, 0, 0, 0); // Transparent for AR
 
-    const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 5, new Vector3(0, 1, 0), scene);
+    const camera = new ArcRotateCamera(
+        "camera", 
+        -Math.PI / 2, 
+        Math.PI / 2.6, // Slightly from below
+        4.0,           // Closer distance
+        new Vector3(0, 1.5, 0), // Higher target
+        scene
+    );
     camera.attachControl(canvas, true);
     camera.lowerRadiusLimit = 1;
     camera.upperRadiusLimit = 20;

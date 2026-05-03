@@ -170,7 +170,7 @@
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        padding-bottom: 20px;
+        padding-bottom: 8px;
         pointer-events: none;
       }
 
@@ -648,14 +648,9 @@
       <div id="ui-container">
         <!-- ヘッダー -->
         <header class="top-header">
-          <h1 class="brand">39AI AVATAR</h1>
+          <h1 class="brand">AI AVATAR</h1>
           <p class="brand-sub">MMD × WebXR AR Experience</p>
-          <div class="stats-row">
-            <span class="stat-dot"></span>
-            <span id="fps">FPS: --</span>
-            <span style="opacity: 0.4;">|</span>
-            <span>v2.8</span>
-          </div>
+          <span id="fps" style="display:none;"></span>
         </header>
 
         <!-- 右上FABグループ -->
@@ -668,8 +663,8 @@
         <!-- 中央：ガイド -->
         <div class="center-area">
           <div class="guide-card">
-            画面の<strong>ミク</strong>はあなたの部屋に呼び出せます。<br>
-            下の <strong>ENTER AR</strong> ボタンから起動 → <strong>床をタップ</strong>で配置。
+            初音ミクをあなたのカメラに呼び出せます!!<br>
+            「<strong>ENTER AR</strong>」ボタンを起動 → <strong>画面タップ</strong>で配置。
           </div>
         </div>
 
@@ -682,7 +677,11 @@
             </button>
           </div>
           <p class="ar-hint">
-            <span class="icon">✨</span> Android Chrome 推奨 / 床のある明るい場所で
+            <span class="icon">✨</span> Android Chrome 推奨
+            <br>
+            <span style="font-size:0.68rem; opacity:0.75;">
+              ※ iOS Safari は WebXR 非対応のため AR 起動不可
+            </span>
           </p>
           <div class="tech-stack">
             <span class="tech-badge">WebXR</span>

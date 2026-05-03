@@ -7,7 +7,7 @@ import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 
 async function init() {
-    console.log("App Initialization - Version 2.13 (Robust Audio)");
+    console.log("App Initialization - Version 2.14 (Android Fixed)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -22,37 +22,53 @@ async function init() {
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);
 
-    // ===== 再生開始ロジック（早期定義 & Android 最適化）=====
-    let playbackStarted = false;
-    const startPlayback = () => {
-        if (playbackStarted) return;
+    // ===== 再生開始ロジック（早期定義 & Android 最適化 v2.14）=====
+    let internalAudio: HTMLAudioElement | null = null;
+    let bgmStarted = false;
+
+    const startPlayback = (): boolean => {
+        if (bgmStarted) return true;
         console.log("startPlayback triggered");
 
         try {
-            // AudioContext を resume
+            // 1. AudioContext を必ず resume
             const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-            if (ctx && ctx.state === "suspended") ctx.resume();
+            if (ctx && ctx.state === "suspended") {
+                ctx.resume().then(() => console.log("AudioContext resumed:", ctx.state));
+            }
 
-            // ★ 内部HTMLAudioを直接play（Androidで最も確実）
-            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
+            // 2. HTMLAudioElement を直接 play（これが Android で最も確実）
             if (internalAudio) {
                 internalAudio.muted = false;
                 internalAudio.volume = 1.0;
-                const p = internalAudio.play();
-                if (p && typeof p.then === "function") {
-                    p.then(() => console.log("✅ Internal HTMLAudio playing"))
-                     .catch((err) => console.error("❌ Internal HTMLAudio error:", err));
+                // 停止状態から確実に頭出し再生
+                if (internalAudio.paused) {
+                    const p = internalAudio.play();
+                    if (p && typeof p.then === "function") {
+                        p.then(() => {
+                            console.log("✅ HTMLAudio playing on Android");
+                            bgmStarted = true;
+                        }).catch((err) => {
+                            console.error("❌ HTMLAudio play failed:", err.name, err.message);
+                            if (err.name === "NotAllowedError") {
+                                alert("音声再生にはタップが必要です。画面をもう一度タップしてください。");
+                            }
+                        });
+                    }
                 }
+            } else {
+                console.warn("internalAudio is null");
             }
             
-            // babylon-mmd 経由でも再生（同期保持のため）
-            audioPlayer.play();
+            // 3. アニメーションを再生（音とは独立）
             mmdRuntime.playAnimation();
             
-            playbackStarted = true;
-            console.log("Playback started (v2.7 style)");
+            bgmStarted = true;
+            console.log("Playback started (v2.14)");
+            return true;
         } catch (e) {
-            console.error("Playback failed:", e);
+            console.warn("Playback start failed:", e);
+            return false;
         }
     };
     (window as any).__startPlayback = startPlayback;
@@ -85,30 +101,74 @@ async function init() {
         console.error("Loading failed:", e);
         if (loadingStatus) loadingStatus.textContent = "Error loading assets";
         return;
-    } finally {
-        if (loadingScreen) {
-            loadingScreen.style.opacity = "0";
-            setTimeout(() => loadingScreen.classList.add("hidden"), 500);
-        }
-        
-        // ★ ローディング完了後に TAP TO START を表示
-        setTimeout(() => {
-            const tapToStart = document.getElementById("tap-to-start");
-            if (tapToStart) {
-                tapToStart.classList.remove("hidden");
-                const handleStart = () => {
-                    startPlayback();
-                    tapToStart.classList.add("hidden");
-                    tapToStart.removeEventListener("click", handleStart);
-                    tapToStart.removeEventListener("touchstart", handleStart);
-                };
-                tapToStart.addEventListener("click", handleStart);
-                tapToStart.addEventListener("touchstart", handleStart);
-            }
-        }, 600);
     }
 
-    // 4. Setup UI
+    // 4. Setup Audio Source (Await for Android robustness)
+    const setupAudio = async () => {
+        try {
+            await mmdRuntime.setAudioPlayer(audioPlayer);
+            audioPlayer.source = "assets/audio/music.mp3";
+
+            // StreamAudioPlayer の内部 HTMLAudioElement を取得
+            internalAudio = (audioPlayer as any)._audio || (audioPlayer as any).audio || null;
+            if (!internalAudio) {
+                console.warn("Falling back to manual Audio creation");
+                internalAudio = new Audio("assets/audio/music.mp3");
+                (audioPlayer as any)._audio = internalAudio;
+            }
+
+            if (internalAudio) {
+                internalAudio.preload = "auto";
+                internalAudio.muted = false;
+                internalAudio.volume = 1.0;
+                internalAudio.load();
+
+                // ロード完了（再生可能状態）を待機
+                await new Promise<void>((resolve) => {
+                    if (!internalAudio || internalAudio.readyState >= 3) return resolve();
+                    const onReady = () => {
+                        console.log("✅ Audio ready (canplaythrough)");
+                        internalAudio?.removeEventListener("canplaythrough", onReady);
+                        resolve();
+                    };
+                    internalAudio.addEventListener("canplaythrough", onReady);
+                    setTimeout(() => {
+                        console.warn("⚠️ Audio load timeout");
+                        resolve();
+                    }, 8000);
+                });
+            }
+            console.log("Audio player initialized.");
+        } catch (e) {
+            console.warn("Audio failed", e);
+        }
+    };
+    await setupAudio();
+
+    // 5. Loading Finish UI Handling
+    if (loadingScreen) {
+        loadingScreen.style.opacity = "0";
+        setTimeout(() => loadingScreen.classList.add("hidden"), 500);
+    }
+    
+    // ★ 全リソース完了後に TAP TO START を表示
+    setTimeout(() => {
+        const tapToStart = document.getElementById("tap-to-start");
+        if (tapToStart) {
+            tapToStart.classList.remove("hidden");
+            const handleStart = () => {
+                startPlayback();
+                tapToStart.classList.add("hidden");
+                tapToStart.removeEventListener("click", handleStart);
+                tapToStart.removeEventListener("touchend", handleStart);
+            };
+            // Android では touchend がより確実なケースがある
+            tapToStart.addEventListener("click", handleStart);
+            tapToStart.addEventListener("touchend", handleStart);
+        }
+    }, 600);
+
+    // 6. Setup UI & Performance
     setupUI(scene, mmdRuntime, audioPlayer, getCurrentModel, async (pmx, vmd, textures) => {
         if (currentModel) {
             mmdRuntime.destroyMmdModel(currentModel);
@@ -119,21 +179,9 @@ async function init() {
     });
 
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);
-
-    // 7. Audio Source Setup (Non-blocking as in v2.7)
-    const setupAudio = async () => {
-        try {
-            await mmdRuntime.setAudioPlayer(audioPlayer);
-            audioPlayer.source = "assets/audio/music.mp3";
-            console.log("Audio player initialized.");
-        } catch (e) {
-            console.warn("Audio failed", e);
-        }
-    };
-    setupAudio();
 }
 
-// ===== UIモーダル制御（v2.13）=====
+// ===== UIモーダル制御（v2.14）=====
 function setupModals() {
   const open = (id: string) => document.getElementById(id)?.classList.remove("hidden");
   const close = (id: string) => document.getElementById(id)?.classList.add("hidden");
@@ -144,7 +192,6 @@ function setupModals() {
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
-    // ★ AR起動時にも再生開始を試みる
     const startFn = (window as any).__startPlayback;
     if (typeof startFn === "function") startFn();
 

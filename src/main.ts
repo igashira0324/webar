@@ -5,13 +5,9 @@ import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
-// Note: Do NOT import @babylonjs/core/Audio/audioSceneComponent
-// babylon-mmd's StreamAudioPlayer uses HTML Audio elements, not Babylon.js AudioV2.
-// Importing audioSceneComponent causes "Class extends value undefined" errors
-// due to Vite code-splitting breaking the AudioV2 module chain.
 
 async function init() {
-    console.log("App Initialization - Version 2.8");
+    console.log("App Initialization - Version 2.13 (Robust Audio)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -21,15 +17,15 @@ async function init() {
 
     // 2. Initialize MMD Runtime
     const mmdRuntime = createMmdRuntime(scene);
-    (scene as any).mmdRootRuntime = mmdRuntime; // Explicitly store for AR access
+    (scene as any).mmdRootRuntime = mmdRuntime;
 
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);
 
-    // ===== [NEW] 再生開始ロジックを早期に定義（TAP TO START 対策）=====
-    let bgmStarted = false;
+    // ===== 再生開始ロジック（早期定義 & Android 最適化）=====
+    let playbackStarted = false;
     const startPlayback = () => {
-        if (bgmStarted) return true;
+        if (playbackStarted) return;
         console.log("startPlayback triggered");
 
         try {
@@ -37,171 +33,118 @@ async function init() {
             const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
             if (ctx && ctx.state === "suspended") ctx.resume();
 
-            // ★ 実際の再生を開始（内部HTMLAudioを直接叩くのがAndroidで最も確実）
+            // ★ 内部HTMLAudioを直接play（Androidで最も確実）
             const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
             if (internalAudio) {
-                // 音量・ミュートを最終確認
-                internalAudio.volume = 1.0;
                 internalAudio.muted = false;
-                const promise = internalAudio.play();
-                if (promise && typeof promise.then === "function") {
-                    promise
-                      .then(() => console.log("✅ HTMLAudio playing"))
-                      .catch((err) => console.error("❌ HTMLAudio failed:", err));
+                internalAudio.volume = 1.0;
+                const p = internalAudio.play();
+                if (p && typeof p.then === "function") {
+                    p.then(() => console.log("✅ Internal HTMLAudio playing"))
+                     .catch((err) => console.error("❌ Internal HTMLAudio error:", err));
                 }
             }
-
-            // babylon-mmd 経由でも再生
+            
+            // babylon-mmd 経由でも再生（同期保持のため）
             audioPlayer.play();
             mmdRuntime.playAnimation();
             
-            bgmStarted = true;
-            console.log("Playback started (audio + animation)");
-            return true;
+            playbackStarted = true;
+            console.log("Playback started (v2.7 style)");
         } catch (e) {
-            console.warn("Playback start failed:", e);
-            return false;
+            console.error("Playback failed:", e);
         }
     };
-    // グローバルに公開（setupModals や TAP TO START ハンドラから呼べるようにする）
     (window as any).__startPlayback = startPlayback;
 
-    // 通常のクリック/タッチでも発火するように予備として残す
-    document.addEventListener("click", startPlayback, { once: true });
-    document.addEventListener("touchstart", startPlayback, { once: true });
-
-    // 音声ソースの準備も早めに開始（非同期）
-    const setupAudio = async () => {
-        try {
-            await mmdRuntime.setAudioPlayer(audioPlayer);
-            audioPlayer.source = "assets/audio/music.mp3";
-            audioPlayer.volume = 1.0;
-            console.log("Audio player initialized successfully.");
-        } catch (e) {
-            console.warn("Audio failed to load", e);
-        }
-    };
-    const audioPromise = setupAudio();
-
     let currentModel: MmdModel | null = null;
-
-    // Helper to get current model for UI
     const getCurrentModel = () => currentModel;
 
-    // 3. Load Default Model (Phase 2)
+    // 3. Load Default Model
     const loadingScreen = document.getElementById("loading-screen") as HTMLDivElement;
     const loadingStatus = document.getElementById("loading-status") as HTMLSpanElement;
+    
     try {
         currentModel = await loadMmdModel(
-            scene, 
-            mmdRuntime, 
-            "assets/model/miku.pmx", 
-            "assets/motion/dance.vmd",
-            shadowGenerator,
-            undefined,
+            scene, mmdRuntime, 
+            "assets/model/miku.pmx", "assets/motion/dance.vmd",
+            shadowGenerator, undefined,
             (event) => {
                 if (event.lengthComputable && event.total > 0) {
                     const percentage = Math.floor((event.loaded / event.total) * 100);
                     if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
-                } else {
-                    if (loadingStatus) loadingStatus.textContent = "読み込み中... (v2.8)";
                 }
             }
         );
         if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.07); // Default scale 0.07 (approx 1/3 of original 0.2)
+            currentModel.mesh.scaling.setAll(0.07);
             currentModel.mesh.position.set(0, 0, 0); 
-            
-            // Start animation only after user interaction (handled by UI)
-            // mmdRuntime.playAnimation();
-
-            // Initialize WebXR Native UI immediately
             setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
         }
     } catch (e: any) {
-        console.error("Default assets loading failed:", e);
-        if (loadingStatus) {
-            loadingStatus.style.color = "#ff4444";
-            loadingStatus.textContent = `エラー: ${e.message || "ファイルの読み込みに失敗しました"}`;
-        }
-        // Return early to keep the error visible
+        console.error("Loading failed:", e);
+        if (loadingStatus) loadingStatus.textContent = "Error loading assets";
         return;
     } finally {
-        // Hide loading screen
         if (loadingScreen) {
             loadingScreen.style.opacity = "0";
             setTimeout(() => loadingScreen.classList.add("hidden"), 500);
         }
-
-        // ★ ローディング完了後、TAP TO START を表示（Android対策）
+        
+        // ★ ローディング完了後に TAP TO START を表示
         setTimeout(() => {
             const tapToStart = document.getElementById("tap-to-start");
             if (tapToStart) {
                 tapToStart.classList.remove("hidden");
-                const handler = () => {
-                    const startFn = (window as any).__startPlayback;
-                    if (typeof startFn === "function") startFn();
+                const handleStart = () => {
+                    startPlayback();
                     tapToStart.classList.add("hidden");
-                    tapToStart.removeEventListener("click", handler);
-                    tapToStart.removeEventListener("touchstart", handler);
+                    tapToStart.removeEventListener("click", handleStart);
+                    tapToStart.removeEventListener("touchstart", handleStart);
                 };
-                tapToStart.addEventListener("click", handler);
-                tapToStart.addEventListener("touchstart", handler);
+                tapToStart.addEventListener("click", handleStart);
+                tapToStart.addEventListener("touchstart", handleStart);
             }
         }, 600);
     }
 
     // 4. Setup UI
-    setupUI(
-        scene, 
-        mmdRuntime, 
-        audioPlayer,
-        getCurrentModel,
-        async (pmx, vmd, textures) => {
-            // Clean up old model if exists
-            if (currentModel) {
-                mmdRuntime.destroyMmdModel(currentModel);
-                currentModel.mesh.dispose();
-            }
-            // Load new model from files
-            currentModel = await loadMmdModelFromFiles(
-                scene,
-                mmdRuntime,
-                pmx,
-                vmd,
-                textures,
-                shadowGenerator
-            );
-            if (currentModel) {
-                currentModel.mesh.scaling.setAll(0.07); 
-            }
+    setupUI(scene, mmdRuntime, audioPlayer, getCurrentModel, async (pmx, vmd, textures) => {
+        if (currentModel) {
+            mmdRuntime.destroyMmdModel(currentModel);
+            currentModel.mesh.dispose();
         }
-    );
+        currentModel = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
+        if (currentModel) currentModel.mesh.scaling.setAll(0.07);
+    });
 
-    // 5. Performance Controls
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);
 
-    // 6. WebXR AR (Now handled via native UI initialized above)
-
-    // 音声準備の完了を待機（もし必要なら）
-    await audioPromise;
+    // 7. Audio Source Setup (Non-blocking as in v2.7)
+    const setupAudio = async () => {
+        try {
+            await mmdRuntime.setAudioPlayer(audioPlayer);
+            audioPlayer.source = "assets/audio/music.mp3";
+            console.log("Audio player initialized.");
+        } catch (e) {
+            console.warn("Audio failed", e);
+        }
+    };
+    setupAudio();
 }
 
-// ===== UIモーダル制御（init とは独立して登録）=====
+// ===== UIモーダル制御（v2.13）=====
 function setupModals() {
-  // 共通：モーダルの開閉ヘルパ
   const open = (id: string) => document.getElementById(id)?.classList.remove("hidden");
   const close = (id: string) => document.getElementById(id)?.classList.add("hidden");
   const bindBackdrop = (id: string) => {
     const m = document.getElementById(id);
-    m?.addEventListener("click", (e) => {
-      if (e.target === m) m.classList.add("hidden");
-    });
+    m?.addEventListener("click", (e) => { if (e.target === m) m.classList.add("hidden"); });
   };
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
-    // ★ AR起動と同時に必ず音声を開始（ユーザー操作なのでautoplay許可される）
+    // ★ AR起動時にも再生開始を試みる
     const startFn = (window as any).__startPlayback;
     if (typeof startFn === "function") startFn();
 
@@ -213,29 +156,24 @@ function setupModals() {
     }
   });
 
-  // 情報モーダル
   document.getElementById("infoFab")?.addEventListener("click", () => open("info-modal"));
   document.getElementById("closeInfoBtn")?.addEventListener("click", () => close("info-modal"));
   bindBackdrop("info-modal");
 
-  // 設定モーダル
   document.getElementById("settingsFab")?.addEventListener("click", () => open("settings-modal"));
   document.getElementById("closeSettingsBtn")?.addEventListener("click", () => close("settings-modal"));
   bindBackdrop("settings-modal");
 
-  // QRモーダル
   document.getElementById("qrFab")?.addEventListener("click", () => open("qr-modal"));
   document.getElementById("closeQrBtn")?.addEventListener("click", () => close("qr-modal"));
   bindBackdrop("qr-modal");
 
-  // AR非対応モーダル
   document.getElementById("closeArUnavailableBtn")?.addEventListener("click", () => close("ar-unavailable-modal"));
   bindBackdrop("ar-unavailable-modal");
 
   console.log("Modals initialized");
 }
 
-// DOMContentLoaded を待ってモーダル登録（init() より先でもOK）
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", setupModals);
 } else {

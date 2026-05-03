@@ -604,6 +604,53 @@
 
       .hidden { display: none !important; }
 
+      /* ===== TAP TO START ===== */
+      #tap-to-start {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(0, 30, 60, 0.92), rgba(5, 5, 22, 0.96));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+        cursor: pointer;
+        animation: fade-in 0.5s ease-out;
+        pointer-events: auto;
+      }
+
+      #tap-to-start .tap-content {
+        text-align: center;
+        pointer-events: none;
+      }
+
+      #tap-to-start .tap-icon {
+        font-size: 4rem;
+        animation: tap-bounce 1.2s ease-in-out infinite;
+        margin-bottom: 16px;
+      }
+
+      #tap-to-start h2 {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.8rem;
+        letter-spacing: 4px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0 0 12px;
+      }
+
+      #tap-to-start p {
+        color: var(--text-dim);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      @keyframes tap-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-12px); }
+      }
+
       /* ===== AR Overlay ===== */
       #ar-overlay {
         display: none;
@@ -789,6 +836,15 @@
               ⚠ iOS (Safari) — WebXR 非対応のため AR 起動不可<br>
               ✅ デスクトップ — 通常の 3D ビューワとして動作
             </p>
+          </div>
+        </div>
+
+        <!-- 初回タップ誘導オーバーレイ -->
+        <div id="tap-to-start" class="hidden">
+          <div class="tap-content">
+            <div class="tap-icon">👆</div>
+            <h2>TAP TO START</h2>
+            <p>画面をタップして音楽と<br>アニメーションを開始</p>
           </div>
         </div>
 

@@ -75,6 +75,23 @@ async function init() {
             loadingScreen.style.opacity = "0";
             setTimeout(() => loadingScreen.classList.add("hidden"), 500);
         }
+
+        // ★ ローディング完了後、TAP TO START を表示（Android対策）
+        setTimeout(() => {
+            const tapToStart = document.getElementById("tap-to-start");
+            if (tapToStart) {
+                tapToStart.classList.remove("hidden");
+                const handler = () => {
+                    const startFn = (window as any).__startPlayback;
+                    if (typeof startFn === "function") startFn();
+                    tapToStart.classList.add("hidden");
+                    tapToStart.removeEventListener("click", handler);
+                    tapToStart.removeEventListener("touchstart", handler);
+                };
+                tapToStart.addEventListener("click", handler);
+                tapToStart.addEventListener("touchstart", handler);
+            }
+        }, 600);
     }
 
     // 4. Setup UI
@@ -115,6 +132,13 @@ async function init() {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
             audioPlayer.source = "assets/audio/music.mp3";
+            audioPlayer.volume = 1.0;
+            // 内部のHTMLオーディオも明示的に設定
+            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
+            if (internalAudio) {
+                internalAudio.volume = 1.0;
+                internalAudio.muted = false;
+            }
             console.log("Audio player initialized successfully.");
         } catch (e) {
             console.warn("Audio failed to load", e);
@@ -125,35 +149,43 @@ async function init() {
     // ===== ユーザー初回操作で BGM＋アニメ 自動スタート =====
     let bgmStarted = false;
     const startPlayback = () => {
-        if (bgmStarted) return;
-        bgmStarted = true;
+        if (bgmStarted) return true;
 
         try {
             // AudioContext を resume
             const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
             if (ctx && ctx.state === "suspended") ctx.resume();
 
-            // ★ 実際の再生を開始
-            const result = audioPlayer.play();
-            mmdRuntime.playAnimation();
-            console.log("Playback started (audio + animation)");
-            
-            // Promiseを返す場合のデバッグ
-            if (result && typeof (result as any).then === "function") {
-                (result as any).then(() => console.log("✅ Audio playing"))
-                               .catch((err: any) => console.error("❌ Audio play error:", err));
+            // ★ 実際の再生を開始（内部HTMLAudioを直接叩くのがAndroidで最も確実）
+            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
+            if (internalAudio) {
+                const promise = internalAudio.play();
+                if (promise && typeof promise.then === "function") {
+                    promise
+                      .then(() => console.log("✅ HTMLAudio playing"))
+                      .catch((err) => console.error("❌ HTMLAudio failed:", err));
+                }
             }
+
+            // babylon-mmd 経由でも再生
+            audioPlayer.play();
+            mmdRuntime.playAnimation();
+            
+            bgmStarted = true;
+            console.log("Playback started (audio + animation)");
+            return true;
         } catch (e) {
             console.warn("Playback start failed:", e);
-            bgmStarted = false; // 失敗したら次のクリックで再試行
+            return false;
         }
-
-        document.removeEventListener("click", startPlayback);
-        document.removeEventListener("touchstart", startPlayback);
     };
 
-    document.addEventListener("click", startPlayback);
-    document.addEventListener("touchstart", startPlayback);
+    // グローバルに公開（setupModals 等から呼べるようにする）
+    (window as any).__startPlayback = startPlayback;
+
+    // 通常のクリック/タッチでも発火するように残しておく
+    document.addEventListener("click", startPlayback, { once: true });
+    document.addEventListener("touchstart", startPlayback, { once: true });
 }
 
 // ===== UIモーダル制御（init とは独立して登録）=====
@@ -170,13 +202,9 @@ function setupModals() {
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
-    // ★ AR起動と同時に音声アンロックを試みる
-    try {
-        const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-        if (ctx && ctx.state === "suspended") {
-            ctx.resume();
-        }
-    } catch (e) {}
+    // ★ AR起動と同時に必ず音声を開始（ユーザー操作なのでautoplay許可される）
+    const startFn = (window as any).__startPlayback;
+    if (typeof startFn === "function") startFn();
 
     const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement | null;
     if (xrBtn) {

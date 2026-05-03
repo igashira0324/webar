@@ -26,6 +26,63 @@ async function init() {
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);
 
+    // ===== [NEW] 再生開始ロジックを早期に定義（TAP TO START 対策）=====
+    let bgmStarted = false;
+    const startPlayback = () => {
+        if (bgmStarted) return true;
+        console.log("startPlayback triggered");
+
+        try {
+            // AudioContext を resume
+            const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
+            if (ctx && ctx.state === "suspended") ctx.resume();
+
+            // ★ 実際の再生を開始（内部HTMLAudioを直接叩くのがAndroidで最も確実）
+            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
+            if (internalAudio) {
+                // 音量・ミュートを最終確認
+                internalAudio.volume = 1.0;
+                internalAudio.muted = false;
+                const promise = internalAudio.play();
+                if (promise && typeof promise.then === "function") {
+                    promise
+                      .then(() => console.log("✅ HTMLAudio playing"))
+                      .catch((err) => console.error("❌ HTMLAudio failed:", err));
+                }
+            }
+
+            // babylon-mmd 経由でも再生
+            audioPlayer.play();
+            mmdRuntime.playAnimation();
+            
+            bgmStarted = true;
+            console.log("Playback started (audio + animation)");
+            return true;
+        } catch (e) {
+            console.warn("Playback start failed:", e);
+            return false;
+        }
+    };
+    // グローバルに公開（setupModals や TAP TO START ハンドラから呼べるようにする）
+    (window as any).__startPlayback = startPlayback;
+
+    // 通常のクリック/タッチでも発火するように予備として残す
+    document.addEventListener("click", startPlayback, { once: true });
+    document.addEventListener("touchstart", startPlayback, { once: true });
+
+    // 音声ソースの準備も早めに開始（非同期）
+    const setupAudio = async () => {
+        try {
+            await mmdRuntime.setAudioPlayer(audioPlayer);
+            audioPlayer.source = "assets/audio/music.mp3";
+            audioPlayer.volume = 1.0;
+            console.log("Audio player initialized successfully.");
+        } catch (e) {
+            console.warn("Audio failed to load", e);
+        }
+    };
+    const audioPromise = setupAudio();
+
     let currentModel: MmdModel | null = null;
 
     // Helper to get current model for UI
@@ -126,66 +183,8 @@ async function init() {
 
     // 6. WebXR AR (Now handled via native UI initialized above)
 
-
-    // 7. Initialize Audio Player Sync and Source
-    const setupAudio = async () => {
-        try {
-            await mmdRuntime.setAudioPlayer(audioPlayer);
-            audioPlayer.source = "assets/audio/music.mp3";
-            audioPlayer.volume = 1.0;
-            // 内部のHTMLオーディオも明示的に設定
-            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
-            if (internalAudio) {
-                internalAudio.volume = 1.0;
-                internalAudio.muted = false;
-            }
-            console.log("Audio player initialized successfully.");
-        } catch (e) {
-            console.warn("Audio failed to load", e);
-        }
-    };
-    await setupAudio();
-
-    // ===== ユーザー初回操作で BGM＋アニメ 自動スタート =====
-    let bgmStarted = false;
-    const startPlayback = () => {
-        if (bgmStarted) return true;
-
-        try {
-            // AudioContext を resume
-            const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-            if (ctx && ctx.state === "suspended") ctx.resume();
-
-            // ★ 実際の再生を開始（内部HTMLAudioを直接叩くのがAndroidで最も確実）
-            const internalAudio = (audioPlayer as any)._audio as HTMLAudioElement | undefined;
-            if (internalAudio) {
-                const promise = internalAudio.play();
-                if (promise && typeof promise.then === "function") {
-                    promise
-                      .then(() => console.log("✅ HTMLAudio playing"))
-                      .catch((err) => console.error("❌ HTMLAudio failed:", err));
-                }
-            }
-
-            // babylon-mmd 経由でも再生
-            audioPlayer.play();
-            mmdRuntime.playAnimation();
-            
-            bgmStarted = true;
-            console.log("Playback started (audio + animation)");
-            return true;
-        } catch (e) {
-            console.warn("Playback start failed:", e);
-            return false;
-        }
-    };
-
-    // グローバルに公開（setupModals 等から呼べるようにする）
-    (window as any).__startPlayback = startPlayback;
-
-    // 通常のクリック/タッチでも発火するように残しておく
-    document.addEventListener("click", startPlayback, { once: true });
-    document.addEventListener("touchstart", startPlayback, { once: true });
+    // 音声準備の完了を待機（もし必要なら）
+    await audioPromise;
 }
 
 // ===== UIモーダル制御（init とは独立して登録）=====

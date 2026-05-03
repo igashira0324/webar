@@ -344,14 +344,23 @@
       .fab-group {
         position: absolute;
         top: 120px;
-        .file-input-group {
+        right: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: auto;
+        z-index: 5;
+      }
+
+      /* 新規追加：モデル選択モーダル用スタイル */
+      .file-input-group {
         display: flex;
         flex-direction: column;
         gap: 5px;
         margin-bottom: 15px;
-    }
+      }
 
-    .styled-select {
+      .styled-select {
         width: 100%;
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid var(--accent-color);
@@ -360,55 +369,24 @@
         border-radius: 5px;
         margin-bottom: 15px;
         font-family: 'Outfit', sans-serif;
-    }
+      }
 
-    .styled-select option {
+      .styled-select option {
         background: #1a1a1a;
         color: white;
-    }
+      }
 
-    .divider {
+      .divider {
         height: 1px;
         background: rgba(255, 255, 255, 0.2);
         margin: 20px 0;
-    }
+      }
 
-    .usage-terms {
+      .usage-terms {
         margin-top: 20px;
         font-size: 10px;
         color: rgba(255, 255, 255, 0.5);
         text-align: center;
-    }
-
-    .styled-select {
-        width: 100%;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid var(--accent-color);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 15px;
-        font-family: 'Outfit', sans-serif;
-    }
-
-    .styled-select option {
-        background: #1a1a1a;
-        color: white;
-    }
-
-    .divider {
-        height: 1px;
-        background: rgba(255, 255, 255, 0.2);
-        margin: 20px 0;
-    }
-
-    .usage-terms {
-        margin-top: 20px;
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.5);
-        text-align: center;
-    }
-    z-index: 5;
       }
 
       .fab-btn {
@@ -885,18 +863,49 @@
           </div>
         </div>
 
-        <!-- ファイル / マーカーモーダル（既存・隠し） -->
+        <!-- Model Selection Modal -->
         <div id="file-modal" class="modal hidden">
-          <div class="modal-content">
-            <h3>MMDファイルをロード</h3>
-            <label>PMX:</label><input type="file" id="pmxInput" accept=".pmx" />
-            <label>VMD:</label><input type="file" id="vmdInput" accept=".vmd" />
-            <label>テクスチャ:</label><input type="file" id="textureDirInput" webkitdirectory directory />
-            <div class="modal-buttons">
-              <button id="loadFilesBtn" class="primary-btn">ロード</button>
-              <button id="closeModalBtn" class="secondary-btn">閉じる</button>
+            <div class="modal-content">
+                <button class="close-x" id="closeModalBtn">×</button>
+                <h3>MODEL SELECTION</h3>
+                
+                <div class="section-title">PRESET MODELS</div>
+                <div class="setting-group">
+                    <select id="presetModelSelect" class="styled-select">
+                        <option value="original">Default Miku (602e)</option>
+                        <option value="takosanp">TakosanP (Magical Mirai 2015)</option>
+                        <option value="sour_snow">Sour Snow Miku v1.02</option>
+                        <option value="onasu">Onasu Sakura Miku</option>
+                        <option value="riverside">Riverside Miku v2.02</option>
+                    </select>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="section-title">CUSTOM UPLOAD</div>
+                <div class="setting-group">
+                    <div class="file-input-group">
+                        <span>PMX File</span>
+                        <input type="file" id="pmxInput" accept=".pmx">
+                    </div>
+                    <div class="file-input-group">
+                        <span>VMD File</span>
+                        <input type="file" id="vmdInput" accept=".vmd">
+                    </div>
+                    <div class="file-input-group">
+                        <span>Texture Folder</span>
+                        <input type="file" id="textureDirInput" webkitdirectory directory multiple>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button id="loadFilesBtn" class="primary-btn" style="width:100%;">LOAD CUSTOM</button>
+                </div>
+
+                <div class="usage-terms">
+                    <p>※ 利用規約を遵守してください（非営利・個人利用限定）</p>
+                </div>
             </div>
-          </div>
         </div>
 
 

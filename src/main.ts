@@ -121,6 +121,34 @@ async function init() {
         }
     };
     setupAudio();
+
+    // ===== カスタム ENTER AR ボタンと情報モーダルの連携 =====
+    const arLaunchBtn = document.getElementById("arLaunchBtn");
+    const infoFab = document.getElementById("infoFab");
+    const infoModal = document.getElementById("info-modal");
+    const closeInfoBtn = document.getElementById("closeInfoBtn");
+
+    // ENTER AR ボタンで Babylon標準のAR起動ボタンをクリック
+    arLaunchBtn?.addEventListener("click", () => {
+        // Babylon が自動生成するXR入場ボタンを探してクリック
+        const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement;
+        if (xrBtn) {
+            xrBtn.click();
+        } else {
+            alert("AR の準備ができていません。少し待ってからお試しください。");
+        }
+    });
+
+    // 情報モーダル
+    infoFab?.addEventListener("click", () => {
+        infoModal?.classList.remove("hidden");
+    });
+    closeInfoBtn?.addEventListener("click", () => {
+        infoModal?.classList.add("hidden");
+    });
+    infoModal?.addEventListener("click", (e) => {
+        if (e.target === infoModal) infoModal.classList.add("hidden");
+    });
 }
 
 init();

@@ -5,28 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>MMD WebAR Player | 39AI Avatar</title>
 
-    <!-- PWA & Mobile Optimization -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#111111" />
+    <meta name="theme-color" content="#0a0a1a" />
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- SEO & SNS (OGP) -->
     <meta name="description" content="ブラウザだけで楽しめる、高精細WebAR MMDプレイヤー。初音ミクがあなたの部屋で踊ります。" />
     <meta property="og:title" content="MMD WebAR Player" />
     <meta property="og:description" content="最新のWebXR技術を使用した、インストール不要のAR体験。" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
     <style>
       :root {
-        --primary-color: #00e5ff;
-        --secondary-color: #ff00ff;
-        --bg-color: rgba(0, 0, 0, 0.6);
-        --text-color: #ffffff;
-        --glass-bg: rgba(255, 255, 255, 0.1);
-        --glass-border: rgba(255, 255, 255, 0.2);
+        --primary: #00e5ff;
+        --primary-dim: #00a8cc;
+        --secondary: #ff00aa;
+        --accent: #ffaa00;
+        --bg-deep: #050516;
+        --bg-mid: #0a0a2a;
+        --text: #ffffff;
+        --text-dim: #a0b0d0;
+        --glass-bg: rgba(255, 255, 255, 0.06);
+        --glass-border: rgba(0, 229, 255, 0.25);
+        --glass-strong: rgba(255, 255, 255, 0.12);
       }
+
+      * { box-sizing: border-box; }
 
       body, html {
         margin: 0;
@@ -34,15 +45,40 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background-color: #111;
-        color: var(--text-color);
+        font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg-deep);
+        color: var(--text);
+      }
+
+      /* 背景グリッドアニメーション */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 20% 10%, rgba(0, 229, 255, 0.15), transparent 40%),
+          radial-gradient(circle at 80% 90%, rgba(255, 0, 170, 0.12), transparent 40%);
+        pointer-events: none;
+        z-index: 0;
       }
 
       #app {
         width: 100%;
         height: 100%;
         position: relative;
+        z-index: 1;
       }
 
       #renderCanvas {
@@ -50,246 +86,392 @@
         height: 100%;
         touch-action: none;
         outline: none;
+        position: relative;
+        z-index: 1;
       }
 
       #ui-container {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        inset: 0;
         pointer-events: none;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        padding: 20px;
-        box-sizing: border-box;
+        padding: 16px;
+        z-index: 2;
       }
 
-      #stats-panel {
-        align-self: flex-start;
-        background: var(--glass-bg);
-        backdrop-filter: blur(10px);
-        border: 1px solid var(--glass-border);
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-family: monospace;
-      }
-
-      #control-panel {
+      /* ===== ヘッダー ===== */
+      .top-header {
         pointer-events: auto;
-        align-self: flex-start;
-        width: 80%;
-        max-width: 320px;
-        background: var(--glass-bg);
-        backdrop-filter: blur(15px);
-        border: 1px solid var(--glass-border);
-        padding: 20px;
-        border-radius: 20px;
         display: flex;
         flex-direction: column;
-        gap: 15px;
-        margin-bottom: 20px;
-        margin-left: 20px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      }
-
-      .panel-section {
-        display: flex;
-        flex-direction: column;
+        align-items: center;
         gap: 8px;
+        padding: 16px 20px 12px;
+        background: linear-gradient(180deg, rgba(5, 5, 22, 0.85), rgba(5, 5, 22, 0.4));
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 0 24px rgba(0, 229, 255, 0.15);
+        max-width: 600px;
+        margin: 0 auto;
+        width: 100%;
       }
 
-      .vertical-buttons {
-        flex-direction: column;
+      .brand {
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 900;
+        font-size: 1.4rem;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        margin: 0;
       }
 
-      button {
-        padding: 12px 20px;
-        border-radius: 10px;
-        border: none;
-        font-weight: bold;
-        cursor: pointer;
-        transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+      .brand-sub {
+        font-size: 0.7rem;
+        letter-spacing: 4px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        margin: 0;
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-family: 'Orbitron', monospace;
+        font-size: 0.7rem;
+        color: var(--primary);
+      }
+
+      .stat-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #00ff88;
+        box-shadow: 0 0 8px #00ff88;
+        animation: pulse-dot 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+
+      /* ===== 中央エリア（ガイドカード） ===== */
+      .center-area {
         flex: 1;
-      }
-
-      .primary-btn {
-        background: linear-gradient(135deg, var(--primary-color), #00a8ff);
-        color: #000;
-      }
-
-      .primary-btn:active {
-        transform: scale(0.95);
-      }
-
-      .secondary-btn {
-        background: var(--glass-bg);
-        color: #fff;
-        border: 1px solid var(--glass-border);
-      }
-
-      .secondary-btn:hover {
-        background: var(--glass-border);
-      }
-
-      input[type="range"] {
-        width: 100%;
-        cursor: pointer;
-      }
-
-      .toggle-switch {
         display: flex;
-        align-items: center;
-        gap: 10px;
-        cursor: pointer;
-        font-size: 0.9rem;
-      }
-
-      #file-modal {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
-        pointer-events: auto;
-        z-index: 100;
-      }
-
-      .modal-content {
-        width: 90%;
-        max-width: 400px;
-        padding: 30px;
-        border-radius: 30px;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        border: 1px solid var(--glass-border);
-      }
-
-      .marker-container {
-        display: flex;
-        justify-content: center;
-        margin: 20px 0;
-      }
-
-      .input-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-
-      .modal-buttons {
-        display: flex;
-        gap: 10px;
-      }
-
-      .hidden {
-        display: none !important;
-      }
-
-      .modal {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        pointer-events: auto;
-        z-index: 100;
-      }
-
-      #marker-modal {
-        justify-content: flex-end;
-        padding-right: 40px;
-      }
-
-      #control-panel {
-        transition: transform 0.3s ease, opacity 0.3s ease;
-      }
-
-      #control-panel.collapsed {
-        transform: translateX(-120%);
-        opacity: 0;
+        padding-bottom: 20px;
         pointer-events: none;
       }
 
-      .panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
-      }
-
-      .panel-header h3 {
-        margin: 0;
-        font-size: 1.1rem;
-        color: var(--primary-color);
-      }
-
-      .icon-btn {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-        padding: 5px;
-        line-height: 1;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .icon-btn:hover {
-        color: var(--primary-color);
-      }
-
-      .floating-btn {
-        position: absolute;
-        bottom: 40px;
-        left: 20px;
+      .guide-card {
         pointer-events: auto;
-        z-index: 50;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-        padding: 10px 20px;
-        border-radius: 12px;
-        width: auto;
-      }
-
-      #ar-unsupported {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(255, 0, 0, 0.7);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
+        background: rgba(5, 5, 22, 0.7);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 14px 18px;
+        max-width: 360px;
+        width: calc(100% - 32px);
         text-align: center;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        line-height: 1.6;
+        animation: float-in 0.8s ease-out;
       }
 
-      @keyframes fadeIn {
+      .guide-card strong {
+        color: var(--primary);
+        font-weight: 700;
+      }
+
+      @keyframes float-in {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
 
+      /* ===== AR起動ボタン（メイン） ===== */
+      .ar-launch-area {
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: 8px;
+      }
+
+      .ar-mega-btn {
+        position: relative;
+        width: 200px;
+        height: 64px;
+        border: none;
+        border-radius: 32px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: #fff;
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 900;
+        font-size: 1.05rem;
+        letter-spacing: 3px;
+        cursor: pointer;
+        box-shadow:
+          0 0 30px rgba(0, 229, 255, 0.6),
+          0 0 60px rgba(255, 0, 170, 0.3),
+          inset 0 0 20px rgba(255, 255, 255, 0.15);
+        transition: transform 0.2s, box-shadow 0.3s;
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      .ar-mega-btn::before {
+        content: '';
+        position: absolute;
+        inset: -3px;
+        border-radius: 35px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary), var(--primary));
+        background-size: 200% 200%;
+        z-index: -1;
+        animation: glow-rotate 3s linear infinite;
+        opacity: 0.6;
+        filter: blur(8px);
+      }
+
+      .ar-mega-btn::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 32px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        z-index: -1;
+      }
+
+      @keyframes glow-rotate {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      .ar-mega-btn:active {
+        transform: scale(0.96);
+      }
+
+      .ar-mega-btn .icon {
+        font-size: 1.3rem;
+        margin-right: 6px;
+      }
+
+      .ar-pulse-ring {
+        position: absolute;
+        inset: -8px;
+        border-radius: 40px;
+        border: 2px solid var(--primary);
+        opacity: 0;
+        animation: pulse-ring 2s ease-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes pulse-ring {
+        0% { opacity: 0.7; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.25); }
+      }
+
+      .ar-hint {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        letter-spacing: 1px;
+        text-align: center;
+        max-width: 280px;
+        line-height: 1.5;
+      }
+
+      .ar-hint .icon {
+        color: var(--primary);
+      }
+
+      /* ===== 技術スタックバッジ ===== */
+      .tech-stack {
+        pointer-events: auto;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 500px;
+        margin: 12px auto 0;
+      }
+
+      .tech-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        font-size: 0.65rem;
+        font-family: 'Orbitron', monospace;
+        letter-spacing: 1px;
+        background: rgba(0, 229, 255, 0.08);
+        border: 1px solid rgba(0, 229, 255, 0.3);
+        border-radius: 12px;
+        color: var(--primary);
+        transition: all 0.2s;
+      }
+
+      .tech-badge:hover {
+        background: rgba(0, 229, 255, 0.15);
+        transform: translateY(-1px);
+      }
+
+      .tech-badge.alt {
+        background: rgba(255, 0, 170, 0.08);
+        border-color: rgba(255, 0, 170, 0.3);
+        color: var(--secondary);
+      }
+
+      .tech-badge.alt:hover {
+        background: rgba(255, 0, 170, 0.15);
+      }
+
+      /* ===== Info FAB（情報ボタン） ===== */
+      .info-fab {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        color: var(--primary);
+        font-size: 1.2rem;
+        cursor: pointer;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 16px rgba(0, 229, 255, 0.2);
+        z-index: 5;
+      }
+
+      /* ===== モーダル共通 ===== */
+      .modal {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 100;
+        animation: fade-in 0.3s ease-out;
+      }
+
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .modal-content {
+        width: calc(100% - 32px);
+        max-width: 420px;
+        max-height: 85vh;
+        overflow-y: auto;
+        padding: 24px;
+        border-radius: 24px;
+        background: linear-gradient(160deg, rgba(15, 15, 40, 0.95), rgba(5, 5, 22, 0.95));
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 0 40px rgba(0, 229, 255, 0.2);
+      }
+
+      .modal-content h3 {
+        font-family: 'Orbitron', sans-serif;
+        color: var(--primary);
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+        letter-spacing: 2px;
+      }
+
+      .modal-content p {
+        font-size: 0.85rem;
+        line-height: 1.7;
+        color: var(--text-dim);
+        margin: 8px 0;
+      }
+
+      .modal-content .section-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.75rem;
+        letter-spacing: 2px;
+        color: var(--secondary);
+        margin: 16px 0 6px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--glass-border);
+      }
+
+      .close-x {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        color: var(--text);
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-content { position: relative; }
+
+      /* ===== ボタン共通 ===== */
+      button.primary-btn {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+        color: #000;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      button.secondary-btn {
+        background: var(--glass-bg);
+        color: #fff;
+        border: 1px solid var(--glass-border);
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .modal-buttons button { flex: 1; }
+
+      /* ===== ローディング ===== */
       #loading-screen {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #111;
+        inset: 0;
+        background: radial-gradient(circle at center, var(--bg-mid), var(--bg-deep));
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -299,34 +481,69 @@
       }
 
       .loader {
-        border: 4px solid var(--glass-border);
-        border-top: 4px solid var(--primary-color);
+        width: 60px;
+        height: 60px;
+        border: 3px solid transparent;
+        border-top-color: var(--primary);
+        border-right-color: var(--secondary);
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
         animation: spin 1s linear infinite;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+      }
+
+      #loading-screen p {
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 2px;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+      }
+
+      #loading-status {
+        color: var(--primary);
+        font-weight: 700;
       }
 
       @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        to { transform: rotate(360deg); }
       }
 
+      .hidden { display: none !important; }
+
+      /* ===== AR Overlay ===== */
       #ar-overlay {
         display: none;
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        inset: 0;
         touch-action: none;
         pointer-events: auto;
         z-index: 10;
       }
 
-      #ar-overlay.active {
-        display: block;
+      #ar-overlay.active { display: block; }
+
+      /* ===== エラー表示 ===== */
+      #ar-unsupported {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 50, 50, 0.85);
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+      }
+
+      /* ===== モバイル調整 ===== */
+      @media (max-width: 480px) {
+        .brand { font-size: 1.15rem; }
+        .ar-mega-btn { width: 180px; height: 60px; font-size: 0.95rem; }
+        .guide-card { font-size: 0.8rem; padding: 12px 16px; }
+      }
+
+      /* Babylon native button hidden */
+      .babylonVRicon {
+        display: none !important;
       }
     </style>
   </head>
@@ -334,109 +551,141 @@
     <div id="app">
       <canvas id="renderCanvas"></canvas>
       <div id="ar-overlay"></div>
-      
+
       <div id="ui-container">
-        <div id="stats-panel">
-          <div id="fps">FPS: --</div>
+        <!-- ヘッダー -->
+        <header class="top-header">
+          <h1 class="brand">39AI AVATAR</h1>
+          <p class="brand-sub">MMD × WebXR AR Experience</p>
+          <div class="stats-row">
+            <span class="stat-dot"></span>
+            <span id="fps">FPS: --</span>
+            <span style="opacity: 0.4;">|</span>
+            <span>v2.8</span>
+          </div>
+        </header>
+
+        <!-- 情報FAB -->
+        <button id="infoFab" class="info-fab" title="このアプリについて">ℹ</button>
+
+        <!-- 中央：ガイド -->
+        <div class="center-area">
+          <div class="guide-card">
+            画面の<strong>ミク</strong>はあなたの部屋に呼び出せます。<br>
+            下の <strong>ENTER AR</strong> ボタンから起動 → <strong>床をタップ</strong>で配置。
+          </div>
         </div>
 
-        <div id="control-panel">
+        <!-- AR起動エリア -->
+        <div class="ar-launch-area">
+          <div style="position: relative;">
+            <span class="ar-pulse-ring"></span>
+            <button id="arLaunchBtn" class="ar-mega-btn">
+              <span class="icon">📷</span>ENTER AR
+            </button>
+          </div>
+          <p class="ar-hint">
+            <span class="icon">✨</span> Android Chrome 推奨 / 床のある明るい場所で
+          </p>
+          <div class="tech-stack">
+            <span class="tech-badge">WebXR</span>
+            <span class="tech-badge">Babylon.js</span>
+            <span class="tech-badge alt">babylon-mmd</span>
+            <span class="tech-badge">TypeScript</span>
+            <span class="tech-badge alt">Vite</span>
+            <span class="tech-badge">ARCore</span>
+          </div>
+        </div>
+
+        <!-- 設定パネル（非表示） -->
+        <div id="control-panel" class="hidden">
           <div class="panel-header">
             <h3>設定</h3>
-            <button id="minimizeBtn" class="icon-btn" title="最小化">×</button>
+            <button id="minimizeBtn" class="icon-btn">×</button>
           </div>
-          <div class="panel-section vertical-buttons">
-            <button id="playPauseBtn" class="primary-btn">再生 / 一時停止</button>
-          </div>
+          <button id="playPauseBtn" class="primary-btn">再生 / 一時停止</button>
+          <label>モデルスケール: <span id="scaleVal">0.2</span></label>
+          <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.1" value="0.2" />
+          <label>Y 位置調整: <span id="yPosVal">0.0</span></label>
+          <input type="range" id="yPosSlider" min="-10" max="10" step="0.1" value="0.0" />
+          <label>再生位置: <span id="seekVal">0</span> / <span id="durationVal">0</span></label>
+          <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" />
+          <label><input type="checkbox" id="physicsToggle" /> 物理演算</label>
+          <label><input type="checkbox" id="shadowToggle" /> 影</label>
+          <button id="fileSelectToggle" class="secondary-btn">ファイル選択を表示</button>
+        </div>
 
+        <button id="showSettingsBtn" class="hidden">⚙️</button>
+        <button id="showMarkerBtn" class="hidden">📷</button>
 
-          <div class="panel-section">
-            <label for="scaleSlider">モデルスケール: <span id="scaleVal">0.2</span></label>
-            <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.1" value="0.2" />
-          </div>
+        <!-- 情報モーダル -->
+        <div id="info-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeInfoBtn">×</button>
+            <h3>ABOUT</h3>
+            <p>
+              ブラウザを開くだけで、3D MMD モデルが現実空間に登場する WebAR 体験です。
+              アプリのインストールは不要。スマホのカメラと WebXR 対応ブラウザだけで動作します。
+            </p>
 
-          <div class="panel-section">
-            <label for="yPosSlider">Y 位置調整: <span id="yPosVal">0.0</span></label>
-            <input type="range" id="yPosSlider" min="-10" max="10" step="0.1" value="0.0" />
-          </div>
+            <div class="section-title">USAGE / 使い方</div>
+            <p>
+              ① <strong>ENTER AR</strong> をタップして AR モードへ。<br>
+              ② カメラを<strong>床に向けて</strong>少し動かし、平面をスキャン。<br>
+              ③ <strong>床をタップ</strong>するとミクが登場します。<br>
+              ④ <strong>1本指ドラッグ</strong>で回転、<strong>2本指ピンチ</strong>で拡大縮小。
+            </p>
 
-          <div class="panel-section">
-            <label for="seekSlider">再生位置: <span id="seekVal">0</span> / <span id="durationVal">0</span></label>
-            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" />
-          </div>
+            <div class="section-title">TECH STACK / 技術スタック</div>
+            <p>
+              <strong>レンダリング</strong>: Babylon.js（WebGL2）<br>
+              <strong>3Dモデル</strong>: babylon-mmd（PMX / VMD ローダ）<br>
+              <strong>AR基盤</strong>: WebXR Device API + ARCore<br>
+              <strong>言語 / ビルド</strong>: TypeScript + Vite<br>
+              <strong>配信</strong>: Vercel（HTTPS / Edge）
+            </p>
 
-          <div class="panel-section">
-            <label class="toggle-switch">
-              <input type="checkbox" id="physicsToggle" />
-              <span class="slider"></span>
-              物理演算
-            </label>
-            <label class="toggle-switch">
-              <input type="checkbox" id="shadowToggle" />
-              <span class="slider"></span>
-              影
-            </label>
-          </div>
-
-          <div class="panel-section">
-            <button id="fileSelectToggle" class="secondary-btn">ファイル選択を表示</button>
+            <div class="section-title">SUPPORTED DEVICES</div>
+            <p>
+              ✅ Android (Chrome 90+) — フル対応<br>
+              ⚠ iOS (Safari) — WebXR 非対応のため AR 起動不可<br>
+              ✅ デスクトップ — 通常の 3D ビューワとして動作
+            </p>
           </div>
         </div>
 
-        <button id="showSettingsBtn" class="glass-btn hidden floating-btn">
-          <i class="fas fa-cog"></i> ⚙️ 設定を表示
-        </button>
-        <button id="showMarkerBtn" class="glass-btn floating-btn" style="bottom: 100px; pointer-events: auto;">
-          <i class="fas fa-qrcode"></i> 📷 マーカーを表示
-        </button>
-
+        <!-- ファイル / マーカーモーダル（既存・隠し） -->
         <div id="file-modal" class="modal hidden">
-          <div class="modal-content glass-panel">
+          <div class="modal-content">
             <h3>MMDファイルをロード</h3>
-            <div class="input-group">
-              <label>PMX (モデル):</label>
-              <input type="file" id="pmxInput" accept=".pmx" />
-            </div>
-            <div class="input-group">
-              <label>VMD (モーション):</label>
-              <input type="file" id="vmdInput" accept=".vmd" />
-            </div>
-            <div class="input-group">
-              <label>テクスチャ (フォルダごと):</label>
-              <input type="file" id="textureDirInput" webkitdirectory directory />
-            </div>
+            <label>PMX:</label><input type="file" id="pmxInput" accept=".pmx" />
+            <label>VMD:</label><input type="file" id="vmdInput" accept=".vmd" />
+            <label>テクスチャ:</label><input type="file" id="textureDirInput" webkitdirectory directory />
             <div class="modal-buttons">
-              <button id="loadFilesBtn" class="primary-btn">ロード開始</button>
+              <button id="loadFilesBtn" class="primary-btn">ロード</button>
               <button id="closeModalBtn" class="secondary-btn">閉じる</button>
             </div>
           </div>
         </div>
 
-        <!-- AR Marker Modal -->
         <div id="marker-modal" class="modal hidden">
-          <div class="modal-content glass-panel" style="text-align: center; max-width: 450px;">
-            <h3 style="margin-bottom: 5px;">AR起動用 QRマーカー</h3>
-            <div class="marker-container" style="margin: 10px 0;">
-              <img src="assets/marker_qr.png" alt="AR Marker" style="width: 100%; max-width: 350px; border: 10px solid white; border-radius: 10px;" />
-            </div>
-            <div style="text-align: left; font-size: 0.9em; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;">
-              <p style="margin: 0 0 5px 0;">1. スマホの標準カメラでこのQRをスキャン。</p>
-              <p style="margin: 0 0 5px 0;">2. サイトが開いたら、画面右下の「メガネ型アイコン」をタップ。</p>
-              <p style="margin: 0;">3. そのままカメラをこのQRに向けるとミクが登場！</p>
-            </div>
-            <div class="modal-buttons" style="justify-content: center; margin-top: 15px;">
+          <div class="modal-content">
+            <h3>QRマーカー</h3>
+            <img src="assets/marker_qr.png" alt="QR" style="width:100%; max-width:300px; display:block; margin:10px auto;" />
+            <div class="modal-buttons">
               <button id="closeMarkerBtn" class="secondary-btn">閉じる</button>
             </div>
           </div>
         </div>
 
         <div id="ar-unsupported" class="hidden">
-          この端末はWebXR ARに対応していません。
+          この端末は WebXR AR に対応していません。
         </div>
 
         <div id="loading-screen">
           <div class="loader"></div>
-          <p>アセット読み込み中...<br><span id="loading-status">0%</span></p>
+          <p>LOADING ASSETS</p>
+          <p><span id="loading-status">0%</span></p>
         </div>
       </div>
     </div>

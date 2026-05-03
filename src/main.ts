@@ -177,41 +177,68 @@ async function init() {
     }, async (presetId) => {
         const presets: Record<string, string> = {
             "original": "assets/model/miku.pmx",
-            "takosanp": "assets/model/takosanp/Takosan P's DIVA FT Style Models 第一弾/配布用 DIVAFT マジカルミライ 2015/たこさんP式DIVAFT風 初音ミク マジカルミライ 2015.pmx",
-            "sour_snow": "assets/model/sour_snow/Sour式改変雪ミクVer.1.02/★改変雪ミク.pmx",
-            "onasu": "assets/model/onasu/おナス式初音ミクver0.4(桜ミク風)/おナス式初音ミクver0.4(桜ミク).pmx",
-            "riverside": "assets/model/riverside/リバーサイド式ミク_Ver2.02.pmx"
+            "takosanp": "assets/model/presets/mm2015/model.pmx",
+            "sour_snow": "assets/model/presets/snow/model.pmx",
+            "onasu": "assets/model/presets/sakura/model.pmx",
+            "riverside": "assets/model/presets/riverside/model.pmx"
         };
         const pmxPath = presets[presetId];
         if (!pmxPath) return;
+
+        console.log(`🔄 Attempting to switch to preset: ${presetId} (${pmxPath})`);
 
         if (loadingScreen) {
             loadingScreen.style.opacity = "1";
             loadingScreen.classList.remove("hidden");
         }
+        if (loadingStatus) loadingStatus.textContent = "Loading...";
 
-        if (currentModel) {
-            mmdRuntime.destroyMmdModel(currentModel);
-            currentModel.mesh.dispose();
-        }
-
-        currentModel = await loadMmdModel(
-            scene, mmdRuntime, 
-            pmxPath, "assets/motion/dance.vmd",
-            shadowGenerator, undefined,
-            (event) => {
-                if (event.lengthComputable && event.total > 0) {
-                    const percentage = Math.floor((event.loaded / event.total) * 100);
-                    if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
-                }
+        try {
+            // 前のモデルを破棄（ただし保険のため直ぐには破棄せず、ロード成功後に破棄するのが理想だが、メモリ管理上先に消す）
+            if (currentModel) {
+                mmdRuntime.destroyMmdModel(currentModel);
+                currentModel.mesh.dispose();
+                currentModel = null;
             }
-        );
 
-        if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.07);
-            currentModel.mesh.position.set(0, 0, 0); 
-            if (expressionCleanup) (expressionCleanup as any)();
-            expressionCleanup = setupExpressions(scene, currentModel);
+            currentModel = await loadMmdModel(
+                scene, mmdRuntime, 
+                pmxPath, "assets/motion/dance.vmd",
+                shadowGenerator, undefined,
+                (event) => {
+                    if (event.lengthComputable && event.total > 0) {
+                        const percentage = Math.floor((event.loaded / event.total) * 100);
+                        if (loadingStatus) loadingStatus.textContent = `${percentage}%`;
+                    }
+                }
+            );
+
+            if (currentModel) {
+                currentModel.mesh.scaling.setAll(0.07);
+                currentModel.mesh.position.set(0, 0, 0); 
+                if (expressionCleanup) (expressionCleanup as any)();
+                expressionCleanup = setupExpressions(scene, currentModel);
+                console.log(`✅ Successfully switched to preset: ${presetId}`);
+            }
+        } catch (e: any) {
+            console.error(`❌ Failed to switch to ${presetId}:`, e);
+            alert(`モデル「${presetId}」の読み込みに失敗しました。\n${e.message || e}\nデフォルトモデルに戻します。`);
+            
+            // フォールバック：デフォルトモデルへ復帰
+            try {
+                currentModel = await loadMmdModel(
+                    scene, mmdRuntime, "assets/model/miku.pmx", "assets/motion/dance.vmd",
+                    shadowGenerator
+                );
+                if (currentModel) {
+                    currentModel.mesh.scaling.setAll(0.07);
+                    currentModel.mesh.position.set(0, 0, 0); 
+                    if (expressionCleanup) (expressionCleanup as any)();
+                    expressionCleanup = setupExpressions(scene, currentModel);
+                }
+            } catch (fallbackError) {
+                console.error("Critical: Fallback also failed", fallbackError);
+            }
         }
 
         if (loadingScreen) {

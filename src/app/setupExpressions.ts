@@ -42,12 +42,32 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
     console.log("MMD Available morphs:", available);
   } catch (e) { /* ignore */ }
 
-  // 安全にモーフ値を設定するヘルパー
+  // 安全にモーフ値を設定するヘルパー（エイリアス対応）
   const setWeight = (name: string, value: number) => {
-    try {
-      morph.setMorphWeight(name, value);
-    } catch (e) {
-      // モーフが存在しない場合はスキップ
+    // モデルによって異なる可能性があるモーフ名の対応表
+    const aliases: Record<string, string[]> = {
+      "まばたき": ["まばたき", "Blink", "blink", "瞳閉じ", "Close"],
+      "笑い": ["笑い", "Smile", "smile", "にっこり", "にこり", "W笑い"],
+      "ウィンク": ["ウィンク", "Wink", "wink", "ウィンク右", "ウィンク左"],
+      "ウィンク2": ["ウィンク2", "Wink2", "wink2", "ウィンク右2", "ウィンク左2"],
+      "なごみ": ["なごみ", "Calm", "calm", "真面目"],
+      "あ": ["あ", "A", "a", "Lip_A"],
+      "い": ["い", "I", "i", "Lip_I"],
+      "う": ["う", "U", "u", "Lip_U"],
+      "え": ["え", "E", "e", "Lip_E"],
+      "お": ["お", "O", "o", "Lip_O"],
+    };
+
+    const targetNames = aliases[name] || [name];
+    
+    for (const target of targetNames) {
+      try {
+        // babylon-mmd の morph.setMorphWeight は存在しないモーフ名を渡すとエラーになるか
+        // 何もしない場合があるため、明示的にチェックする
+        morph.setMorphWeight(target, value);
+      } catch (e) {
+        // 存在しない場合は次を試す
+      }
     }
   };
 

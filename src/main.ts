@@ -323,7 +323,8 @@ async function init() {
             console.log("Switching Dance to:", newId);
             currentDanceId = newId;
 
-            // 1. 再生停止
+            // 1. 再生状態の保存と停止
+            const wasPlaying = bgmStarted;
             mmdRuntime.pauseAnimation();
             if (internalAudio) internalAudio.pause();
             if (vocalAudio) vocalAudio.pause();
@@ -336,6 +337,11 @@ async function init() {
             // 3. 音声読み込み
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
             await setupAudio(newId);
+
+            // 4. 自動再生（切り替え前が再生中だった場合）
+            if (wasPlaying) {
+                startPlayback();
+            }
 
             if (loadingStatus) loadingStatus.textContent = "";
             console.log("Dance Switch Complete");

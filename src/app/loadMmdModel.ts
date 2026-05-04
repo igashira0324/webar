@@ -65,8 +65,8 @@ export const loadMmdModel = async (
     const handle = mmdModel.createRuntimeAnimation(motion);
     mmdModel.setRuntimeAnimation(handle);
 
-    // Force set duration to allow seeking
-    mmdRuntime.setManualAnimationDuration(motion.endFrame);
+    // Force set duration to allow seeking (convert frames to seconds)
+    mmdRuntime.setManualAnimationDuration(motion.endFrame / 30);
 
     return mmdModel;
 };

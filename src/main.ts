@@ -6,6 +6,7 @@ import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
 import { MmdModel, StreamAudioPlayer } from 'babylon-mmd';
 import { setupExpressions } from './app/setupExpressions';
+import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
     console.log("App Initialization - Version 2.15 (No Overlay)");
@@ -43,6 +44,9 @@ async function init() {
 
             // 2. HTMLAudioElement を直接 play
             if (internalAudio) {
+                // ★ 音楽連動リップシンクをアタッチ
+                lipSync.attach(internalAudio);
+
                 internalAudio.muted = false;
                 internalAudio.volume = 1.0;
                 if (internalAudio.paused) {
@@ -82,6 +86,62 @@ async function init() {
 
     let currentModel: MmdModel | null = null;
     const getCurrentModel = () => currentModel;
+
+    // ===== 音楽ファイルからのリップシンク初期化 =====
+    const lipSync = setupAudioLipSync(scene, getCurrentModel);
+
+    // ===== 繰り返し再生機能の状態管理 =====
+    let isLooping = false;
+    let loopTimer: number | null = null;
+    let loopEnabled = true;
+
+    scene.onBeforeRenderObservable.add(() => {
+        // 再生開始前 or ループ設定OFF or すでにループ処理中はスキップ
+        if (!bgmStarted || !loopEnabled || isLooping) return;
+
+        const duration = mmdRuntime.animationFrameTimeDuration;
+        const current = mmdRuntime.currentFrameTime;
+
+        // 終端に到達したか（0.5フレーム手前で判定して取りこぼし防止）
+        if (duration > 0 && current >= duration - 0.5) {
+            isLooping = true;
+            console.log("🔁 Animation ended, looping in 2s...");
+
+            // 一時停止（音声・アニメ両方）
+            try {
+                mmdRuntime.pauseAnimation();
+                if (internalAudio && !internalAudio.paused) {
+                    internalAudio.pause();
+                }
+            } catch (e) {
+                console.warn("Loop pause failed:", e);
+            }
+
+            // 2秒後にリセット & 再生
+            loopTimer = window.setTimeout(() => {
+                try {
+                    // アニメーションを先頭に
+                    mmdRuntime.seekAnimation(0, true);
+                    // 音声も先頭に
+                    if (internalAudio) {
+                        internalAudio.currentTime = 0;
+                        const p = internalAudio.play();
+                        if (p && typeof p.then === "function") {
+                            p.catch(err => console.warn("Loop audio play failed:", err));
+                        }
+                    }
+                    // アニメ再開
+                    mmdRuntime.playAnimation();
+                    console.log("🔁 Loop restarted");
+                } catch (e) {
+                    console.warn("Loop restart failed:", e);
+                } finally {
+                    isLooping = false;
+                    loopTimer = null;
+                }
+            }, 2000);
+        }
+    });
 
     // 3. Load Default Model
     const loadingScreen = document.getElementById("loading-screen") as HTMLDivElement;
@@ -248,6 +308,20 @@ async function init() {
     });
 
     setupPerformanceControls(scene, mmdRuntime, shadowGenerator);
+
+    // ===== 新規トグルのイベントリスナー追加 =====
+    document.getElementById("loopToggle")?.addEventListener("change", (e) => {
+        loopEnabled = (e.target as HTMLInputElement).checked;
+        if (!loopEnabled && loopTimer !== null) {
+            window.clearTimeout(loopTimer);
+            loopTimer = null;
+            isLooping = false;
+        }
+    });
+
+    document.getElementById("lipsyncToggle")?.addEventListener("change", (e) => {
+        lipSync.setEnabled((e.target as HTMLInputElement).checked);
+    });
 }
 
 // ===== UIモーダル制御 =====

@@ -9,7 +9,7 @@ import { setupExpressions } from './app/setupExpressions';
 import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
-    console.log("39AI AVATAR - Final Build v2.50 (Ironclad Stability)");
+    console.log("MMD WebXR Player - Final Build v2.60 (Full Features)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -56,6 +56,7 @@ async function init() {
     const getCurrentModel = () => currentModel;
     const lipSync = setupAudioLipSync(scene, getCurrentModel);
 
+    // --- 統合再生・一時停止ロジック ---
     const togglePlayback = async (forceState?: boolean): Promise<boolean> => {
         if (!currentModel || !internalAudio) return false;
         const shouldPlay = forceState !== undefined ? forceState : internalAudio.paused;
@@ -87,9 +88,9 @@ async function init() {
             return false;
         }
     };
-
     (window as any).__startPlayback = () => togglePlayback(true);
 
+    // --- インタラクション ---
     scene.onPointerObservable.add((pointerInfo) => {
         if (pointerInfo.type === 1 && pointerInfo.pickInfo?.hit) {
             const pickedMesh = pointerInfo.pickInfo.pickedMesh;
@@ -98,6 +99,12 @@ async function init() {
             }
         }
     });
+
+    // --- ループ再生イベントハンドラ ---
+    const onAudioEnded = () => {
+        console.log("🔁 audio ended fired");
+        if (loopEnabled && !isLooping) (window as any).__triggerLoop();
+    };
 
     (window as any).__triggerLoop = () => {
         if (isLooping || !loopEnabled) return;
@@ -126,13 +133,18 @@ async function init() {
             
             const audio = (audioPlayer as any)._audio || (audioPlayer as any).audio;
             if (audio) {
-                audio.onended = () => {
-                    if (loopEnabled && !isLooping) (window as any).__triggerLoop();
-                };
+                // babylon-mmd の内部 loop を無効化して ended を確実に発火させる
+                audio.loop = false;
+                audio.removeEventListener("ended", onAudioEnded);
+                audio.addEventListener("ended", onAudioEnded);
+
                 internalAudio = audio;
                 audio.preload = "auto";
                 vocalAudio = preset.vocal ? new Audio(preset.vocal) : null;
-                if (vocalAudio) vocalAudio.preload = "auto";
+                if (vocalAudio) {
+                    vocalAudio.loop = false;
+                    vocalAudio.preload = "auto";
+                }
                 
                 await new Promise<void>(resolve => {
                     if (audio.readyState >= 3) resolve();
@@ -145,9 +157,26 @@ async function init() {
         }
     };
 
+    // --- 初期ロード ---
     const loadingScreen = document.getElementById("loading-screen");
     const loadingStatus = document.getElementById("loading-status");
     const arLaunchBtn = document.getElementById("arLaunchBtn") as HTMLButtonElement;
+
+    const showLoading = (text?: string) => {
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "1";
+            loadingScreen.classList.remove("hidden");
+        }
+        if (loadingStatus && text) loadingStatus.textContent = text;
+    };
+
+    const hideLoading = () => {
+        if (loadingScreen) {
+            loadingScreen.style.opacity = "0";
+            setTimeout(() => loadingScreen.classList.add("hidden"), 500);
+        }
+        if (loadingStatus) loadingStatus.textContent = "";
+    };
 
     try {
         const result = await loadMmdModel(scene, mmdRuntime, "assets/model/miku.pmx", DANCE_PRESETS[currentDanceId].vmd, shadowGenerator);
@@ -156,7 +185,7 @@ async function init() {
             currentModel.mesh.scaling.setAll(0.07);
             expressionCleanup = setupExpressions(scene, currentModel);
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
-            mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
+            if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
             await setupAudio(currentDanceId);
         }
     } catch (e) {
@@ -168,24 +197,24 @@ async function init() {
         arLaunchBtn.style.opacity = "1";
     }
 
-    scene.executeWhenReady(() => {
-        if (loadingScreen) {
-            loadingScreen.style.opacity = "0";
-            setTimeout(() => loadingScreen.classList.add("hidden"), 500);
-        }
-    });
+    scene.executeWhenReady(() => hideLoading());
 
+    // --- UI/ダンス切り替え ---
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;
     danceSelect?.addEventListener("change", async () => {
         const newId = danceSelect.value;
         if (newId === currentDanceId || !currentModel) return;
         currentDanceId = newId;
         togglePlayback(false);
-        if (loadingStatus) loadingStatus.textContent = "Loading...";
-        const motion = await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
-        await setupAudio(newId);
-        mmdRuntime.setManualAnimationDuration(motion.endFrame);
-        if (loadingStatus) loadingStatus.textContent = "";
+        showLoading("Loading Motion...");
+        try {
+            const motion = await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
+            if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
+            await setupAudio(newId);
+            if (motion) mmdRuntime.setManualAnimationDuration(motion.endFrame);
+        } finally {
+            hideLoading();
+        }
     });
 
     setupUI(scene, mmdRuntime, audioPlayer, getCurrentModel, togglePlayback, async (pmx, vmd, textures) => {
@@ -194,14 +223,16 @@ async function init() {
             currentModel.mesh.dispose();
             if (expressionCleanup) expressionCleanup();
         }
+        showLoading("Loading Custom Model...");
         const result = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
         currentModel = result.model;
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
             expressionCleanup = setupExpressions(scene, currentModel);
-            mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
+            if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
             if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
         }
+        hideLoading();
     }, async (presetId) => {
         const presets: Record<string, string> = {
             "original": "assets/model/miku.pmx",
@@ -213,16 +244,30 @@ async function init() {
         const pmxPath = presets[presetId];
         if (!pmxPath || !currentModel) return;
         togglePlayback(false);
-        mmdRuntime.destroyMmdModel(currentModel);
-        currentModel.mesh.dispose();
-        if (expressionCleanup) expressionCleanup();
-        const result = await loadMmdModel(scene, mmdRuntime, pmxPath, DANCE_PRESETS[currentDanceId].vmd, shadowGenerator);
-        currentModel = result.model;
-        if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.07);
-            expressionCleanup = setupExpressions(scene, currentModel);
-            mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
-            if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
+        showLoading("0%");
+        try {
+            mmdRuntime.destroyMmdModel(currentModel);
+            currentModel.mesh.dispose();
+            if (expressionCleanup) expressionCleanup();
+            const result = await loadMmdModel(
+                scene, mmdRuntime, pmxPath, DANCE_PRESETS[currentDanceId].vmd, shadowGenerator, 
+                undefined, 
+                (event) => {
+                    if (event.lengthComputable && event.total > 0) {
+                        const pct = Math.floor((event.loaded / event.total) * 100);
+                        if (loadingStatus) loadingStatus.textContent = `${pct}%`;
+                    }
+                }
+            );
+            currentModel = result.model;
+            if (currentModel) {
+                currentModel.mesh.scaling.setAll(0.07);
+                expressionCleanup = setupExpressions(scene, currentModel);
+                if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
+                if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
+            }
+        } finally {
+            hideLoading();
         }
     });
 
@@ -234,8 +279,22 @@ async function init() {
         lipSync.setEnabled((e.target as HTMLInputElement).checked);
     });
 
+    // アイドル表現 & ループフォールバック
     let idleMouthTimer = 0;
+    let lastCurrentFrame = 0;
     scene.onBeforeRenderObservable.add(() => {
+        // 1. ループフォールバック（Endedイベントが来ない場合の保険）
+        if (bgmStarted && loopEnabled && !isLooping) {
+            const duration = mmdRuntime.animationFrameTimeDuration;
+            const current = mmdRuntime.currentFrameTime;
+            if (duration > 0 && current >= duration - 0.5 && lastCurrentFrame < current) {
+                console.log("🔁 frame-based end detected");
+                (window as any).__triggerLoop();
+            }
+            lastCurrentFrame = current;
+        }
+
+        // 2. アイドル表情
         if (!bgmStarted || !currentModel || DANCE_PRESETS[currentDanceId].vocal) return;
         const deltaTime = scene.getEngine().getDeltaTime();
         idleMouthTimer += deltaTime;

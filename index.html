@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>MMD WebAR Player | 39AI Avatar</title>
+    <title>MMD(MikuMikuDance) × WebXR Experience</title>
 
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -626,9 +626,9 @@
         width: 44px;
         height: 44px;
         border-radius: 50%;
-        border: 2px solid var(--neon-cyan);
-        background: rgba(0, 243, 255, 0.1);
-        color: var(--neon-cyan);
+        border: 2px solid var(--primary);
+        background: rgba(0, 229, 255, 0.1);
+        color: var(--primary);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -636,22 +636,27 @@
         transition: all 0.2s ease;
         flex-shrink: 0;
         font-size: 1.2rem;
-        box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 700;
       }
       .play-pause-circle:hover {
-        background: rgba(0, 243, 255, 0.2);
-        box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+        background: rgba(0, 229, 255, 0.2);
+        box-shadow: 0 0 18px rgba(0, 229, 255, 0.5);
         transform: scale(1.05);
       }
       .play-pause-circle:active {
         transform: scale(0.95);
       }
       .frame-counter {
-        font-size: 0.75rem;
-        font-family: 'Courier New', monospace;
-        color: var(--neon-cyan);
-        opacity: 0.8;
-        margin-left: auto;
+        color: var(--primary);
+        font-family: 'Orbitron', monospace;
+        font-size: 0.78rem;
+        padding: 2px 10px;
+        background: rgba(0, 229, 255, 0.1);
+        border: 1px solid rgba(0, 229, 255, 0.3);
+        border-radius: 8px;
+        letter-spacing: 1px;
       }
       .playback-row-title {
         display: flex;
@@ -793,7 +798,8 @@
 
       /* ===== モバイル調整 ===== */
       @media (max-width: 480px) {
-        .brand { font-size: 1.15rem; }
+        .brand { font-size: 1.0rem; letter-spacing: 1px; }
+        .brand-sub { font-size: 0.6rem; letter-spacing: 2px; }
         .ar-mega-btn { width: 180px; height: 60px; font-size: 0.95rem; }
         .guide-card { font-size: 0.8rem; padding: 12px 16px; }
       }
@@ -825,10 +831,9 @@
       <div id="ar-overlay"></div>
 
       <div id="ui-container">
-        <!-- ヘッダー -->
         <header class="top-header">
-          <h1 class="brand">AI AVATAR</h1>
-          <p class="brand-sub">MMD × WebXR AR Experience</p>
+          <h1 class="brand">MMD<span style="font-size:0.65em; opacity:0.85;">(MikuMikuDance)</span></h1>
+          <p class="brand-sub">× WebXR Experience</p>
           <span id="fps" style="display:none;"></span>
         </header>
 
@@ -836,7 +841,7 @@
         <div class="fab-group">
           <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
           <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
-          <button id="qrFab" class="fab-btn" title="QRコード">📷</button>
+          <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
         </div>
 
         <!-- 中央：ガイド -->

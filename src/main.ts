@@ -9,7 +9,7 @@ import { setupExpressions } from './app/setupExpressions';
 import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
-    console.log("MMD WebXR Player - Final Build v2.80 (Restored UX)");
+    console.log("MMD WebXR Player - Final Build v2.85 (Robust sequence)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -127,7 +127,6 @@ async function init() {
 
     const setupAudio = async (danceId: string) => {
         try {
-            await mmdRuntime.setAudioPlayer(audioPlayer);
             const preset = DANCE_PRESETS[danceId];
             audioPlayer.source = preset.music;
             
@@ -145,11 +144,14 @@ async function init() {
                     vocalAudio.preload = "auto";
                 }
                 
-                await new Promise<void>(resolve => {
-                    if (audio.readyState >= 3) resolve();
-                    else audio.oncanplaythrough = () => resolve();
-                    setTimeout(resolve, 5000);
-                });
+                // 5秒でタイムアウトして次に進む
+                await Promise.race([
+                    new Promise<void>(resolve => {
+                        if (audio.readyState >= 3) resolve();
+                        else audio.oncanplaythrough = () => resolve();
+                    }),
+                    new Promise<void>(resolve => setTimeout(resolve, 5000))
+                ]);
             }
         } catch (e) {
             console.warn("Audio setup failed", e);
@@ -176,6 +178,23 @@ async function init() {
         }
     };
 
+    // 先に完了時のハンドラを登録しておく
+    scene.executeWhenReady(() => {
+        let frameCount = 0;
+        const observer = scene.onAfterRenderObservable.add(() => {
+            frameCount++;
+            if (frameCount >= 2 && currentModel && currentModel.mesh.isReady(true)) {
+                scene.onAfterRenderObservable.remove(observer);
+                hideLoading();
+                console.log("✅ Render complete, loading hidden");
+            }
+        });
+        setTimeout(() => {
+            scene.onAfterRenderObservable.remove(observer);
+            hideLoading();
+        }, 8000);
+    });
+
     try {
         showLoading("0%");
         const result = await loadMmdModel(
@@ -190,11 +209,14 @@ async function init() {
         );
         currentModel = result.model;
         if (currentModel) {
-            currentModel.mesh.scaling.setAll(0.07); // 以前の正常なスケールに戻す
+            currentModel.mesh.scaling.setAll(0.07);
             expressionCleanup = setupExpressions(scene, currentModel);
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
+            
+            // オーディオは最悪タイムアウトしてでも次に進ませる
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
+            await mmdRuntime.setAudioPlayer(audioPlayer);
             await setupAudio(currentDanceId);
         }
     } catch (e) {
@@ -205,23 +227,6 @@ async function init() {
         arLaunchBtn.disabled = false;
         arLaunchBtn.style.opacity = "1";
     }
-
-    // シーン準備完了 → モデル描画完了まで待ってからフェードアウト
-    scene.executeWhenReady(() => {
-        let frameCount = 0;
-        const observer = scene.onAfterRenderObservable.add(() => {
-            frameCount++;
-            if (frameCount >= 2 && currentModel && currentModel.mesh.isReady(true)) {
-                scene.onAfterRenderObservable.remove(observer);
-                hideLoading();
-                console.log("✅ Render complete, loading hidden");
-            }
-        });
-        setTimeout(() => {
-            scene.onAfterRenderObservable.remove(observer);
-            hideLoading();
-        }, 5000);
-    });
 
     // --- UI/ダンス切り替え ---
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;
@@ -328,7 +333,6 @@ async function init() {
     let idleMouthTimer = 0;
     let lastCurrentFrame = 0;
     scene.onBeforeRenderObservable.add(() => {
-        // 1. ループフォールバック
         if (bgmStarted && loopEnabled && !isLooping) {
             const duration = mmdRuntime.animationFrameTimeDuration;
             const current = mmdRuntime.currentFrameTime;
@@ -339,7 +343,6 @@ async function init() {
             lastCurrentFrame = current;
         }
 
-        // 2. アイドル表情
         if (!bgmStarted || !currentModel || DANCE_PRESETS[currentDanceId].vocal) return;
         const deltaTime = scene.getEngine().getDeltaTime();
         idleMouthTimer += deltaTime;

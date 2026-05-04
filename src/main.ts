@@ -1,6 +1,6 @@
 import { createScene } from './app/createScene';
 import { createMmdRuntime } from './app/mmdRuntime';
-import { loadMmdModel, loadMmdModelFromFiles } from './app/loadMmdModel';
+import { loadMmdModel, loadMmdModelFromFiles, loadVmdToModel } from './app/loadMmdModel';
 import { setupUI } from './app/setupUI';
 import { setupWebXR } from './app/setupWebXR';
 import { setupPerformanceControls } from './app/performance';
@@ -30,6 +30,21 @@ async function init() {
     let internalAudio: HTMLAudioElement | null = null;
     let vocalAudio: HTMLAudioElement | null = null;
     let bgmStarted = false;
+
+    // ダンスプリセット定義
+    const DANCE_PRESETS: Record<string, { vmd: string, music: string, vocal: string | null }> = {
+        dindondan: {
+            vmd: "assets/motion/dindondan.vmd",
+            music: "assets/audio/dindondan_full.mp3",
+            vocal: "assets/audio/dindondan_vocal.mp3"
+        },
+        nightoffire: {
+            vmd: "assets/motion/nightoffire.vmd",
+            music: "assets/audio/nightoffire_full.mp3",
+            vocal: null
+        }
+    };
+    let currentDanceId = "dindondan";
 
     let currentModel: MmdModel | null = null;
     const getCurrentModel = () => currentModel;
@@ -104,6 +119,42 @@ async function init() {
     let isLooping = false;
     let loopTimer: number | null = null;
     let loopEnabled = true;
+
+    // ===== アイドル時の自然な表情（歌声がない時用） =====
+    let idleMouthTimer = 0;
+    let idleSmileTimer = 0;
+    scene.onBeforeRenderObservable.add(() => {
+        if (!bgmStarted || !currentModel) return;
+        
+        // 歌声トラックがある場合はスキップ
+        if (DANCE_PRESETS[currentDanceId].vocal) return;
+
+        const deltaTime = scene.getEngine().getDeltaTime();
+        
+        // 1. 時々口を少し動かす（自然な仕草）
+        idleMouthTimer += deltaTime;
+        if (idleMouthTimer > 2000) { // 2秒おき
+            if (Math.random() > 0.7) {
+                const weight = Math.random() * 0.2; // 控えめに
+                try {
+                    currentModel.morph.setMorphWeight("あ", weight);
+                    currentModel.morph.setMorphWeight("a", weight);
+                } catch(e) {}
+            }
+            idleMouthTimer = 0;
+        }
+
+        // 2. 笑顔を時々強調
+        idleSmileTimer += deltaTime;
+        if (idleSmileTimer > 5000) { // 5秒おき
+            if (Math.random() > 0.5) {
+                try {
+                    currentModel.morph.setMorphWeight("笑い", 0.5 + Math.random() * 0.5);
+                } catch(e) {}
+            }
+            idleSmileTimer = 0;
+        }
+    });
 
     scene.onBeforeRenderObservable.add(() => {
         // 再生開始前 or ループ設定OFF or すでにループ処理中はスキップ
@@ -198,10 +249,11 @@ async function init() {
     }
 
     // 4. Setup Audio Source
-    const setupAudio = async () => {
+    const setupAudio = async (danceId: string) => {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
-            audioPlayer.source = "assets/audio/music.mp3";
+            const preset = DANCE_PRESETS[danceId];
+            audioPlayer.source = preset.music;
 
             internalAudio = (audioPlayer as any)._audio || (audioPlayer as any).audio || null;
             if (internalAudio) {
@@ -209,22 +261,27 @@ async function init() {
                 internalAudio.load();
                 
                 // ★ リップシンク用ボーカル音声のセットアップ
-                vocalAudio = new Audio("assets/audio/vocal.mp3");
-                vocalAudio.preload = "auto";
-                // ★ muted は false のまま（attach の silent オプションで音を消す）
-                vocalAudio.load();
+                if (preset.vocal) {
+                    vocalAudio = new Audio(preset.vocal);
+                    vocalAudio.preload = "auto";
+                    vocalAudio.load();
+                } else {
+                    vocalAudio = null;
+                }
 
-                await Promise.all([
-                    new Promise<void>((resolve) => {
-                        if (!internalAudio || internalAudio.readyState >= 3) return resolve();
-                        const onReady = () => {
-                            internalAudio?.removeEventListener("canplaythrough", onReady);
-                            resolve();
-                        };
-                        internalAudio.addEventListener("canplaythrough", onReady);
-                        setTimeout(resolve, 5000);
-                    }),
-                    new Promise<void>((resolve) => {
+                const promises = [];
+                promises.push(new Promise<void>((resolve) => {
+                    if (!internalAudio || internalAudio.readyState >= 3) return resolve();
+                    const onReady = () => {
+                        internalAudio?.removeEventListener("canplaythrough", onReady);
+                        resolve();
+                    };
+                    internalAudio.addEventListener("canplaythrough", onReady);
+                    setTimeout(resolve, 5000);
+                }));
+
+                if (vocalAudio) {
+                    promises.push(new Promise<void>((resolve) => {
                         if (!vocalAudio || vocalAudio.readyState >= 3) return resolve();
                         const onReady = () => {
                             vocalAudio?.removeEventListener("canplaythrough", onReady);
@@ -232,14 +289,16 @@ async function init() {
                         };
                         vocalAudio.addEventListener("canplaythrough", onReady);
                         setTimeout(resolve, 5000);
-                    })
-                ]);
+                    }));
+                }
+
+                await Promise.all(promises);
             }
         } catch (e) {
             console.warn("Audio failed", e);
         }
     };
-    await setupAudio();
+    await setupAudio(currentDanceId);
 
     // 5. Finalize UI
     if (arLaunchBtn) {
@@ -254,6 +313,35 @@ async function init() {
     }
     
     // 6. Setup UI & Performance
+    // ダンス切り替えリスナー
+    const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;
+    if (danceSelect) {
+        danceSelect.addEventListener("change", async () => {
+            const newId = danceSelect.value;
+            if (newId === currentDanceId || !currentModel) return;
+
+            console.log("Switching Dance to:", newId);
+            currentDanceId = newId;
+
+            // 1. 再生停止
+            mmdRuntime.pauseAnimation();
+            if (internalAudio) internalAudio.pause();
+            if (vocalAudio) vocalAudio.pause();
+            bgmStarted = false;
+
+            // 2. モーション読み込み
+            if (loadingStatus) loadingStatus.textContent = "Loading Motion...";
+            await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
+            
+            // 3. 音声読み込み
+            if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
+            await setupAudio(newId);
+
+            if (loadingStatus) loadingStatus.textContent = "";
+            console.log("Dance Switch Complete");
+        });
+    }
+
     setupUI(scene, mmdRuntime, audioPlayer, getCurrentModel, async (pmx, vmd, textures) => {
         if (currentModel) {
             mmdRuntime.destroyMmdModel(currentModel);
@@ -295,7 +383,7 @@ async function init() {
 
             currentModel = await loadMmdModel(
                 scene, mmdRuntime, 
-                pmxPath, "assets/motion/dance.vmd",
+                pmxPath, DANCE_PRESETS[currentDanceId].vmd,
                 shadowGenerator, undefined,
                 (event) => {
                     if (event.lengthComputable && event.total > 0) {
@@ -319,7 +407,7 @@ async function init() {
             // フォールバック：デフォルトモデルへ復帰
             try {
                 currentModel = await loadMmdModel(
-                    scene, mmdRuntime, "assets/model/presets/v_miku_full/model.pmx", "assets/motion/dance.vmd",
+                    scene, mmdRuntime, "assets/model/presets/v_miku_full/model.pmx", DANCE_PRESETS[currentDanceId].vmd,
                     shadowGenerator
                 );
                 if (currentModel) {

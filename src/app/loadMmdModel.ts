@@ -88,3 +88,22 @@ export const loadMmdModelFromFiles = async (
     return await loadMmdModel(scene, mmdRuntime, pmxFile, vmdFile, shadowGenerator, files, onProgress);
 };
 
+export const loadVmdToModel = async (
+    scene: Scene,
+    mmdRuntime: any,
+    mmdModel: any,
+    vmdPath: string | File
+) => {
+    // Load VMD
+    const vmdLoader = new VmdLoader(scene);
+    const motion = await vmdLoader.loadAsync("motion", vmdPath);
+    
+    // Add motion to model
+    const handle = mmdModel.createRuntimeAnimation(motion);
+    mmdModel.setRuntimeAnimation(handle);
+
+    // Force set duration to allow seeking
+    mmdRuntime.setManualAnimationDuration(motion.endFrame);
+
+    return motion;
+};

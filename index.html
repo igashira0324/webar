@@ -299,6 +299,28 @@
         color: var(--primary);
       }
 
+      .neon-select {
+        background: rgba(0, 50, 100, 0.4);
+        border: 2px solid var(--primary);
+        color: #fff;
+        padding: 10px;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        outline: none;
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+        transition: all 0.3s ease;
+      }
+      .neon-select:focus {
+        border-color: var(--secondary);
+        box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+      }
+      .neon-select option {
+        background: #001220;
+        color: #fff;
+      }
+
       /* ===== 技術スタックバッジ ===== */
       .tech-stack {
         pointer-events: auto;
@@ -739,6 +761,12 @@
 
             <div class="section-title">PLAYBACK</div>
             <button id="playPauseBtn" class="primary-btn" style="width:100%;">▶ 再生 / 一時停止</button>
+
+            <div class="section-title">DANCE & MUSIC</div>
+            <select id="danceSelect" class="neon-select" style="width:100%; margin-bottom: 15px;">
+              <option value="dindondan">Din Don Dan (歌声あり)</option>
+              <option value="nightoffire">NIGHT OF FIRE (インスト)</option>
+            </select>
 
             <div class="section-title">MODEL</div>
             <label class="settings-label">

@@ -63,57 +63,48 @@ async function init() {
     // startPlayback() 内で参照されるため、先に定義します
     const lipSync = setupAudioLipSync(scene, getCurrentModel);
 
-    const startPlayback = (): boolean => {
-        if (bgmStarted) return true;
-        console.log("startPlayback triggered");
+    const startPlayback = async (): Promise<boolean> => {
+        if (!currentModel) return false;
 
+        console.log("startPlayback triggered (v2.16)");
         try {
-            // 1. AudioContext を必ず resume
-            const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-            if (ctx && ctx.state === "suspended") {
-                ctx.resume().then(() => console.log("AudioContext resumed:", ctx.state));
-            }
+            // 1. UIの更新（円形ボタンを一時停止アイコンに）
+            const btn = document.getElementById("playPauseBtn");
+            if (btn) btn.textContent = "||";
 
-            // 2. HTMLAudioElement を直接 play
-            if (internalAudio) {
-                // ★ 歌声のみのトラックをリップシンクに使用（精度向上のため）
-                //    - muted/volume には触らない（解析データが 0 になるため）
-                //    - silent=true で destination 非接続にして無音再生を実現
-                if (vocalAudio) {
-                    lipSync.attach(vocalAudio, true); // ★ silent=true
-                    vocalAudio.play().catch(e => console.warn("Vocal play failed", e));
-                    console.log("✅ Vocal track attached for analysis (silent)");
-                } else {
-                    // フォールバック
-                    lipSync.attach(internalAudio, false);
-                }
-
-                internalAudio.muted = false;
-                internalAudio.volume = 1.0;
-                if (internalAudio.paused) {
-                    const p = internalAudio.play();
-                    if (p && typeof p.then === "function") {
-                        p.then(() => {
-                            console.log("✅ HTMLAudio playing");
-                            bgmStarted = true;
-                        }).catch((err) => {
-                            console.error("❌ HTMLAudio play failed:", err.name, err.message);
-                            if (err.name === "NotAllowedError") {
-                                alert("画面をタップして再生を開始してください");
-                            }
-                        });
-                    }
-                }
-            }
-            
-            // 3. アニメーションを再生
+            // 2. アニメーション再生
             mmdRuntime.playAnimation();
-            
-            bgmStarted = true;
-            console.log("Playback started (v2.15)");
+
+            if (!bgmStarted) {
+                // 初回再生時の初期化
+                const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
+                if (ctx && ctx.state === "suspended") {
+                    await ctx.resume();
+                }
+
+                if (internalAudio) {
+                    // リップシンクの紐付け（歌声優先、なければBGM）
+                    const analysisAudio = vocalAudio || internalAudio;
+                    const isSilent = !!vocalAudio; // 歌声のみの場合は無音で解析
+                    lipSync.attach(analysisAudio, isSilent);
+                    
+                    if (vocalAudio) {
+                        vocalAudio.play().catch(e => console.warn("Vocal play failed", e));
+                    }
+
+                    internalAudio.muted = false;
+                    internalAudio.volume = 1.0;
+                    await internalAudio.play();
+                }
+                bgmStarted = true;
+            } else {
+                // 一時停止からの再開
+                if (internalAudio && internalAudio.paused) internalAudio.play();
+                if (vocalAudio && vocalAudio.paused) vocalAudio.play();
+            }
             return true;
         } catch (e) {
-            console.warn("Playback start failed:", e);
+            console.warn("Playback failed:", e);
             return false;
         }
     };
@@ -141,7 +132,7 @@ async function init() {
     let loopTimer: number | null = null;
     let loopEnabled = true;
 
-    // ===== アイドル時の自然な表情（歌声がない時用） =====
+    // ===== アイドル時の自然な表情（歌声がない時用） ＆ ループ再生検知 =====
     let idleMouthTimer = 0;
     scene.onBeforeRenderObservable.add(() => {
         if (!bgmStarted || !currentModel) return;
@@ -163,57 +154,17 @@ async function init() {
             }
             idleMouthTimer = 0;
         }
-    });
 
-    scene.onBeforeRenderObservable.add(() => {
-        // 再生開始前 or ループ設定OFF or すでにループ処理中はスキップ
-        if (!bgmStarted || !loopEnabled || isLooping) return;
+        // --- ループ再生検知 ---
+        // ループ設定OFF or すでにループ処理中はスキップ
+        if (!loopEnabled || isLooping) return;
 
         const duration = mmdRuntime.animationFrameTimeDuration;
         const current = mmdRuntime.currentFrameTime;
 
-        // 再生中かつ終端に到達したか（1.0フレーム手前で判定して取りこぼし防止）
-        if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 1.0) {
-            isLooping = true;
-            console.log("🔁 Animation ended, looping in 2s...");
-
-            // 一時停止（音声・アニメ両方）
-            try {
-                mmdRuntime.pauseAnimation();
-                if (internalAudio && !internalAudio.paused) {
-                    internalAudio.pause();
-                }
-                if (vocalAudio && !vocalAudio.paused) {
-                    vocalAudio.pause();
-                }
-            } catch (e) {
-                console.warn("Loop pause failed:", e);
-            }
-
-            // 2秒後にリセット & 再生
-            loopTimer = window.setTimeout(() => {
-                try {
-                    // アニメーションを先頭に
-                    mmdRuntime.seekAnimation(0, true);
-                    // 音声も先頭に
-                    if (internalAudio) {
-                        internalAudio.currentTime = 0;
-                        internalAudio.play().catch(err => console.warn("Loop audio play failed:", err));
-                    }
-                    if (vocalAudio) {
-                        vocalAudio.currentTime = 0;
-                        vocalAudio.play().catch(err => console.warn("Loop vocal play failed:", err));
-                    }
-                    // アニメ再開
-                    mmdRuntime.playAnimation();
-                    console.log("🔁 Loop restarted");
-                } catch (e) {
-                    console.warn("Loop restart failed:", e);
-                } finally {
-                    isLooping = false;
-                    loopTimer = null;
-                }
-            }, 2000);
+        // 再生中かつ終端に到達したか
+        if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 1.5) {
+            (window as any).__triggerLoop();
         }
     });
 
@@ -263,12 +214,59 @@ async function init() {
         return;
     }
 
+    // グローバルにループ発火関数を公開
+    (window as any).__triggerLoop = () => {
+        if (isLooping || !loopEnabled) return;
+        isLooping = true;
+        console.log("🔁 Hybrid Loop Triggered (Frame or Audio)");
+        
+        mmdRuntime.pauseAnimation();
+        if (internalAudio) internalAudio.pause();
+        if (vocalAudio) vocalAudio.pause();
+        
+        const btn = document.getElementById("playPauseBtn");
+        if (btn) btn.textContent = "▶"; // 待機中は再生アイコンに
+
+        if (loopTimer) clearTimeout(loopTimer);
+        loopTimer = window.setTimeout(() => {
+            try {
+                mmdRuntime.seekAnimation(0, true);
+                if (internalAudio) { 
+                    internalAudio.currentTime = 0; 
+                    internalAudio.play().catch(e => console.warn(e));
+                }
+                if (vocalAudio) { 
+                    vocalAudio.currentTime = 0; 
+                    vocalAudio.play().catch(e => console.warn(e));
+                }
+                mmdRuntime.playAnimation();
+                if (btn) btn.textContent = "||"; // 再開したら一時停止アイコンに
+                isLooping = false;
+                console.log("🔁 Loop restarted successfully");
+            } catch(e) {
+                console.warn("Loop restart failed:", e);
+                isLooping = false;
+            }
+        }, 1000);
+    };
+
     // 4. Setup Audio Source
     const setupAudio = async (danceId: string) => {
         try {
             await mmdRuntime.setAudioPlayer(audioPlayer);
             const preset = DANCE_PRESETS[danceId];
             audioPlayer.source = preset.music;
+            
+            // ★ ループ用の音声終了検知を追加
+            if ((audioPlayer as any)._audio) {
+                const audio = (audioPlayer as any)._audio;
+                audio.addEventListener("ended", () => {
+                    if (loopEnabled && !isLooping) {
+                        // ループ処理を発火
+                        (window as any).__triggerLoop();
+                    }
+                });
+            }
 
             internalAudio = (audioPlayer as any)._audio || (audioPlayer as any).audio || null;
             if (!internalAudio) {
@@ -510,7 +508,7 @@ async function init() {
     document.getElementById("lipsyncToggle")?.addEventListener("change", (e) => {
         lipSync.setEnabled((e.target as HTMLInputElement).checked);
     });
-}
+} // ★ init 関数の閉じカッコを復元
 
 // ===== UIモーダル制御 =====
 function setupModals() {

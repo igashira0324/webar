@@ -9,7 +9,8 @@ export interface AudioLipSyncController {
 }
 
 /**
- * 歌声の特徴（変動性・周波数バランス）を捉えて高精度なリップシンクを行うコントローラー
+ * LipSync v3 (Soft Scoring)
+ * 歌声らしさをスコア化し、自然な連動を実現するコントローラー
  */
 export const setupAudioLipSync = (
   scene: Scene,
@@ -24,34 +25,30 @@ export const setupAudioLipSync = (
   let attached = false;
 
   // 状態保持
-  let smoothedMouth = 0;        // 最終的な口の開き
-  let prevVocalEnergy = 0;      // 前フレームの中音域エネルギー
-  let energyHistory: number[] = []; // エネルギー変動の履歴
-  const HISTORY_SIZE = 20;      // 約 0.3 秒分（60fps想定）
+  let smoothedMouth = 0;
+  let prevVocalEnergy = 0;
+  let energyHistory: number[] = [];
+  let vocalScoreSmoothed = 0;
+  const HISTORY_SIZE = 15;
 
   // 調整パラメータ
-  const SMOOTHING = 0.65;       // 平滑化（カクつき防止）
-  const MAX_OPEN = 0.85;        // 口の最大開き
-  const ENERGY_THRESHOLD = 0.15; // この値以下のエネルギーは無視
-  const VARIATION_THRESHOLD = 0.020; // この変動以下は楽器音と判定
-  const SENSITIVITY = 3.0;      // 感度
+  const MOUTH_SMOOTHING = 0.55;       // 口の動きの平滑化
+  const SCORE_SMOOTHING = 0.75;       // スコアの平滑化（急激な変化を抑制）
+  const MAX_OPEN = 0.9;
   const MORPH_NAMES = ["あ", "a", "A", "Lip_A"];
 
   const attach = (audioElement: HTMLAudioElement): boolean => {
     if (attached) return true;
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctx) {
-        console.warn("[LipSync] Web Audio API not supported");
-        return false;
-      }
+      if (!Ctx) return false;
       audioCtx = new Ctx();
       if (!audioCtx) return false;
 
       sourceNode = audioCtx.createMediaElementSource(audioElement);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;            // 解像度向上（約 43Hz/ビン）
-      analyser.smoothingTimeConstant = 0.3; // 短めにして変動を捉える
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.25; // 短めで変動を捉える
 
       sourceNode.connect(analyser);
       analyser.connect(audioCtx.destination);
@@ -65,50 +62,64 @@ export const setupAudioLipSync = (
 
         analyser.getByteFrequencyData(freqData as any);
 
-        // ===== 1. 中音域エネルギー（声帯の主要帯域: 300Hz〜3.4kHz）=====
-        // fftSize=1024, sampleRate=44100 → ビン1つ ≈ 43.07Hz
-        // 300Hz ≈ ビン7, 3400Hz ≈ ビン79
-        let vocalEnergy = 0;
-        const startBin = 7;
-        const endBin = 79;
-        for (let i = startBin; i <= endBin; i++) {
-          vocalEnergy += freqData[i];
+        // ===== 帯域別エネルギー（fftSize=1024, 約 43Hz/ビン）=====
+        // 低音: 0〜200Hz（ベース・キック）
+        let bassSum = 0;
+        for (let i = 0; i <= 4; i++) bassSum += freqData[i];
+        const bass = bassSum / 5 / 255;
+
+        // ボーカル中心域: 300Hz〜3kHz（フォルマント主帯域）
+        let vocalSum = 0;
+        const vStart = 7, vEnd = 70;
+        for (let i = vStart; i <= vEnd; i++) vocalSum += freqData[i];
+        const vocal = vocalSum / (vEnd - vStart + 1) / 255;
+
+        // ===== ボーカル帯域内のピーク性（フォルマント検出の簡易版）=====
+        let vocalPeak = 0;
+        for (let i = vStart; i <= vEnd; i++) {
+          if (freqData[i] > vocalPeak) vocalPeak = freqData[i];
         }
-        const avgVocal = vocalEnergy / (endBin - startBin + 1) / 255;
+        const peakRatio = (vocalPeak / 255) - vocal; // 歌声はピークが鋭い
+        const peakScore = Math.min(1, peakRatio * 3.0);
 
-        // ===== 2. 低音域エネルギー（ベース・キック: 〜200Hz）=====
-        let bassEnergy = 0;
-        for (let i = 0; i <= 4; i++) {
-          bassEnergy += freqData[i];
-        }
-        const avgBass = bassEnergy / 5 / 255;
-
-        // ===== 3. エネルギー変動の計算（歌声 vs 楽器音の判別の核心）=====
-        const energyDelta = Math.abs(avgVocal - prevVocalEnergy);
-        prevVocalEnergy = avgVocal;
-
-        energyHistory.push(energyDelta);
+        // ===== エネルギー変動 =====
+        const delta = Math.abs(vocal - prevVocalEnergy);
+        prevVocalEnergy = vocal;
+        energyHistory.push(delta);
         if (energyHistory.length > HISTORY_SIZE) energyHistory.shift();
-
-        // 直近の平均変動量
         const avgVariation = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
+        const variationScore = Math.min(1, avgVariation * 40);
 
-        // ===== 4. 歌声判定 =====
-        // 条件1: 中音域に十分なエネルギーがある
-        // 条件2: エネルギーの変動が大きい（歌声の特徴）
-        // 条件3: 中音域が低音域に対して一定以上の存在感がある（ベース支配を除外）
-        const hasEnoughEnergy = avgVocal > ENERGY_THRESHOLD;
-        const isVarying = avgVariation > VARIATION_THRESHOLD;
-        const isVocalDominant = avgVocal > avgBass * 0.65; 
+        // ===== 中音域支配度（楽器低音だけの場合に弱くする）=====
+        const dominanceScore = Math.min(1, vocal / Math.max(0.05, bass) * 0.6);
 
+        // ===== エネルギースコア（基礎的な「音があるか」）=====
+        const energyScore = Math.min(1, Math.max(0, (vocal - 0.06) * 4));
+
+        // ===== 総合スコア（重み付き加算）=====
+        const rawScore =
+          energyScore * 0.35 +
+          variationScore * 0.30 +
+          peakScore * 0.20 +
+          dominanceScore * 0.15;
+
+        // スコアを平滑化
+        vocalScoreSmoothed = vocalScoreSmoothed * SCORE_SMOOTHING +
+                             rawScore * (1 - SCORE_SMOOTHING);
+
+        // ===== 口の開き量計算 =====
         let target = 0;
-        if (hasEnoughEnergy && isVarying && isVocalDominant) {
-          target = Math.max(0, (avgVocal - ENERGY_THRESHOLD) * SENSITIVITY);
+        if (vocalScoreSmoothed > 0.25) {
+          // スコア 0.25〜1.0 を 0〜1.0 にリマップ
+          const scoreRamp = (vocalScoreSmoothed - 0.25) / 0.75;
+          // 開き量 = スコアの確信度 × 音量
+          target = scoreRamp * vocal * 3.5;
           target = Math.min(MAX_OPEN, target);
         }
 
-        // 平滑化
-        smoothedMouth = smoothedMouth * SMOOTHING + target * (1 - SMOOTHING);
+        // 口の動きの平滑化
+        smoothedMouth = smoothedMouth * MOUTH_SMOOTHING +
+                        target * (1 - MOUTH_SMOOTHING);
 
         // モーフ適用
         const morph = model.morph;
@@ -119,7 +130,7 @@ export const setupAudioLipSync = (
       });
 
       attached = true;
-      console.log("🎵 Audio LipSync v2 attached (vocal-aware)");
+      console.log("🎵 LipSync v3 attached (soft scoring)");
       return true;
     } catch (e) {
       console.warn("[LipSync] Attach failed:", e);
@@ -140,6 +151,7 @@ export const setupAudioLipSync = (
         }
       }
       smoothedMouth = 0;
+      vocalScoreSmoothed = 0;
       energyHistory = [];
     }
   };

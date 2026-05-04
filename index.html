@@ -952,7 +952,29 @@
               <img src="assets/marker_qr.png" alt="QR Code"
                    style="width:100%; max-width:280px; border:8px solid #fff; border-radius:12px; box-shadow:0 0 24px rgba(0,229,255,0.4);" />
             </div>
-              <div class="section-title">USAGE / 使い方</div>
+            <p style="font-size:0.78rem; color:var(--text-dim);">
+              📱 Android Chrome で開き、<strong style="color:var(--primary);">ENTER AR</strong> ボタンから AR を起動してください。
+            </p>
+          </div>
+        </div>
+
+        <!-- 隠し互換用 -->
+        <div id="control-panel" class="hidden"></div>
+        <button id="showSettingsBtn" class="hidden"></button>
+        <button id="showMarkerBtn" class="hidden"></button>
+        <div id="minimizeBtn" class="hidden"></div>
+
+        <!-- 情報モーダル（修復版） -->
+        <div id="info-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeInfoBtn">×</button>
+            <h3>ABOUT</h3>
+            <p style="font-size: 0.9rem; line-height: 1.6;">
+              ブラウザを開くだけで、3D MMD モデルが現実空間に登場する WebAR 体験です。
+              アプリのインストールは不要。スマホのカメラと WebXR 対応ブラウザだけで動作します。
+            </p>
+
+            <div class="section-title">USAGE / 使い方</div>
             <p style="line-height: 1.8; font-size: 0.85rem;">
               ① <strong>ENTER AR</strong> をタップして AR モードへ。<br>
               ② カメラを動かして平面（床や机）を認識。<br>
@@ -964,44 +986,19 @@
             </p>
 
             <div class="section-title">SUPPORTED DEVICES</div>
-            <p style="font-size: 0.85rem;">
+            <p style="font-size: 0.85rem; line-height: 1.6;">
               ✅ Android (Chrome 90+) — フル対応<br>
               ⚠ iOS (Safari) — WebXR 非対応のため AR 起動不可<br>
               ✅ デスクトップ — 通常の 3D ビューワとして動作
             </p>
 
             <div class="section-title">TECH STACK / 技術スタック</div>
-            <p style="font-size: 0.85rem;">
+            <p style="font-size: 0.85rem; line-height: 1.6;">
               <strong>レンダリング</strong>: Babylon.js（WebGL2）<br>
               <strong>3Dモデル</strong>: babylon-mmd（PMX / VMD ローダ）<br>
               <strong>AR基盤</strong>: WebXR Device API + ARCore<br>
               <strong>言語 / ビルド</strong>: TypeScript + Vite<br>
               <strong>配信</strong>: Vercel（HTTPS / Edge）
-            </p>
-: 0.85rem;">
-              ① <strong>ENTER AR</strong> をタップして AR モードへ。<br>
-              ② カメラを動かして平面（床や机）を認識。<br>
-              ③ <strong>画面をタップ</strong>した場所にアバターが登場します。<br>
-              ④ <strong>アバターをタップ</strong>：ダンスの再生 / 一時停止。<br>
-              ⑤ <strong>画面全体の操作</strong>（アバター以外を触ってもOK）：<br>
-              &nbsp;&nbsp;・<strong>1本指ドラッグ</strong>：アバターを回転<br>
-              &nbsp;&nbsp;・<strong>2本指ピンチ</strong>：アバターを拡大・縮小
-            </p>
-
-            <div class="section-title">TECH STACK / 技術スタック</div>
-            <p>
-              <strong>レンダリング</strong>: Babylon.js（WebGL2）<br>
-              <strong>3Dモデル</strong>: babylon-mmd（PMX / VMD ローダ）<br>
-              <strong>AR基盤</strong>: WebXR Device API + ARCore<br>
-              <strong>言語 / ビルド</strong>: TypeScript + Vite<br>
-              <strong>配信</strong>: Vercel（HTTPS / Edge）
-            </p>
-
-            <div class="section-title">SUPPORTED DEVICES</div>
-            <p>
-              ✅ Android (Chrome 90+) — フル対応<br>
-              ⚠ iOS (Safari) — WebXR 非対応のため AR 起動不可<br>
-              ✅ デスクトップ — 通常の 3D ビューワとして動作
             </p>
           </div>
         </div>

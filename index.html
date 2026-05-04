@@ -328,8 +328,8 @@
         top: 50%;
         transform: translateY(-50%);
         display: flex;
-        gap: 30px;
-        z-index: 9999; /* 最前面に */
+        gap: 15px; /* 間隔を狭める */
+        z-index: 9999;
         pointer-events: none;
       }
       .side-slider-group {
@@ -347,6 +347,10 @@
         writing-mode: vertical-rl;
         text-orientation: mixed;
         letter-spacing: 2px;
+        height: 80px; /* 高さを固定して下のバーの位置を揃える */
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .vertical-slider {
         -webkit-appearance: none;
@@ -1008,7 +1012,7 @@
         </div>
       </div> <!-- End of ui-container -->
     </div> <!-- End of ui-overlay -->
-    <script type="module" src="/src/main.ts?v=1"></script>
+    <script type="module" src="/src/main.ts?v=2"></script>
     </div> <!-- End of app -->
   </body>
 </html>

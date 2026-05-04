@@ -11,10 +11,6 @@ export const setupUI = (
 ) => {
     // null許容で取得
     const playPauseBtn = document.getElementById("playPauseBtn") as HTMLButtonElement | null;
-    const scaleSlider = document.getElementById("scaleSlider") as HTMLInputElement | null;
-    const scaleVal = document.getElementById("scaleVal") as HTMLSpanElement | null;
-    const yPosSlider = document.getElementById("yPosSlider") as HTMLInputElement | null;
-    const yPosVal = document.getElementById("yPosVal") as HTMLSpanElement | null;
     const fpsDiv = document.getElementById("fps") as HTMLDivElement | null;
     
     const fileSelectToggle = document.getElementById("fileSelectToggle") as HTMLButtonElement | null;
@@ -56,18 +52,19 @@ export const setupUI = (
         }
     });
 
-    // ===== Scale =====
-    scaleSlider?.addEventListener("input", () => {
-        const val = parseFloat(scaleSlider.value);
-        if (scaleVal) scaleVal.textContent = val.toFixed(2);
+    const sideScaleSlider = document.getElementById("sideScaleSlider") as HTMLInputElement | null;
+    const sideYPosSlider = document.getElementById("sideYPosSlider") as HTMLInputElement | null;
+
+    // ===== Scale (Side Bar) =====
+    sideScaleSlider?.addEventListener("input", () => {
+        const val = parseFloat(sideScaleSlider.value);
         const model = getCurrentModel();
         if (model) model.mesh.scaling.setAll(val * S_BASE);
     });
 
-    // ===== Y Position =====
-    yPosSlider?.addEventListener("input", () => {
-        const val = parseFloat(yPosSlider.value);
-        if (yPosVal) yPosVal.textContent = val.toFixed(1);
+    // ===== Y Position (Side Bar) =====
+    sideYPosSlider?.addEventListener("input", () => {
+        const val = parseFloat(sideYPosSlider.value);
         const model = getCurrentModel();
         if (model) model.mesh.position.y = val + Y_BASE;
     });

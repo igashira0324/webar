@@ -172,8 +172,8 @@ async function init() {
         const duration = mmdRuntime.animationFrameTimeDuration;
         const current = mmdRuntime.currentFrameTime;
 
-        // 終端に到達したか（0.5フレーム手前で判定して取りこぼし防止）
-        if (duration > 0 && current >= duration - 0.5) {
+        // 再生中かつ終端に到達したか（1.0フレーム手前で判定して取りこぼし防止）
+        if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 1.0) {
             isLooping = true;
             console.log("🔁 Animation ended, looping in 2s...");
 

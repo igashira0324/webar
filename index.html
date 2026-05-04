@@ -836,7 +836,11 @@
             <h3>SETTINGS</h3>
 
             <div class="section-title">PLAYBACK</div>
-            <button id="playPauseBtn" class="primary-btn" style="width:100%;">▶ 再生 / 一時停止</button>
+            <button id="playPauseBtn" class="primary-btn" style="width:100%; margin-bottom: 15px;">▶ 再生 / 一時停止</button>
+            <label class="settings-label">
+              <span class="val-tag"><span id="seekVal">0</span> / <span id="durationVal">0</span></span>
+            </label>
+            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="margin-bottom: 20px;" />
 
             <div class="section-title">DANCE & MUSIC</div>
             <select id="danceSelect" class="neon-select" style="width:100%; margin-bottom: 15px;">
@@ -854,12 +858,6 @@
               <option value="onasu">Onasu Sakura Miku</option>
               <option value="riverside">Riverside Miku v2.02</option>
             </select>
-
-            <div class="section-title">PLAYBACK POSITION</div>
-            <label class="settings-label">
-              <span class="val-tag"><span id="seekVal">0</span> / <span id="durationVal">0</span></span>
-            </label>
-            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" />
 
             <div class="section-title">ADVANCED</div>
             <label class="toggle-row">

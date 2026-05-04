@@ -9,7 +9,7 @@ import { setupExpressions } from './app/setupExpressions';
 import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
-    console.log("MMD WebXR Player - Final Build v2.90 (Layout Fix)");
+    console.log("MMD WebXR Player - Final Build v2.95 (Refined Modals)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -56,7 +56,6 @@ async function init() {
     const getCurrentModel = () => currentModel;
     const lipSync = setupAudioLipSync(scene, getCurrentModel);
 
-    // --- 統合再生・一時停止ロジック ---
     const togglePlayback = async (forceState?: boolean): Promise<boolean> => {
         if (!currentModel || !internalAudio) return false;
         const shouldPlay = forceState !== undefined ? forceState : internalAudio.paused;
@@ -90,7 +89,6 @@ async function init() {
     };
     (window as any).__startPlayback = () => togglePlayback(true);
 
-    // --- インタラクション ---
     scene.onPointerObservable.add((pointerInfo) => {
         if (pointerInfo.type === 1 && pointerInfo.pickInfo?.hit) {
             const pickedMesh = pointerInfo.pickInfo.pickedMesh;
@@ -100,7 +98,6 @@ async function init() {
         }
     });
 
-    // --- ループ再生イベントハンドラ ---
     const onAudioEnded = () => {
         console.log("🔁 audio ended fired");
         if (loopEnabled && !isLooping) (window as any).__triggerLoop();
@@ -129,13 +126,11 @@ async function init() {
         try {
             const preset = DANCE_PRESETS[danceId];
             audioPlayer.source = preset.music;
-            
             const audio = (audioPlayer as any)._audio || (audioPlayer as any).audio;
             if (audio) {
                 audio.loop = false;
                 audio.removeEventListener("ended", onAudioEnded);
                 audio.addEventListener("ended", onAudioEnded);
-
                 internalAudio = audio;
                 audio.preload = "auto";
                 vocalAudio = preset.vocal ? new Audio(preset.vocal) : null;
@@ -143,7 +138,6 @@ async function init() {
                     vocalAudio.loop = false;
                     vocalAudio.preload = "auto";
                 }
-                
                 await Promise.race([
                     new Promise<void>(resolve => {
                         if (audio.readyState >= 3) resolve();
@@ -157,7 +151,6 @@ async function init() {
         }
     };
 
-    // --- 初期ロード ---
     const loadingScreen = document.getElementById("loading-screen");
     const loadingStatus = document.getElementById("loading-status");
     const arLaunchBtn = document.getElementById("arLaunchBtn") as HTMLButtonElement;
@@ -208,11 +201,10 @@ async function init() {
         currentModel = result.model;
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
-            currentModel.mesh.position.y = 0.5; // 少し上に配置
+            currentModel.mesh.position.y = 0.5;
             expressionCleanup = setupExpressions(scene, currentModel);
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
-            
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
             await mmdRuntime.setAudioPlayer(audioPlayer);
             await setupAudio(currentDanceId);
@@ -226,13 +218,11 @@ async function init() {
         arLaunchBtn.style.opacity = "1";
     }
 
-    // --- UI/ダンス切り替え ---
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;
     danceSelect?.addEventListener("change", async () => {
         const newId = danceSelect.value;
         if (newId === currentDanceId || !currentModel) return;
         currentDanceId = newId;
-        
         showLoading("Loading...");
         try {
             const motion = await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
@@ -248,7 +238,6 @@ async function init() {
         const wasPlaying = bgmStarted && internalAudio !== null && !internalAudio.paused;
         const savedAudioTime = internalAudio?.currentTime || 0;
         mmdRuntime.pauseAnimation();
-
         if (currentModel) {
             mmdRuntime.destroyMmdModel(currentModel);
             currentModel.mesh.dispose();
@@ -260,11 +249,10 @@ async function init() {
             currentModel = result.model;
             if (currentModel) {
                 currentModel.mesh.scaling.setAll(0.07);
-                currentModel.mesh.position.y = 0.5; // 少し上に配置
+                currentModel.mesh.position.y = 0.5;
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
-                
                 if (wasPlaying) {
                     mmdRuntime.seekAnimation(savedAudioTime * 30, true);
                     mmdRuntime.playAnimation();
@@ -283,11 +271,9 @@ async function init() {
         };
         const pmxPath = presets[presetId];
         if (!pmxPath || !currentModel) return;
-
         const wasPlaying = bgmStarted && internalAudio !== null && !internalAudio.paused;
         const savedAudioTime = internalAudio?.currentTime || 0;
         mmdRuntime.pauseAnimation();
-
         showLoading("0%");
         try {
             mmdRuntime.destroyMmdModel(currentModel);
@@ -306,11 +292,10 @@ async function init() {
             currentModel = result.model;
             if (currentModel) {
                 currentModel.mesh.scaling.setAll(0.07);
-                currentModel.mesh.position.y = 0.5; // 少し上に配置
+                currentModel.mesh.position.y = 0.5;
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
-                
                 if (wasPlaying) {
                     mmdRuntime.seekAnimation(savedAudioTime * 30, true);
                     mmdRuntime.playAnimation();
@@ -329,7 +314,6 @@ async function init() {
         lipSync.setEnabled((e.target as HTMLInputElement).checked);
     });
 
-    // アイドル表現 & ループフォールバック
     let idleMouthTimer = 0;
     let lastCurrentFrame = 0;
     scene.onBeforeRenderObservable.add(() => {
@@ -342,7 +326,6 @@ async function init() {
             }
             lastCurrentFrame = current;
         }
-
         if (!bgmStarted || !currentModel || DANCE_PRESETS[currentDanceId].vocal) return;
         const deltaTime = scene.getEngine().getDeltaTime();
         idleMouthTimer += deltaTime;
@@ -361,7 +344,17 @@ async function init() {
 }
 
 function setupModals() {
-    const open = (id: string) => document.getElementById(id)?.classList.remove("hidden");
+    const infoFab = document.getElementById("infoFab");
+    const settingsFab = document.getElementById("settingsFab");
+    const qrFab = document.getElementById("qrFab");
+    
+    console.log("[setupModals] infoFab:", !!infoFab, "settingsFab:", !!settingsFab, "qrFab:", !!qrFab);
+
+    const open = (id: string) => {
+        const el = document.getElementById(id);
+        console.log("[openModal]", id, "found:", !!el);
+        el?.classList.remove("hidden");
+    };
     const close = (id: string) => document.getElementById(id)?.classList.add("hidden");
     const bindBackdrop = (id: string) => {
         const m = document.getElementById(id);
@@ -379,13 +372,20 @@ function setupModals() {
         }
     });
 
-    document.getElementById("infoFab")?.addEventListener("click", () => open("info-modal"));
+    infoFab?.addEventListener("click", () => {
+        console.log("ℹ Info clicked");
+        open("info-modal");
+    });
     document.getElementById("closeInfoBtn")?.addEventListener("click", () => close("info-modal"));
-    document.getElementById("settingsFab")?.addEventListener("click", () => open("settings-modal"));
+    
+    settingsFab?.addEventListener("click", () => open("settings-modal"));
     document.getElementById("closeSettingsBtn")?.addEventListener("click", () => close("settings-modal"));
-    document.getElementById("qrFab")?.addEventListener("click", () => open("qr-modal"));
+    
+    qrFab?.addEventListener("click", () => open("qr-modal"));
     document.getElementById("closeQrBtn")?.addEventListener("click", () => close("qr-modal"));
+    
     document.getElementById("closeArUnavailableBtn")?.addEventListener("click", () => close("ar-unavailable-modal"));
+    
     bindBackdrop("info-modal");
     bindBackdrop("settings-modal");
     bindBackdrop("qr-modal");

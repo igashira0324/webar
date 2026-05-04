@@ -15,7 +15,7 @@ export const createScene = async (canvas: HTMLCanvasElement) => {
         "camera",
         -Math.PI / 2,
         Math.PI / 2.2,
-        1.5,                          // 距離を 1.5m に近づける
+        4.0,                          // 1.5 → 4.0 に戻す
         new Vector3(0, 0.7, 0),       // ミクの胸元あたり
         scene
     );

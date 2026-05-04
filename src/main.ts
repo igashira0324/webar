@@ -9,7 +9,7 @@ import { setupExpressions } from './app/setupExpressions';
 import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
-    console.log("MMD WebXR Player - Final Build v2.70 (Seamless UX)");
+    console.log("MMD WebXR Player - Final Build v2.80 (Restored UX)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -174,7 +174,6 @@ async function init() {
             loadingScreen.style.opacity = "0";
             setTimeout(() => loadingScreen.classList.add("hidden"), 500);
         }
-        if (loadingStatus) loadingStatus.textContent = "";
     };
 
     try {
@@ -191,7 +190,7 @@ async function init() {
         );
         currentModel = result.model;
         if (currentModel) {
-            currentModel.mesh.scaling.setAll(1.0); // プレビュー用
+            currentModel.mesh.scaling.setAll(0.07); // 以前の正常なスケールに戻す
             expressionCleanup = setupExpressions(scene, currentModel);
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
@@ -215,7 +214,7 @@ async function init() {
             if (frameCount >= 2 && currentModel && currentModel.mesh.isReady(true)) {
                 scene.onAfterRenderObservable.remove(observer);
                 hideLoading();
-                console.log("✅ First render complete, loading hidden");
+                console.log("✅ Render complete, loading hidden");
             }
         });
         setTimeout(() => {
@@ -231,8 +230,7 @@ async function init() {
         if (newId === currentDanceId || !currentModel) return;
         currentDanceId = newId;
         
-        // 音楽は止めず、アニメだけ同期調整
-        showLoading("Loading Motion...");
+        showLoading("Loading...");
         try {
             const motion = await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
@@ -253,12 +251,12 @@ async function init() {
             currentModel.mesh.dispose();
             if (expressionCleanup) expressionCleanup();
         }
-        showLoading("Loading Custom Model...");
+        showLoading("Loading...");
         try {
             const result = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
             currentModel = result.model;
             if (currentModel) {
-                currentModel.mesh.scaling.setAll(1.0);
+                currentModel.mesh.scaling.setAll(0.07);
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
@@ -303,7 +301,7 @@ async function init() {
             );
             currentModel = result.model;
             if (currentModel) {
-                currentModel.mesh.scaling.setAll(1.0);
+                currentModel.mesh.scaling.setAll(0.07);
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);

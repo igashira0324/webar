@@ -223,7 +223,7 @@ async function init() {
     try {
         currentModel = await loadMmdModel(
             scene, mmdRuntime, 
-            "assets/model/miku.pmx", "assets/motion/dance.vmd",
+            "assets/model/miku.pmx", DANCE_PRESETS[currentDanceId].vmd,
             shadowGenerator, undefined,
             (event) => {
                 if (event.lengthComputable && event.total > 0) {

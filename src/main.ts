@@ -89,6 +89,7 @@ async function init() {
                     lipSync.attach(analysisAudio, isSilent);
                     
                     if (vocalAudio) {
+                        console.log("✅ Vocal track attached for analysis (silent)");
                         vocalAudio.play().catch(e => console.warn("Vocal play failed", e));
                     }
 
@@ -142,7 +143,7 @@ async function init() {
 
         const deltaTime = scene.getEngine().getDeltaTime();
         
-        // 1. 時々口を少し動かす（自然な仕草）
+        // 1. 時々口や表情を少し動かす（自然な仕草 / アイドル表現エンジン）
         idleMouthTimer += deltaTime;
         if (idleMouthTimer > 2000) { // 2秒おき
             if (Math.random() > 0.7) {
@@ -150,20 +151,30 @@ async function init() {
                 try {
                     currentModel.morph.setMorphWeight("あ", weight);
                     currentModel.morph.setMorphWeight("a", weight);
+                    
+                    // 笑顔（笑いモーフ）を時々混ぜる
+                    if (Math.random() > 0.5) {
+                        currentModel.morph.setMorphWeight("笑い", weight * 1.5);
+                    }
                 } catch(e) {}
             }
             idleMouthTimer = 0;
         }
 
         // --- ループ再生検知 ---
-        // ループ設定OFF or すでにループ処理中はスキップ
         if (!loopEnabled || isLooping) return;
 
-        const duration = mmdRuntime.animationFrameTimeDuration;
+        let duration = mmdRuntime.animationFrameTimeDuration;
+        // durationが未取得なら音楽から算出(30fps)
+        if (duration <= 0 && internalAudio && internalAudio.duration) {
+            duration = internalAudio.duration * 30;
+        }
+        
         const current = mmdRuntime.currentFrameTime;
 
-        // 再生中かつ終端に到達したか
-        if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 1.5) {
+        // 再生中かつ終端付近に到達したか
+        if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 2.0) {
+            console.log(`🔁 Loop condition met: ${current.toFixed(1)} / ${duration.toFixed(1)}`);
             (window as any).__triggerLoop();
         }
     });

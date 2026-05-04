@@ -95,7 +95,7 @@ export const setupAudioLipSync = (
       });
 
       attached = true;
-      console.log("🎵 LipSync v1 (restored) attached");
+      console.log(`🎵 LipSync attached (silent=${silent})`);
       return true;
     } catch (e) {
       console.warn("[LipSync] Attach failed:", e);

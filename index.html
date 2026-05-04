@@ -616,7 +616,49 @@
         cursor: pointer;
       }
 
-      /* ネオン調レンジスライダー */
+      .playback-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+      .play-pause-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 2px solid var(--neon-cyan);
+        background: rgba(0, 243, 255, 0.1);
+        color: var(--neon-cyan);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+        font-size: 1.2rem;
+        box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+      }
+      .play-pause-circle:hover {
+        background: rgba(0, 243, 255, 0.2);
+        box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+        transform: scale(1.05);
+      }
+      .play-pause-circle:active {
+        transform: scale(0.95);
+      }
+      .frame-counter {
+        font-size: 0.75rem;
+        font-family: 'Courier New', monospace;
+        color: var(--neon-cyan);
+        opacity: 0.8;
+        margin-left: auto;
+      }
+      .playback-row-title {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 10px;
+      }
       .neon-range {
         -webkit-appearance: none;
         appearance: none;
@@ -761,8 +803,9 @@
         display: none !important;
       }
     </style>
+    <script type="module" src="/src/main.ts"></script>
   </head>
-  <body data-ver="v2-ui-update">
+  <body data-ver="v2.16-force-ui-refresh">
     <div id="app">
       <canvas id="renderCanvas"></canvas>
       <!-- サイドコントロール（垂直スライダー） -->
@@ -835,12 +878,17 @@
             <button class="close-x" id="closeSettingsBtn">×</button>
             <h3>SETTINGS</h3>
 
-            <div class="section-title">PLAYBACK</div>
-            <button id="playPauseBtn" class="primary-btn" style="width:100%; margin-bottom: 15px;">▶ 再生 / 一時停止</button>
-            <label class="settings-label">
-              <span class="val-tag"><span id="seekVal">0</span> / <span id="durationVal">0</span></span>
-            </label>
-            <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="margin-bottom: 20px;" />
+            <div class="playback-row-title">
+              <div class="section-title" style="margin-bottom: 0;">PLAYBACK</div>
+              <div class="frame-counter">
+                <span id="seekVal">0</span> / <span id="durationVal">0</span>
+              </div>
+            </div>
+            
+            <div class="playback-controls">
+              <button id="playPauseBtn" class="play-pause-circle" aria-label="Play/Pause">▶</button>
+              <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="flex-grow: 1;" />
+            </div>
 
             <div class="section-title">DANCE & MUSIC</div>
             <select id="danceSelect" class="neon-select" style="width:100%; margin-bottom: 15px;">
@@ -1003,61 +1051,9 @@
           この端末は WebXR AR に対応していません。
         </div>
 
-        <!-- INFO Modal -->
-        <div id="info-modal" class="modal hidden">
-          <div class="modal-content">
-            <button class="close-x" id="closeInfoBtn">×</button>
-            <h3>ABOUT</h3>
-            <p style="font-size: 0.9rem; line-height: 1.6; color: var(--text-dim);">
-              WebXR と Babylon.js を活用したブラウザ完結型 MMD AR 体験。<br>
-              初音ミクをあなたの部屋に召喚できます。
-            </p>
-            <div class="section-title">USAGE</div>
-            <ol style="font-size: 0.85rem; line-height: 1.8; padding-left: 20px;">
-              <li>「ENTER AR」をタップ</li>
-              <li>カメラ許可</li>
-              <li>床をタップして配置</li>
-            </ol>
-            <div class="section-title">DEVICES</div>
-            <p style="font-size: 0.85rem;">✅ Android Chrome / ❌ iOS Safari</p>
-          </div>
-        </div>
-
-        <div id="loading-screen">
-          <div class="loader"></div>
-          <p>LOADING ASSETS</p>
-          <p><span id="loading-status">0%</span></p>
-        </div>
-        <!-- AR Unavailable Modal -->
-        <div id="ar-unavailable-modal" class="modal hidden">
-          <div class="modal-content">
-            <button class="close-x" id="closeArUnavailableBtn">×</button>
-            <h3>AR 起動不可</h3>
-            <p style="font-size: 0.9rem; line-height: 1.6;">
-              お使いの環境では WebXR AR が利用できません。<br>
-              <strong>Android Chrome</strong> 環境でアクセスしてください。
-            </p>
-          </div>
-        </div>
-
-        <!-- QR Modal -->
-        <div id="qr-modal" class="modal hidden">
-          <div class="modal-content" style="text-align: center;">
-            <button class="close-x" id="closeQrBtn">×</button>
-            <h3>AR QR CODE</h3>
-            <div style="margin: 20px 0;">
-              <img src="assets/marker_qr.png" alt="AR QR Code" style="width: 100%; max-width: 240px; border: 4px solid #fff; border-radius: 12px; box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);">
-            </div>
-            <p style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.6;">
-              Android スマートフォンでスキャンして、<br>
-              ブラウザ（Chrome）で AR を開始してください。
-            </p>
-          </div>
-        </div>
-
       </div> <!-- End of ui-container -->
     </div> <!-- End of ui-overlay -->
-    <script type="module" src="/src/main.ts?v=3"></script>
+    <script type="module" src="/src/main.ts"></script>
     </div> <!-- End of app -->
   </body>
 </html>

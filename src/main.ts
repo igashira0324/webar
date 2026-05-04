@@ -253,7 +253,9 @@ async function init() {
             if (expressionCleanup) (expressionCleanup as any)();
             expressionCleanup = setupExpressions(scene, currentModel);
 
-            setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
+            console.log("Starting WebXR initialization...");
+            await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
+            console.log("WebXR initialization complete.");
         }
     } catch (e: any) {
         console.error("Loading failed:", e);
@@ -511,24 +513,44 @@ function setupModals() {
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", async () => {
-    console.log("AR Launch Button Clicked (Direct API Mode)");
-    
-    const xrHelper = (window as any).__xrHelper;
-    if (xrHelper && xrHelper.baseExperience) {
-      try {
-        // ユーザー操作のコンテキスト内で直接 enterXRAsync を呼ぶ (Android対策)
-        await xrHelper.baseExperience.enterXRAsync(
-          "immersive-ar", 
-          "local-floor",
-          xrHelper.renderTarget
-        );
-        console.log("✅ AR session started directly");
-      } catch (e: any) {
-        console.error("❌ AR session failed:", e);
-        open("ar-unavailable-modal");
-      }
-    } else {
-      console.warn("xrHelper not ready or unavailable");
+    console.log("AR Launch Button Clicked");
+
+    const xr = (window as any).__xrHelper;
+
+    // 1) xrHelper がまだ準備できていない
+    if (!xr || !xr.baseExperience) {
+      console.warn("xrHelper not ready yet");
+      alert("AR システムの準備がまだ整っていません。数秒待ってから再度お試しください。");
+      return;
+    }
+
+    // 2) ブラウザ自体が AR 非対応
+    if (!navigator.xr || typeof navigator.xr.isSessionSupported !== "function") {
+      console.warn("navigator.xr not available");
+      open("ar-unavailable-modal");
+      return;
+    }
+
+    const supported = await navigator.xr.isSessionSupported("immersive-ar");
+    console.log("immersive-ar supported:", supported);
+    if (!supported) {
+      console.warn("immersive-ar not supported by browser/device");
+      open("ar-unavailable-modal");
+      return;
+    }
+
+    // 3) user activation 内で直接セッション開始
+    try {
+      await xr.baseExperience.enterXRAsync(
+        "immersive-ar",
+        "local-floor",
+        xr.renderTarget
+      );
+      console.log("✅ AR session started");
+    } catch (e: any) {
+      console.error("❌ enterXRAsync failed:", e?.name, e?.message);
+      // 詳細なエラーをアラートで表示してデバッグしやすくする
+      alert(`AR起動失敗: ${e?.name || "Error"} - ${e?.message || e}`);
       open("ar-unavailable-modal");
     }
   });

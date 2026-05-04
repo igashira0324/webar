@@ -123,14 +123,15 @@
       .brand {
         font-family: 'Orbitron', sans-serif;
         font-weight: 900;
-        font-size: 1.4rem;
-        letter-spacing: 2px;
-        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        font-size: 1.15rem;
+        letter-spacing: 1.5px;
+        background: linear-gradient(90deg, var(--primary) 0%, #b388ff 50%, var(--secondary) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         text-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
         margin: 0;
+        white-space: nowrap;
       }
 
       .brand-sub {
@@ -798,8 +799,8 @@
 
       /* ===== モバイル調整 ===== */
       @media (max-width: 480px) {
-        .brand { font-size: 1.0rem; letter-spacing: 1px; }
-        .brand-sub { font-size: 0.6rem; letter-spacing: 2px; }
+        .brand { font-size: 0.95rem; letter-spacing: 1px; }
+        .brand-sub { font-size: 0.55rem; letter-spacing: 1.5px; }
         .ar-mega-btn { width: 180px; height: 60px; font-size: 0.95rem; }
         .guide-card { font-size: 0.8rem; padding: 12px 16px; }
       }
@@ -832,7 +833,7 @@
 
       <div id="ui-container">
         <header class="top-header">
-          <h1 class="brand">MMD<span style="font-size:0.65em; opacity:0.85;">(MikuMikuDance)</span></h1>
+          <h1 class="brand">MMD(MikuMikuDance)</h1>
           <p class="brand-sub">× WebXR Experience</p>
           <span id="fps" style="display:none;"></span>
         </header>

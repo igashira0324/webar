@@ -1,6 +1,6 @@
 import {
   Scene, AbstractMesh, WebXRState, WebXRFeatureName,
-  Quaternion, Vector3, TransformNode
+  Quaternion, Vector3, TransformNode, Color4
 } from "@babylonjs/core";
 import { StreamAudioPlayer } from "babylon-mmd";
 
@@ -219,6 +219,9 @@ export const setupWebXR = async (
 
     xr.baseExperience.onStateChangedObservable.add((state) => {
       if (state === WebXRState.IN_XR) {
+        // AR入室時は背景を透明に
+        scene.clearColor = new Color4(0, 0, 0, 0);
+
         inXR = true;
         overlay?.classList.add("active");
         if (controlPanel) controlPanel.style.display = "none";
@@ -234,6 +237,9 @@ export const setupWebXR = async (
         attachToArRoot();
         arRoot.setEnabled(false);
       } else if (state === WebXRState.NOT_IN_XR) {
+        // AR退出時は背景を濃紺に戻す
+        scene.clearColor = new Color4(0.04, 0.04, 0.10, 1.0);
+
         inXR = false;
         overlay?.classList.remove("active");
         if (controlPanel) controlPanel.style.display = "block";

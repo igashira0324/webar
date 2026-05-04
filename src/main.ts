@@ -52,14 +52,15 @@ async function init() {
             // 2. HTMLAudioElement を直接 play
             if (internalAudio) {
                 // ★ 歌声のみのトラックをリップシンクに使用（精度向上のため）
+                //    - muted/volume には触らない（解析データが 0 になるため）
+                //    - silent=true で destination 非接続にして無音再生を実現
                 if (vocalAudio) {
-                    lipSync.attach(vocalAudio);
-                    vocalAudio.muted = true;
-                    vocalAudio.volume = 0;
+                    lipSync.attach(vocalAudio, true); // ★ silent=true
                     vocalAudio.play().catch(e => console.warn("Vocal play failed", e));
+                    console.log("✅ Vocal track attached for analysis (silent)");
                 } else {
                     // フォールバック
-                    lipSync.attach(internalAudio);
+                    lipSync.attach(internalAudio, false);
                 }
 
                 internalAudio.muted = false;
@@ -209,8 +210,8 @@ async function init() {
                 
                 // ★ リップシンク用ボーカル音声のセットアップ
                 vocalAudio = new Audio("assets/audio/vocal.mp3");
-                vocalAudio.muted = true;
                 vocalAudio.preload = "auto";
+                // ★ muted は false のまま（attach の silent オプションで音を消す）
                 vocalAudio.load();
 
                 await Promise.all([

@@ -2,7 +2,7 @@ import { Scene } from "@babylonjs/core";
 import { MmdModel } from "babylon-mmd";
 
 export interface AudioLipSyncController {
-  attach: (audioElement: HTMLAudioElement) => boolean;
+  attach: (audioElement: HTMLAudioElement, silent?: boolean) => boolean;
   setEnabled: (enabled: boolean) => void;
   isEnabled: () => boolean;
   dispose: () => void;
@@ -32,7 +32,12 @@ export const setupAudioLipSync = (
   const MAX_OPEN = 0.85;        // 口の最大開き
   const MORPH_NAMES = ["あ", "a", "A", "Lip_A"];
 
-  const attach = (audioElement: HTMLAudioElement): boolean => {
+  /**
+   * @param audioElement 解析対象の HTMLAudioElement
+   * @param silent       true の場合、解析だけ行いスピーカーへは出力しない
+   *                     （ボーカル分離トラックを裏で再生する用途）
+   */
+  const attach = (audioElement: HTMLAudioElement, silent: boolean = false): boolean => {
     if (attached) return true;
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -43,13 +48,18 @@ export const setupAudioLipSync = (
       audioCtx = new Ctx();
       if (!audioCtx) return false;
 
+      // HTMLAudioElement → 解析 → (出力) のグラフを構築
       sourceNode = audioCtx.createMediaElementSource(audioElement);
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.4;
 
       sourceNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
+
+      // ★ silent モード時は destination に繋がない（音は出ないが解析は行われる）
+      if (!silent) {
+        analyser.connect(audioCtx.destination);
+      }
 
       dataArray = new Uint8Array(analyser.frequencyBinCount);
 

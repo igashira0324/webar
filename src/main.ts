@@ -98,6 +98,9 @@ async function init() {
                             bgmStarted = true;
                         }).catch((err) => {
                             console.error("❌ HTMLAudio play failed:", err.name, err.message);
+                            if (err.name === "NotAllowedError") {
+                                alert("画面をタップして再生を開始してください");
+                            }
                         });
                     }
                 }
@@ -258,6 +261,11 @@ async function init() {
             audioPlayer.source = preset.music;
 
             internalAudio = (audioPlayer as any)._audio || (audioPlayer as any).audio || null;
+            if (!internalAudio) {
+                console.log("Fallback: Creating new Audio element");
+                internalAudio = new Audio(preset.music);
+            }
+
             if (internalAudio) {
                 internalAudio.preload = "auto";
                 internalAudio.load();
@@ -279,7 +287,7 @@ async function init() {
                         resolve();
                     };
                     internalAudio.addEventListener("canplaythrough", onReady);
-                    setTimeout(resolve, 5000);
+                    setTimeout(resolve, 10000); // 5000 -> 10000
                 }));
 
                 if (vocalAudio) {
@@ -289,8 +297,8 @@ async function init() {
                             vocalAudio?.removeEventListener("canplaythrough", onReady);
                             resolve();
                         };
-                        vocalAudio.addEventListener("canplaythrough", onReady);
-                        setTimeout(resolve, 5000);
+                        vocalAudio?.addEventListener("canplaythrough", onReady);
+                        setTimeout(resolve, 10000); // 5000 -> 10000
                     }));
                 }
 
@@ -495,8 +503,10 @@ function setupModals() {
 
   // ENTER AR ボタン
   document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
-    const startFn = (window as any).__startPlayback;
-    if (typeof startFn === "function") startFn();
+    console.log("AR Launch Button Clicked");
+    
+    // ⚠ User Activation を温存するため、ここでは音声再生を開始しない
+    // (再生開始は AR 入室後の初回画面タップで行われます)
 
     const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement | null;
     if (xrBtn) {

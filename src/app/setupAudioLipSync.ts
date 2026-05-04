@@ -26,8 +26,6 @@ export const setupAudioLipSync = (
 
   // 調整パラメータ
   const SMOOTHING = 0.55;       // 平滑化（0=即時, 1=固定）
-  const NOISE_FLOOR = 0.02;     // 無音判定のしきい値
-  const SENSITIVITY = 2.8;      // 感度
   const MAX_OPEN = 0.85;        // 口の最大開き
   const MORPH_NAME = "あ";      // 使用するモーフ名
 
@@ -59,18 +57,23 @@ export const setupAudioLipSync = (
         const model = getModel();
         if (!model) return;
 
-        analyser.getByteTimeDomainData(dataArray as any);
+        // 周波数データを取得 (0 〜 255 の値)
+        analyser.getByteFrequencyData(dataArray as any);
 
-        // RMS（音の大きさ）計算
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          const v = (dataArray[i] - 128) / 128;
-          sum += v * v;
+        // 人間の歌声（中音域）に近い帯域のみを抽出して平均を出す
+        // fftSize=512 の場合、各ビンは約 86Hz 刻み (44.1kHzの場合)
+        // 200Hz 〜 4000Hz 程度 (ビン番号 3 〜 46 程度) を重点的に見る
+        let vocalEnergy = 0;
+        const startBin = 3;
+        const endBin = 46;
+        for (let i = startBin; i <= endBin; i++) {
+          vocalEnergy += dataArray[i];
         }
-        const rms = Math.sqrt(sum / dataArray.length);
+        const averageVocal = vocalEnergy / (endBin - startBin + 1) / 255;
 
-        // ノイズフロア除去 → 感度適用 → 上限クランプ
-        let target = Math.max(0, (rms - NOISE_FLOOR) * SENSITIVITY);
+        // ノイズフロア除去 -> 感度適用 -> 上限クランプ
+        // 楽器音を無視するためしきい値を少し高めに設定
+        let target = Math.max(0, (averageVocal - 0.08) * 3.5);
         target = Math.min(MAX_OPEN, target);
 
         // 平滑化（カクつき防止）

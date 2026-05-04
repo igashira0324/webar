@@ -397,6 +397,11 @@ async function init() {
             if (currentMotion) {
                 mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
             }
+
+            // ★ AR操作対象を更新
+            if (typeof (window as any).__updateXRTargetMeshes === "function") {
+                (window as any).__updateXRTargetMeshes([currentModel.mesh]);
+            }
         }
     }, async (presetId) => {
         const presets: Record<string, string> = {
@@ -448,6 +453,11 @@ async function init() {
                 // ロード完了後に Duration を再設定
                 if (currentMotion) {
                     mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+                }
+
+                // ★ AR操作対象を更新
+                if (typeof (window as any).__updateXRTargetMeshes === "function") {
+                    (window as any).__updateXRTargetMeshes([currentModel.mesh]);
                 }
                 console.log(`✅ Successfully switched to preset: ${presetId}`);
             }

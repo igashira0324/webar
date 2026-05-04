@@ -19,12 +19,20 @@ export const setupWebXR = async (
   arRoot.scaling.setAll(baseScale);
   arRoot.setEnabled(false);
 
+  let targetMeshes = [...meshes]; // 内部で保持
+
+  // ★ 外部から操作対象メッシュを更新できるようにする
+  (window as any).__updateXRTargetMeshes = (newMeshes: AbstractMesh[]) => {
+    console.log("Updating WebXR target meshes:", newMeshes.length);
+    targetMeshes = [...newMeshes];
+  };
+
   const originalState = new Map<AbstractMesh, {
     parent: any, scaling: Vector3, position: Vector3, rotationQuaternion: Quaternion | null
   }>();
 
   const attachToArRoot = () => {
-    meshes.forEach((m) => {
+    targetMeshes.forEach((m) => {
       originalState.set(m, {
         parent: m.parent,
         scaling: m.scaling.clone(),
@@ -39,7 +47,7 @@ export const setupWebXR = async (
   };
 
   const detachFromArRoot = () => {
-    meshes.forEach((m) => {
+    targetMeshes.forEach((m) => {
       const s = originalState.get(m);
       m.parent = s ? s.parent : null;
       if (s) {

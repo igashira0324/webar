@@ -1,12 +1,10 @@
 import { Scene } from "@babylonjs/core";
-import { MmdRuntime, MmdModel, StreamAudioPlayer } from "babylon-mmd";
+import { StreamAudioPlayer } from "babylon-mmd";
+import { appState } from "./state";
+import { togglePlayback } from "./audioController";
 
 export const setupUI = (
     scene: Scene, 
-    mmdRuntime: MmdRuntime, 
-    audioPlayer: StreamAudioPlayer,
-    getCurrentModel: () => MmdModel | null,
-    onTogglePlayback: (state?: boolean) => Promise<boolean>,
     onLoadFiles: (pmx: File, vmd: File, textures: FileList) => void,
     onPresetSelect: (presetId: string) => void
 ) => {
@@ -36,9 +34,9 @@ export const setupUI = (
     const S_BASE = 1.0;
     const Y_BASE = -5.0;
 
-    // ===== Play/Pause (main.ts の togglePlayback を使用) =====
+    // ===== Play/Pause =====
     playPauseBtn?.addEventListener("click", () => {
-        onTogglePlayback();
+        togglePlayback();
     });
 
     const sideScaleSlider = document.getElementById("sideScaleSlider") as HTMLInputElement | null;
@@ -47,15 +45,13 @@ export const setupUI = (
     // ===== Scale (Side Bar) =====
     sideScaleSlider?.addEventListener("input", () => {
         const val = parseFloat(sideScaleSlider.value);
-        const model = getCurrentModel();
-        if (model) model.mesh.scaling.setAll(val * S_BASE);
+        if (appState.currentModel) appState.currentModel.mesh.scaling.setAll(val * S_BASE);
     });
 
     // ===== Y Position (Side Bar) =====
     sideYPosSlider?.addEventListener("input", () => {
         const val = parseFloat(sideYPosSlider.value);
-        const model = getCurrentModel();
-        if (model) model.mesh.position.y = val + Y_BASE;
+        if (appState.currentModel) appState.currentModel.mesh.position.y = val + Y_BASE;
     });
 
     // ===== Seek =====
@@ -67,17 +63,19 @@ export const setupUI = (
             if (seekVal) seekVal.textContent = Math.floor(frame).toString();
         });
         seekSlider.addEventListener("change", () => {
+            if (!appState.mmdRuntime) return;
             const frame = parseFloat(seekSlider.value);
-            mmdRuntime.seekAnimation(frame, true);
+            appState.mmdRuntime.seekAnimation(frame, true);
             isSeeking = false;
         });
     }
 
     // ===== Duration =====
     const updateDuration = () => {
-        let duration = mmdRuntime.animationFrameTimeDuration;
-        if (duration <= 0 && mmdRuntime.audioPlayer) {
-            duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30;
+        if (!appState.mmdRuntime) return;
+        let duration = appState.mmdRuntime.animationFrameTimeDuration;
+        if (duration <= 0 && appState.mmdRuntime.audioPlayer) {
+            duration = (appState.mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30;
         }
         if (duration > 0) {
             if (durationVal) durationVal.textContent = Math.floor(duration).toString();
@@ -88,13 +86,17 @@ export const setupUI = (
         }
     };
 
-    mmdRuntime.onAnimationDurationChangedObservable.add(updateDuration);
-    audioPlayer.onDurationChangedObservable.add(updateDuration);
+    if (appState.mmdRuntime) {
+        appState.mmdRuntime.onAnimationDurationChangedObservable.add(updateDuration);
+    }
+    if (appState.audioPlayer) {
+        appState.audioPlayer.onDurationChangedObservable.add(updateDuration);
+    }
 
     scene.onBeforeRenderObservable.add(() => {
-        if (!isSeeking && seekSlider) {
-            const currentFrame = mmdRuntime.currentFrameTime;
-            const duration = mmdRuntime.animationFrameTimeDuration;
+        if (!isSeeking && seekSlider && appState.mmdRuntime) {
+            const currentFrame = appState.mmdRuntime.currentFrameTime;
+            const duration = appState.mmdRuntime.animationFrameTimeDuration;
             if (duration > 0 && (parseFloat(seekSlider.max) === 0 || Math.abs(parseFloat(seekSlider.max) - duration) > 10)) {
                 updateDuration();
             }

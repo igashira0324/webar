@@ -135,17 +135,22 @@
       }
 
       .brand-sub {
-        display: none;
+        display: block;
+        font-size: 0.65rem;
+        color: var(--text-dim);
+        margin-top: 4px;
+        letter-spacing: 1px;
+        font-family: 'Orbitron', sans-serif;
       }
 
       .fab-row-container {
         pointer-events: none;
-        max-width: 600px;
-        margin: 8px auto 0;
-        width: 100%;
+        position: absolute;
+        top: 20px;
+        right: 20px;
         display: flex;
-        justify-content: flex-start;
-        padding: 0 4px;
+        justify-content: flex-end;
+        z-index: 1000;
       }
 
       .stats-row {
@@ -788,11 +793,11 @@
       /* ===== AR Overlay ===== */
       #ar-overlay {
         display: none;
-        position: absolute;
+        position: fixed;
         inset: 0;
         touch-action: none;
         pointer-events: auto;
-        z-index: 10;
+        z-index: 10000;
       }
 
       #ar-overlay.active { display: block; }
@@ -823,7 +828,8 @@
       }
     </style>
   </head>
-  <body data-ver="v2.16-force-ui-refresh">
+    <body data-ver="v2.16-force-ui-refresh">
+    <div id="ar-overlay"></div>
     <div id="app">
       <canvas id="renderCanvas"></canvas>
       <!-- サイドコントロール（垂直スライダー） -->
@@ -841,12 +847,10 @@
     </div>
 
     <div class="ui-overlay">
-      <!-- AR 操作用オーバーレイ (DOM Overlay) -->
-      <div id="ar-overlay"></div>
-
       <div id="ui-container">
         <header class="top-header">
-          <h1 class="brand">MMD(MikuMikuDance) × WebXR</h1>
+          <h1 class="brand">MMD(MikuMikuDance)</h1>
+          <span class="brand-sub">× WebXR Experience</span>
           <span id="fps" style="display:none;"></span>
         </header>
 
@@ -1007,8 +1011,8 @@
           <div class="modal-content" style="text-align:center;">
             <button class="close-x" id="closeArUnavailableBtn">×</button>
             <div style="font-size:2.5rem; margin-bottom:8px;">📱</div>
-            <h3 style="color:var(--secondary);">AR 非対応の環境です</h3>
-            <p style="font-size:0.9rem; line-height:1.7; margin-top:12px;">
+            <h3 style="color:var(--secondary);" id="ar-error-title">AR 非対応の環境です</h3>
+            <p id="ar-error-msg" style="font-size:0.9rem; line-height:1.7; margin-top:12px;">
               この端末・ブラウザでは <strong style="color:var(--primary);">WebXR AR</strong> をご利用いただけません。
             </p>
             <div style="

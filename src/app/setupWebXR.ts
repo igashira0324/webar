@@ -2,24 +2,23 @@ import {
   Scene, AbstractMesh, WebXRState, WebXRFeatureName,
   Quaternion, Vector3, TransformNode, Color4
 } from "@babylonjs/core";
-import { StreamAudioPlayer } from "babylon-mmd";
+import { appState } from "./state";
+import { togglePlayback } from "./audioController";
 
 export const setupWebXR = async (
   scene: Scene,
-  meshes: AbstractMesh[],
-  _audioPlayer: StreamAudioPlayer
+  meshes: AbstractMesh[]
 ) => {
-  console.log("Setting up WebXR... (v2.7)");
+  console.log("Setting up WebXR... (v2.8 Refactored)");
   const controlPanel = document.getElementById("control-panel");
   const showSettingsBtn = document.getElementById("showSettingsBtn");
-  const runtime = (scene as any).mmdRootRuntime;
 
   const arRoot = new TransformNode("arRoot", scene);
   const baseScale = 0.2;
   arRoot.scaling.setAll(baseScale);
   arRoot.setEnabled(false);
 
-  let targetMeshes = [...meshes]; // 内部で保持
+  let targetMeshes = [...meshes];
 
   // ★ 外部から操作対象メッシュを更新できるようにする
   (window as any).__updateXRTargetMeshes = (newMeshes: AbstractMesh[]) => {
@@ -66,7 +65,7 @@ export const setupWebXR = async (
   let inXR = false;
   const tmpQuat = new Quaternion();
 
-  // ===== ジェスチャー操作（DOM Overlay版・確実に動く方式）=====
+  // ===== ジェスチャー操作 (DOM Overlay) =====
   const overlay = document.getElementById("ar-overlay");
   
   const handleTapPlace = () => {
@@ -148,9 +147,7 @@ export const setupWebXR = async (
         movedDistance += Math.abs(dx) + Math.abs(dy);
 
         if (movedDistance > TAP_MAX_MOVE) {
-          // 横ドラッグ -> Y軸回転 (LOCAL)
           arRoot.rotate(Vector3.Up(), dx * -0.005, 1);
-          // 縦ドラッグ -> X軸回転 (LOCAL)
           arRoot.rotate(Vector3.Right(), dy * -0.005, 1);
         }
       } else if (gestureMode === "pinch" && activeTouches.size >= 2) {
@@ -175,7 +172,7 @@ export const setupWebXR = async (
         activeTouches.delete(e.changedTouches[i].identifier);
       }
 
-      if (gestureMode === "rotate" && sizeBefore === 1 && (activeTouches as any).size === 0 && elapsed < TAP_MAX_TIME && movedDistance < TAP_MAX_MOVE) {
+      if (gestureMode === "rotate" && sizeBefore === 1 && activeTouches.size === 0 && elapsed < TAP_MAX_TIME && movedDistance < TAP_MAX_MOVE) {
         handleTapPlace();
       }
 
@@ -200,10 +197,12 @@ export const setupWebXR = async (
         sessionMode: "immersive-ar",
         referenceSpaceType: "local-floor"
       },
-      optionalFeatures: ["hit-test", "dom-overlay"]
+      optionalFeatures: ["hit-test", "dom-overlay"],
+      disableDefaultUI: true
     });
 
-    (window as any).__xrHelper = xr; // ★ windowに公開
+    appState.xrHelper = xr;
+    (window as any).__xrHelper = xr; // Keep global for external entry if needed
 
     const featuresManager = xr.baseExperience.featuresManager;
     const hitTest = featuresManager.enableFeature(
@@ -219,27 +218,19 @@ export const setupWebXR = async (
 
     xr.baseExperience.onStateChangedObservable.add((state) => {
       if (state === WebXRState.IN_XR) {
-        // AR入室時は背景を透明に
         scene.clearColor = new Color4(0, 0, 0, 0);
-
         inXR = true;
         overlay?.classList.add("active");
         if (controlPanel) controlPanel.style.display = "none";
         if (showSettingsBtn) showSettingsBtn.style.display = "none";
         try { 
-            runtime?.playAnimation(); 
-            // ★ AR入室成功を通知
-            if (typeof (window as any).__onArEntered === "function") {
-                (window as any).__onArEntered();
-            }
+            appState.mmdRuntime?.playAnimation(); 
         } catch (e) { console.warn(e); }
         modelPlaced = false;
         attachToArRoot();
         arRoot.setEnabled(false);
       } else if (state === WebXRState.NOT_IN_XR) {
-        // AR退出時は背景を濃紺に戻す
         scene.clearColor = new Color4(0.04, 0.04, 0.10, 1.0);
-
         inXR = false;
         overlay?.classList.remove("active");
         if (controlPanel) controlPanel.style.display = "block";

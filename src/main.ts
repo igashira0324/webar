@@ -177,7 +177,7 @@ async function init() {
     }, async (presetId) => {
         const presets: Record<string, string> = {
             "original": "assets/model/miku.pmx",
-            "takosanp": "assets/model/presets/mm2015/model.pmx",
+            "v_miku_full": "assets/model/presets/v_miku_full/model.pmx",
             "sour_snow": "assets/model/presets/snow/model.pmx",
             "onasu": "assets/model/presets/sakura/model.pmx",
             "riverside": "assets/model/presets/riverside/model.pmx"
@@ -227,7 +227,7 @@ async function init() {
             // フォールバック：デフォルトモデルへ復帰
             try {
                 currentModel = await loadMmdModel(
-                    scene, mmdRuntime, "assets/model/miku.pmx", "assets/motion/dance.vmd",
+                    scene, mmdRuntime, "assets/model/presets/v_miku_full/model.pmx", "assets/motion/dance.vmd",
                     shadowGenerator
                 );
                 if (currentModel) {

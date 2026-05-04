@@ -230,8 +230,9 @@ async function init() {
         arLaunchBtn.style.pointerEvents = "none";
     }
     
+    let currentMotion: any = null;
     try {
-        currentModel = await loadMmdModel(
+        const result = await loadMmdModel(
             scene, mmdRuntime, 
             "assets/model/miku.pmx", DANCE_PRESETS[currentDanceId].vmd,
             shadowGenerator, undefined,
@@ -242,6 +243,9 @@ async function init() {
                 }
             }
         );
+        currentModel = result.model;
+        currentMotion = result.motion; 
+
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
             currentModel.mesh.position.set(0, 0, 0); 
@@ -309,6 +313,11 @@ async function init() {
         }
     };
     await setupAudio(currentDanceId);
+    
+    // 音声セットアップ後に Duration を再設定（上書き対策）
+    if (currentMotion) {
+        mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+    }
 
     // 5. Finalize UI
     if (arLaunchBtn) {
@@ -342,11 +351,16 @@ async function init() {
 
             // 2. モーション読み込み
             if (loadingStatus) loadingStatus.textContent = "Loading Motion...";
-            await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
+            currentMotion = await loadVmdToModel(scene, mmdRuntime, currentModel, DANCE_PRESETS[newId].vmd);
             
             // 3. 音声読み込み
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
             await setupAudio(newId);
+
+            // 音声セットアップ後に Duration を再設定（上書き対策）
+            if (currentMotion) {
+                mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+            }
 
             // 4. 自動再生（切り替え前が再生中だった場合）
             if (wasPlaying) {
@@ -363,12 +377,20 @@ async function init() {
             mmdRuntime.destroyMmdModel(currentModel);
             currentModel.mesh.dispose();
         }
-        currentModel = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
+        const result = await loadMmdModelFromFiles(scene, mmdRuntime, pmx, vmd, textures, shadowGenerator);
+        currentModel = result.model;
+        currentMotion = result.motion;
+        
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
-            // 表情制御を再設定
+            currentModel.mesh.position.set(0, 0, 0); 
             if (expressionCleanup) (expressionCleanup as any)();
             expressionCleanup = setupExpressions(scene, currentModel);
+
+            // ロード完了後に Duration を再設定
+            if (currentMotion) {
+                mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+            }
         }
     }, async (presetId) => {
         const presets: Record<string, string> = {
@@ -397,7 +419,7 @@ async function init() {
                 currentModel = null;
             }
 
-            currentModel = await loadMmdModel(
+            const result = await loadMmdModel(
                 scene, mmdRuntime, 
                 pmxPath, DANCE_PRESETS[currentDanceId].vmd,
                 shadowGenerator, undefined,
@@ -408,12 +430,19 @@ async function init() {
                     }
                 }
             );
+            currentModel = result.model;
+            currentMotion = result.motion;
 
             if (currentModel) {
                 currentModel.mesh.scaling.setAll(0.07);
                 currentModel.mesh.position.set(0, 0, 0); 
                 if (expressionCleanup) (expressionCleanup as any)();
                 expressionCleanup = setupExpressions(scene, currentModel);
+
+                // ロード完了後に Duration を再設定
+                if (currentMotion) {
+                    mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+                }
                 console.log(`✅ Successfully switched to preset: ${presetId}`);
             }
         } catch (e: any) {
@@ -422,15 +451,22 @@ async function init() {
             
             // フォールバック：デフォルトモデルへ復帰
             try {
-                currentModel = await loadMmdModel(
+                const fallbackResult = await loadMmdModel(
                     scene, mmdRuntime, "assets/model/presets/v_miku_full/model.pmx", DANCE_PRESETS[currentDanceId].vmd,
                     shadowGenerator
                 );
+                currentModel = fallbackResult.model;
+                currentMotion = fallbackResult.motion;
                 if (currentModel) {
                     currentModel.mesh.scaling.setAll(0.07);
                     currentModel.mesh.position.set(0, 0, 0); 
                     if (expressionCleanup) (expressionCleanup as any)();
                     expressionCleanup = setupExpressions(scene, currentModel);
+
+                    // フォールバック後も Duration を再設定
+                    if (currentMotion) {
+                        mmdRuntime.setManualAnimationDuration(currentMotion.endFrame);
+                    }
                 }
             } catch (fallbackError) {
                 console.error("Critical: Fallback also failed", fallbackError);

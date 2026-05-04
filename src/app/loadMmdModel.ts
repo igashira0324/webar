@@ -68,7 +68,7 @@ export const loadMmdModel = async (
     // Force set duration to allow seeking (use raw frames)
     mmdRuntime.setManualAnimationDuration(motion.endFrame);
 
-    return mmdModel;
+    return { model: mmdModel, motion: motion };
 };
 
 export const loadMmdModelFromFiles = async (

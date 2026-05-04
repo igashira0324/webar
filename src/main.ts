@@ -174,8 +174,10 @@ async function init() {
 
         // 再生中かつ終端付近に到達したか
         if (mmdRuntime.isAnimationPlaying && duration > 0 && current >= duration - 2.0) {
-            console.log(`🔁 Loop condition met: ${current.toFixed(1)} / ${duration.toFixed(1)}`);
-            (window as any).__triggerLoop();
+            if (!isLooping) {
+                console.log(`🔁 Loop condition met: ${current.toFixed(1)} / ${duration.toFixed(1)}`);
+                (window as any).__triggerLoop();
+            }
         }
     });
 
@@ -184,7 +186,6 @@ async function init() {
     const loadingStatus = document.getElementById("loading-status") as HTMLSpanElement;
     const arLaunchBtn = document.getElementById("arLaunchBtn") as HTMLButtonElement | null;
 
-    // 音声ロード完了までボタンを無効化する保険
     if (arLaunchBtn) {
         arLaunchBtn.disabled = true;
         arLaunchBtn.style.opacity = "0.5";
@@ -211,13 +212,10 @@ async function init() {
             currentModel.mesh.scaling.setAll(0.07);
             currentModel.mesh.position.set(0, 0, 0); 
 
-            // 表情制御を有効化
             if (expressionCleanup) (expressionCleanup as any)();
             expressionCleanup = setupExpressions(scene, currentModel);
 
-            console.log("Starting WebXR initialization...");
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
-            console.log("WebXR initialization complete.");
         }
     } catch (e: any) {
         console.error("Loading failed:", e);
@@ -236,7 +234,7 @@ async function init() {
         if (vocalAudio) vocalAudio.pause();
         
         const btn = document.getElementById("playPauseBtn");
-        if (btn) btn.textContent = "▶"; // 待機中は再生アイコンに
+        if (btn) btn.textContent = "▶";
 
         if (loopTimer) clearTimeout(loopTimer);
         loopTimer = window.setTimeout(() => {
@@ -251,12 +249,12 @@ async function init() {
                     vocalAudio.play().catch(e => console.warn(e));
                 }
                 mmdRuntime.playAnimation();
-                if (btn) btn.textContent = "||"; // 再開したら一時停止アイコンに
-                isLooping = false;
+                if (btn) btn.textContent = "||";
                 console.log("🔁 Loop restarted successfully");
             } catch(e) {
                 console.warn("Loop restart failed:", e);
-                isLooping = false;
+            } finally {
+                isLooping = false; // ★ 必ずリセットする
             }
         }, 1000);
     };

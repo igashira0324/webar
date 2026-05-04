@@ -42,6 +42,16 @@ async function init() {
             vmd: "assets/motion/nightoffire.vmd",
             music: "assets/audio/nightoffire_full.mp3",
             vocal: null
+        },
+        trend2025_a: {
+            vmd: "assets/motion/trend2025_a.vmd",
+            music: "assets/audio/trend2025_a.mp3",
+            vocal: null
+        },
+        trend2025_b: {
+            vmd: "assets/motion/trend2025_b.vmd",
+            music: "assets/audio/trend2025_b.mp3",
+            vocal: null
         }
     };
     let currentDanceId = "dindondan";

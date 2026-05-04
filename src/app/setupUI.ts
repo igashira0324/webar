@@ -77,25 +77,28 @@ export const setupUI = (
     if (seekSlider) {
         seekSlider.addEventListener("input", () => {
             isSeeking = true;
-            const frame = parseFloat(seekSlider.value);
-            if (seekVal) seekVal.textContent = Math.floor(frame).toString();
+            const time = parseFloat(seekSlider.value);
+            if (seekVal) seekVal.textContent = Math.floor(time).toString();
         });
         seekSlider.addEventListener("change", () => {
-            const frame = parseFloat(seekSlider.value);
-            mmdRuntime.seekAnimation(frame, true);
+            const time = parseFloat(seekSlider.value);
+            mmdRuntime.seekAnimation(time, true);
             isSeeking = false;
         });
     }
 
     // ===== Duration =====
     const updateDuration = () => {
-        let duration = mmdRuntime.animationFrameTimeDuration;
+        let duration = mmdRuntime.animationFrameTimeDuration; // すでに秒単位（loadMmdModel.tsで設定）
         if (duration <= 0 && mmdRuntime.audioPlayer) {
-            duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30;
+            duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration;
         }
         if (duration > 0) {
             if (durationVal) durationVal.textContent = Math.floor(duration).toString();
-            if (seekSlider) seekSlider.max = duration.toString();
+            if (seekSlider) {
+                seekSlider.max = duration.toString();
+                seekSlider.step = "0.01"; // 秒単位なので細かくシーク可能に
+            }
         }
     };
 
@@ -104,13 +107,13 @@ export const setupUI = (
 
     scene.onBeforeRenderObservable.add(() => {
         if (!isSeeking && seekSlider) {
-            const currentFrame = mmdRuntime.currentFrameTime;
+            const currentTime = mmdRuntime.currentFrameTime; // 秒単位
             const duration = mmdRuntime.animationFrameTimeDuration;
-            if (duration > 0 && parseFloat(seekSlider.max) === 0) {
+            if (duration > 0 && (parseFloat(seekSlider.max) === 0 || Math.abs(parseFloat(seekSlider.max) - duration) > 1)) {
                 updateDuration();
             }
-            seekSlider.value = currentFrame.toString();
-            if (seekVal) seekVal.textContent = Math.floor(currentFrame).toString();
+            seekSlider.value = currentTime.toString();
+            if (seekVal) seekVal.textContent = Math.floor(currentTime).toString();
         }
     });
 

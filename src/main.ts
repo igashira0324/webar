@@ -28,6 +28,7 @@ async function init() {
     const audioPlayer = new StreamAudioPlayer(scene);
 
     let internalAudio: HTMLAudioElement | null = null;
+    let vocalAudio: HTMLAudioElement | null = null;
     let bgmStarted = false;
 
     let currentModel: MmdModel | null = null;
@@ -50,8 +51,16 @@ async function init() {
 
             // 2. HTMLAudioElement を直接 play
             if (internalAudio) {
-                // ★ 音楽連動リップシンクをアタッチ
-                lipSync.attach(internalAudio);
+                // ★ 歌声のみのトラックをリップシンクに使用（精度向上のため）
+                if (vocalAudio) {
+                    lipSync.attach(vocalAudio);
+                    vocalAudio.muted = true;
+                    vocalAudio.volume = 0;
+                    vocalAudio.play().catch(e => console.warn("Vocal play failed", e));
+                } else {
+                    // フォールバック
+                    lipSync.attach(internalAudio);
+                }
 
                 internalAudio.muted = false;
                 internalAudio.volume = 1.0;
@@ -113,6 +122,9 @@ async function init() {
                 if (internalAudio && !internalAudio.paused) {
                     internalAudio.pause();
                 }
+                if (vocalAudio && !vocalAudio.paused) {
+                    vocalAudio.pause();
+                }
             } catch (e) {
                 console.warn("Loop pause failed:", e);
             }
@@ -125,10 +137,11 @@ async function init() {
                     // 音声も先頭に
                     if (internalAudio) {
                         internalAudio.currentTime = 0;
-                        const p = internalAudio.play();
-                        if (p && typeof p.then === "function") {
-                            p.catch(err => console.warn("Loop audio play failed:", err));
-                        }
+                        internalAudio.play().catch(err => console.warn("Loop audio play failed:", err));
+                    }
+                    if (vocalAudio) {
+                        vocalAudio.currentTime = 0;
+                        vocalAudio.play().catch(err => console.warn("Loop vocal play failed:", err));
                     }
                     // アニメ再開
                     mmdRuntime.playAnimation();
@@ -193,15 +206,33 @@ async function init() {
             if (internalAudio) {
                 internalAudio.preload = "auto";
                 internalAudio.load();
-                await new Promise<void>((resolve) => {
-                    if (!internalAudio || internalAudio.readyState >= 3) return resolve();
-                    const onReady = () => {
-                        internalAudio?.removeEventListener("canplaythrough", onReady);
-                        resolve();
-                    };
-                    internalAudio.addEventListener("canplaythrough", onReady);
-                    setTimeout(resolve, 8000);
-                });
+                
+                // ★ リップシンク用ボーカル音声のセットアップ
+                vocalAudio = new Audio("assets/audio/vocal.mp3");
+                vocalAudio.muted = true;
+                vocalAudio.preload = "auto";
+                vocalAudio.load();
+
+                await Promise.all([
+                    new Promise<void>((resolve) => {
+                        if (!internalAudio || internalAudio.readyState >= 3) return resolve();
+                        const onReady = () => {
+                            internalAudio?.removeEventListener("canplaythrough", onReady);
+                            resolve();
+                        };
+                        internalAudio.addEventListener("canplaythrough", onReady);
+                        setTimeout(resolve, 5000);
+                    }),
+                    new Promise<void>((resolve) => {
+                        if (!vocalAudio || vocalAudio.readyState >= 3) return resolve();
+                        const onReady = () => {
+                            vocalAudio?.removeEventListener("canplaythrough", onReady);
+                            resolve();
+                        };
+                        vocalAudio.addEventListener("canplaythrough", onReady);
+                        setTimeout(resolve, 5000);
+                    })
+                ]);
             }
         } catch (e) {
             console.warn("Audio failed", e);

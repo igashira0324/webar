@@ -135,11 +135,15 @@
       }
 
       .brand-sub {
-        font-size: 0.7rem;
-        letter-spacing: 4px;
-        color: var(--text-dim);
-        text-transform: uppercase;
-        margin: 0;
+        display: none;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        width: 100%;
+        justify-content: flex-start;
       }
 
       .stats-row {
@@ -329,7 +333,15 @@
         top: 50%;
         transform: translateY(-50%);
         display: flex;
-        gap: 15px; /* 間隔を狭める */
+        z-index: 9999;
+        pointer-events: none;
+      }
+      .right-controls {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
         z-index: 9999;
         pointer-events: none;
       }
@@ -427,14 +439,9 @@
 
       /* ===== 右上FABグループ ===== */
       .fab-group {
-        position: absolute;
-        top: 120px;
-        right: 16px;
         display: flex;
-        flex-direction: column;
         gap: 10px;
         pointer-events: auto;
-        z-index: 5;
       }
 
       /* 新規追加：モデル選択モーダル用スタイル */
@@ -824,6 +831,8 @@
         <span class="side-slider-label">SCALE</span>
         <input type="range" id="sideScaleSlider" min="0.05" max="2.0" step="0.01" value="0.07" class="vertical-slider" />
       </div>
+    </div>
+    <div class="right-controls">
       <div class="side-slider-group">
         <span class="side-slider-label">HEIGHT</span>
         <input type="range" id="sideYPosSlider" min="-10" max="10" step="0.1" value="0.0" class="vertical-slider" />
@@ -836,17 +845,16 @@
 
       <div id="ui-container">
         <header class="top-header">
-          <h1 class="brand">MMD(MikuMikuDance)</h1>
-          <p class="brand-sub">× WebXR Experience</p>
+          <h1 class="brand">MMD(MikuMikuDance) × WebXR</h1>
+          <div class="header-actions">
+            <div class="fab-group">
+              <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
+              <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
+              <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
+            </div>
+          </div>
           <span id="fps" style="display:none;"></span>
         </header>
-
-        <!-- 右上FABグループ -->
-        <div class="fab-group">
-          <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
-          <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
-          <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
-        </div>
 
         <!-- 中央：ガイド -->
         <div class="center-area">

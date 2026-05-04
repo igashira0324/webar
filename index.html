@@ -1003,11 +1003,58 @@
           この端末は WebXR AR に対応していません。
         </div>
 
+        <!-- INFO Modal -->
+        <div id="info-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeInfoBtn">×</button>
+            <h3>ABOUT</h3>
+            <p style="font-size: 0.9rem; line-height: 1.6; color: var(--text-dim);">
+              WebXR と Babylon.js を活用したブラウザ完結型 MMD AR 体験。<br>
+              初音ミクをあなたの部屋に召喚できます。
+            </p>
+            <div class="section-title">USAGE</div>
+            <ol style="font-size: 0.85rem; line-height: 1.8; padding-left: 20px;">
+              <li>「ENTER AR」をタップ</li>
+              <li>カメラ許可</li>
+              <li>床をタップして配置</li>
+            </ol>
+            <div class="section-title">DEVICES</div>
+            <p style="font-size: 0.85rem;">✅ Android Chrome / ❌ iOS Safari</p>
+          </div>
+        </div>
+
         <div id="loading-screen">
           <div class="loader"></div>
           <p>LOADING ASSETS</p>
           <p><span id="loading-status">0%</span></p>
         </div>
+        <!-- AR Unavailable Modal -->
+        <div id="ar-unavailable-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeArUnavailableBtn">×</button>
+            <h3>AR 起動不可</h3>
+            <p style="font-size: 0.9rem; line-height: 1.6;">
+              お使いの環境では WebXR AR が利用できません。<br>
+              <strong>Android Chrome</strong> 環境でアクセスしてください。
+            </p>
+          </div>
+        </div>
+
+        <!-- QR Modal -->
+        <div id="qr-modal" class="modal hidden">
+          <div class="modal-content" style="text-align: center;">
+            <button class="close-x" id="closeQrBtn">×</button>
+            <h3>AR QR CODE</h3>
+            <div style="margin: 20px 0;">
+              <img src="assets/marker_qr.png" alt="AR QR Code" style="width: 100%; max-width: 240px; border: 4px solid #fff; border-radius: 12px; box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);">
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.6;">
+              Android スマートフォンでスキャンして、<br>
+              ブラウザ（Chrome）で AR を開始してください。
+            </p>
+          </div>
+        </div>
+
       </div> <!-- End of ui-container -->
     </div> <!-- End of ui-overlay -->
     <script type="module" src="/src/main.ts?v=3"></script>

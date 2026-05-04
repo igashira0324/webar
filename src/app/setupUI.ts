@@ -29,7 +29,7 @@ export const setupUI = (
     const controlPanel = document.getElementById("control-panel") as HTMLDivElement | null;
     const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement | null;
     const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement | null;
-    const showMarkerBtn = document.getElementById("showMarkerBtn") as HTMLButtonElement | null;
+    const showMarkerBtn = document.getElementById("qrFab") as HTMLButtonElement | null;
     // ★ marker-modal は qr-modal にリネームされた
     const markerModal = document.getElementById("qr-modal") as HTMLDivElement | null;
     const closeMarkerBtn = document.getElementById("closeQrBtn") as HTMLButtonElement | null;

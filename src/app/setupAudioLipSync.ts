@@ -9,8 +9,8 @@ export interface AudioLipSyncController {
 }
 
 /**
- * LipSync v4 (Simple + Natural)
- * 自然な追従性と、最低限の楽器音抑制を両立させた実用版
+ * 音楽ファイルの音量に合わせて口パク（リップシンク）を行うコントローラー
+ * v1 復元版：シンプルで自然な追従を優先
  */
 export const setupAudioLipSync = (
   scene: Scene,
@@ -19,102 +19,73 @@ export const setupAudioLipSync = (
   let audioCtx: AudioContext | null = null;
   let analyser: AnalyserNode | null = null;
   let sourceNode: MediaElementAudioSourceNode | null = null;
-  let freqData: Uint8Array | null = null;
+  let dataArray: Uint8Array | null = null;
   let observer: any = null;
   let enabled = true;
   let attached = false;
+  let smoothed = 0;
 
-  // 状態
-  let smoothedMouth = 0;
-  let prevVocal = 0;
-  let recentVariations: number[] = [];
-
-  // パラメータ（レスポンス重視）
-  const MOUTH_SMOOTHING = 0.45;       // 口の動きの平滑化（軽め）
-  const NOISE_FLOOR = 0.08;           // この音量以下は完全に無音扱い
-  const SENSITIVITY = 4.0;            // 口の開き感度
-  const MAX_OPEN = 0.9;
-  const VARIATION_WINDOW = 30;        // 約 0.5 秒分
+  // 調整パラメータ（v1 と同じ設定）
+  const SMOOTHING = 0.55;       // 平滑化（0=即時, 1=固定）
+  const NOISE_FLOOR = 0.02;     // 無音判定のしきい値
+  const SENSITIVITY = 2.8;      // 感度
+  const MAX_OPEN = 0.85;        // 口の最大開き
   const MORPH_NAMES = ["あ", "a", "A", "Lip_A"];
 
   const attach = (audioElement: HTMLAudioElement): boolean => {
     if (attached) return true;
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctx) return false;
+      if (!Ctx) {
+        console.warn("[LipSync] Web Audio API not supported");
+        return false;
+      }
       audioCtx = new Ctx();
       if (!audioCtx) return false;
 
       sourceNode = audioCtx.createMediaElementSource(audioElement);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.2; // 短く（変動を捉える）
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.4;
 
       sourceNode.connect(analyser);
       analyser.connect(audioCtx.destination);
 
-      freqData = new Uint8Array(analyser.frequencyBinCount);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
 
       observer = scene.onAfterAnimationsObservable.add(() => {
-        if (!enabled || !analyser || !freqData) return;
+        if (!enabled || !analyser || !dataArray) return;
         const model = getModel();
         if (!model) return;
 
-        analyser.getByteFrequencyData(freqData as any);
+        // 時間波形を取得
+        analyser.getByteTimeDomainData(dataArray as any);
 
-        // ===== 中音域（声の主要帯域: 約 300Hz〜3kHz）=====
-        // fftSize=1024, sampleRate=44100 → 約 43Hz/ビン
-        let vocalSum = 0;
-        const vStart = 7, vEnd = 70;
-        for (let i = vStart; i <= vEnd; i++) vocalSum += freqData[i];
-        const vocal = vocalSum / (vEnd - vStart + 1) / 255;
-
-        // ===== 変動量（直近 0.5 秒の平均変動量）=====
-        const delta = Math.abs(vocal - prevVocal);
-        prevVocal = vocal;
-        recentVariations.push(delta);
-        if (recentVariations.length > VARIATION_WINDOW) recentVariations.shift();
-        const avgVariation = recentVariations.reduce((a, b) => a + b, 0) / recentVariations.length;
-
-        // ===== 楽器のみパート判定（緩めの条件）=====
-        // 「音量が一定以上あるのに、変動がほとんどない」場合のみ抑制
-        // 歌声は必ず変動する → この条件で楽器の持続音だけを除外
-        let suppressionFactor = 1.0; 
-
-        if (avgVariation < 0.008 && vocal > 0.15) {
-          // 楽器の持続音っぽい（変動小・音量中以上）
-          suppressionFactor = 0.0;
-        } else if (avgVariation < 0.012 && vocal > 0.20) {
-          // 弱めの楽器ライク → 段階的に抑制
-          suppressionFactor = 0.4;
+        // RMS（音の大きさ）計算
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sum += v * v;
         }
+        const rms = Math.sqrt(sum / dataArray.length);
 
-        // ===== 基本の口の開き（音量直結）=====
-        let target = 0;
-        if (vocal > NOISE_FLOOR) {
-          target = (vocal - NOISE_FLOOR) * SENSITIVITY;
-          target = Math.min(MAX_OPEN, target);
-          target *= suppressionFactor;
-        }
+        // ノイズフロア除去 → 感度適用 → 上限クランプ
+        let target = Math.max(0, (rms - NOISE_FLOOR) * SENSITIVITY);
+        target = Math.min(MAX_OPEN, target);
 
-        // 平滑化（軽め）
-        smoothedMouth = smoothedMouth * MOUTH_SMOOTHING + target * (1 - MOUTH_SMOOTHING);
+        // 平滑化（カクつき防止）
+        smoothed = smoothed * SMOOTHING + target * (1 - SMOOTHING);
 
         // モーフ適用
         const morph = model.morph;
         if (!morph) return;
         for (const name of MORPH_NAMES) {
-          try { morph.setMorphWeight(name, smoothedMouth); } catch (e) {}
+          try { morph.setMorphWeight(name, smoothed); } catch (e) {}
         }
-
-        // デバッグ用（必要に応じて有効化）
-        // if (Math.random() < 0.02) {
-        //   console.log(`vocal:${vocal.toFixed(2)} var:${avgVariation.toFixed(3)} suppress:${suppressionFactor.toFixed(1)} → mouth:${smoothedMouth.toFixed(2)}`);
-        // }
       });
 
       attached = true;
-      console.log("🎵 LipSync v4 attached (simple + natural)");
+      console.log("🎵 LipSync v1 (restored) attached");
       return true;
     } catch (e) {
       console.warn("[LipSync] Attach failed:", e);
@@ -134,8 +105,7 @@ export const setupAudioLipSync = (
           try { model.morph.setMorphWeight(name, 0); } catch (e) {}
         }
       }
-      smoothedMouth = 0;
-      recentVariations = [];
+      smoothed = 0;
     }
   };
 

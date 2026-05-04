@@ -6,10 +6,10 @@ export const setupUI = (
     mmdRuntime: MmdRuntime, 
     audioPlayer: StreamAudioPlayer,
     getCurrentModel: () => MmdModel | null,
+    onTogglePlayback: (state?: boolean) => Promise<boolean>,
     onLoadFiles: (pmx: File, vmd: File, textures: FileList) => void,
     onPresetSelect: (presetId: string) => void
 ) => {
-    // null許容で取得
     const playPauseBtn = document.getElementById("playPauseBtn") as HTMLButtonElement | null;
     const fpsDiv = document.getElementById("fps") as HTMLDivElement | null;
     
@@ -30,26 +30,15 @@ export const setupUI = (
     const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement | null;
     const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement | null;
     const showMarkerBtn = document.getElementById("qrFab") as HTMLButtonElement | null;
-    // ★ marker-modal は qr-modal にリネームされた
     const markerModal = document.getElementById("qr-modal") as HTMLDivElement | null;
     const closeMarkerBtn = document.getElementById("closeQrBtn") as HTMLButtonElement | null;
 
     const S_BASE = 1.0;
     const Y_BASE = -5.0;
 
-    // ===== Play/Pause =====
+    // ===== Play/Pause (main.ts の togglePlayback を使用) =====
     playPauseBtn?.addEventListener("click", () => {
-        const xr = (scene as any)._xrExperience;
-        if (xr && xr.baseExperience && xr.baseExperience.state === 2) {
-            return;
-        }
-        if (mmdRuntime.isAnimationPlaying) {
-            mmdRuntime.pauseAnimation();
-            audioPlayer.pause();
-        } else {
-            audioPlayer.play();
-            mmdRuntime.playAnimation();
-        }
+        onTogglePlayback();
     });
 
     const sideScaleSlider = document.getElementById("sideScaleSlider") as HTMLInputElement | null;
@@ -86,7 +75,7 @@ export const setupUI = (
 
     // ===== Duration =====
     const updateDuration = () => {
-        let duration = mmdRuntime.animationFrameTimeDuration; // フレーム単位
+        let duration = mmdRuntime.animationFrameTimeDuration;
         if (duration <= 0 && mmdRuntime.audioPlayer) {
             duration = (mmdRuntime.audioPlayer as StreamAudioPlayer).duration * 30;
         }
@@ -104,7 +93,7 @@ export const setupUI = (
 
     scene.onBeforeRenderObservable.add(() => {
         if (!isSeeking && seekSlider) {
-            const currentFrame = mmdRuntime.currentFrameTime; // フレーム単位
+            const currentFrame = mmdRuntime.currentFrameTime;
             const duration = mmdRuntime.animationFrameTimeDuration;
             if (duration > 0 && (parseFloat(seekSlider.max) === 0 || Math.abs(parseFloat(seekSlider.max) - duration) > 10)) {
                 updateDuration();
@@ -137,7 +126,7 @@ export const setupUI = (
         }
     });
 
-    // ===== Old UI toggles (互換性のため残す。要素が無ければスキップ) =====
+    // ===== UI toggles =====
     minimizeBtn?.addEventListener("click", () => {
         controlPanel?.classList.add("collapsed");
         showSettingsBtn?.classList.remove("hidden");
@@ -147,7 +136,6 @@ export const setupUI = (
         showSettingsBtn?.classList.add("hidden");
     });
 
-    // ===== Marker (QR) Modal - 旧APIだがmain.ts側で再実装済みなのでスキップ可 =====
     showMarkerBtn?.addEventListener("click", () => markerModal?.classList.remove("hidden"));
     closeMarkerBtn?.addEventListener("click", () => markerModal?.classList.add("hidden"));
 

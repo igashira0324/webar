@@ -27,9 +27,15 @@ async function init() {
     // 2.1 Initialize Audio Player
     const audioPlayer = new StreamAudioPlayer(scene);
 
-    // ===== 再生開始ロジック（早期定義 & Android 最適化 v2.15）=====
     let internalAudio: HTMLAudioElement | null = null;
     let bgmStarted = false;
+
+    let currentModel: MmdModel | null = null;
+    const getCurrentModel = () => currentModel;
+
+    // ===== 音楽ファイルからのリップシンク初期化 =====
+    // startPlayback() 内で参照されるため、先に定義します
+    const lipSync = setupAudioLipSync(scene, getCurrentModel);
 
     const startPlayback = (): boolean => {
         if (bgmStarted) return true;
@@ -84,13 +90,7 @@ async function init() {
     canvas.addEventListener("click", onCanvasTap);
     canvas.addEventListener("touchend", onCanvasTap);
 
-    let currentModel: MmdModel | null = null;
-    const getCurrentModel = () => currentModel;
-
-    // ===== 音楽ファイルからのリップシンク初期化 =====
-    const lipSync = setupAudioLipSync(scene, getCurrentModel);
-
-    // ===== 繰り返し再生機能の状態管理 =====
+    // 3. Load Default Model
     let isLooping = false;
     let loopTimer: number | null = null;
     let loopEnabled = true;

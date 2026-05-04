@@ -120,13 +120,21 @@ async function init() {
     (window as any).__startPlayback = startPlayback;
 
     // キャンバスタップでも再生開始するように追加
+    let arEntered = false;
     const onCanvasTap = () => {
+        if (!arEntered) return; // ★ ARに入る前は何もしない
         startPlayback();
         canvas.removeEventListener("click", onCanvasTap);
         canvas.removeEventListener("touchend", onCanvasTap);
     };
     canvas.addEventListener("click", onCanvasTap);
     canvas.addEventListener("touchend", onCanvasTap);
+    
+    // setupWebXR から呼ばれるコールバック
+    (window as any).__onArEntered = () => { 
+        console.log("AR Session Entered - Activating tap-to-play");
+        arEntered = true; 
+    };
 
     // 3. Load Default Model
     let isLooping = false;
@@ -502,16 +510,25 @@ function setupModals() {
   };
 
   // ENTER AR ボタン
-  document.getElementById("arLaunchBtn")?.addEventListener("click", () => {
-    console.log("AR Launch Button Clicked");
+  document.getElementById("arLaunchBtn")?.addEventListener("click", async () => {
+    console.log("AR Launch Button Clicked (Direct API Mode)");
     
-    // ⚠ User Activation を温存するため、ここでは音声再生を開始しない
-    // (再生開始は AR 入室後の初回画面タップで行われます)
-
-    const xrBtn = document.querySelector(".babylonVRicon") as HTMLElement | null;
-    if (xrBtn) {
-      xrBtn.click();
+    const xrHelper = (window as any).__xrHelper;
+    if (xrHelper && xrHelper.baseExperience) {
+      try {
+        // ユーザー操作のコンテキスト内で直接 enterXRAsync を呼ぶ (Android対策)
+        await xrHelper.baseExperience.enterXRAsync(
+          "immersive-ar", 
+          "local-floor",
+          xrHelper.renderTarget
+        );
+        console.log("✅ AR session started directly");
+      } catch (e: any) {
+        console.error("❌ AR session failed:", e);
+        open("ar-unavailable-modal");
+      }
     } else {
+      console.warn("xrHelper not ready or unavailable");
       open("ar-unavailable-modal");
     }
   });

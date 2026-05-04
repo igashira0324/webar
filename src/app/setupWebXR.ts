@@ -195,6 +195,8 @@ export const setupWebXR = async (
       optionalFeatures: ["hit-test", "dom-overlay"]
     });
 
+    (window as any).__xrHelper = xr; // ★ windowに公開
+
     const featuresManager = xr.baseExperience.featuresManager;
     const hitTest = featuresManager.enableFeature(
       WebXRFeatureName.HIT_TEST, "latest"
@@ -213,7 +215,13 @@ export const setupWebXR = async (
         overlay?.classList.add("active");
         if (controlPanel) controlPanel.style.display = "none";
         if (showSettingsBtn) showSettingsBtn.style.display = "none";
-        try { runtime?.playAnimation(); } catch (e) { console.warn(e); }
+        try { 
+            runtime?.playAnimation(); 
+            // ★ AR入室成功を通知
+            if (typeof (window as any).__onArEntered === "function") {
+                (window as any).__onArEntered();
+            }
+        } catch (e) { console.warn(e); }
         modelPlaced = false;
         attachToArRoot();
         arRoot.setEnabled(false);

@@ -138,12 +138,14 @@
         display: none;
       }
 
-      .header-actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 12px;
+      .fab-row-container {
+        pointer-events: none;
+        max-width: 600px;
+        margin: 8px auto 0;
         width: 100%;
+        display: flex;
         justify-content: flex-start;
+        padding: 0 4px;
       }
 
       .stats-row {
@@ -846,15 +848,16 @@
       <div id="ui-container">
         <header class="top-header">
           <h1 class="brand">MMD(MikuMikuDance) × WebXR</h1>
-          <div class="header-actions">
-            <div class="fab-group">
-              <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
-              <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
-              <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
-            </div>
-          </div>
           <span id="fps" style="display:none;"></span>
         </header>
+
+        <div class="fab-row-container">
+          <div class="fab-group">
+            <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
+            <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
+            <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
+          </div>
+        </div>
 
         <!-- 中央：ガイド -->
         <div class="center-area">

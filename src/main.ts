@@ -9,7 +9,7 @@ import { setupExpressions } from './app/setupExpressions';
 import { setupAudioLipSync } from './app/setupAudioLipSync';
 
 async function init() {
-    console.log("MMD WebXR Player - Final Build v2.85 (Robust sequence)");
+    console.log("MMD WebXR Player - Final Build v2.90 (Layout Fix)");
     
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
@@ -144,7 +144,6 @@ async function init() {
                     vocalAudio.preload = "auto";
                 }
                 
-                // 5秒でタイムアウトして次に進む
                 await Promise.race([
                     new Promise<void>(resolve => {
                         if (audio.readyState >= 3) resolve();
@@ -178,7 +177,6 @@ async function init() {
         }
     };
 
-    // 先に完了時のハンドラを登録しておく
     scene.executeWhenReady(() => {
         let frameCount = 0;
         const observer = scene.onAfterRenderObservable.add(() => {
@@ -210,11 +208,11 @@ async function init() {
         currentModel = result.model;
         if (currentModel) {
             currentModel.mesh.scaling.setAll(0.07);
+            currentModel.mesh.position.y = 0.5; // 少し上に配置
             expressionCleanup = setupExpressions(scene, currentModel);
             await setupWebXR(scene, [currentModel.mesh as any], audioPlayer);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
             
-            // オーディオは最悪タイムアウトしてでも次に進ませる
             if (loadingStatus) loadingStatus.textContent = "Loading Audio...";
             await mmdRuntime.setAudioPlayer(audioPlayer);
             await setupAudio(currentDanceId);
@@ -262,6 +260,7 @@ async function init() {
             currentModel = result.model;
             if (currentModel) {
                 currentModel.mesh.scaling.setAll(0.07);
+                currentModel.mesh.position.y = 0.5; // 少し上に配置
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);
@@ -307,6 +306,7 @@ async function init() {
             currentModel = result.model;
             if (currentModel) {
                 currentModel.mesh.scaling.setAll(0.07);
+                currentModel.mesh.position.y = 0.5; // 少し上に配置
                 expressionCleanup = setupExpressions(scene, currentModel);
                 if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
                 if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([currentModel.mesh]);

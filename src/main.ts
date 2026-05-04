@@ -132,7 +132,6 @@ async function init() {
 
     // ===== アイドル時の自然な表情（歌声がない時用） =====
     let idleMouthTimer = 0;
-    let idleSmileTimer = 0;
     scene.onBeforeRenderObservable.add(() => {
         if (!bgmStarted || !currentModel) return;
         
@@ -152,17 +151,6 @@ async function init() {
                 } catch(e) {}
             }
             idleMouthTimer = 0;
-        }
-
-        // 2. 笑顔を時々強調
-        idleSmileTimer += deltaTime;
-        if (idleSmileTimer > 5000) { // 5秒おき
-            if (Math.random() > 0.5) {
-                try {
-                    currentModel.morph.setMorphWeight("笑い", 0.5 + Math.random() * 0.5);
-                } catch(e) {}
-            }
-            idleSmileTimer = 0;
         }
     });
 

@@ -524,6 +524,50 @@
         transform: scale(0.95);
       }
 
+      /* ===== QRコードデザイン強化 ===== */
+      .qr-container {
+        position: relative;
+        padding: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border-radius: 24px;
+        box-shadow: 0 0 30px rgba(0, 229, 255, 0.3);
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .qr-container::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        filter: blur(15px);
+        opacity: 0.5;
+        z-index: -1;
+      }
+
+      .qr-scan-line {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        height: 3px;
+        background: var(--primary);
+        box-shadow: 0 0 15px var(--primary), 0 0 5px #fff;
+        z-index: 5;
+        pointer-events: none;
+        animation: scan-move 3s ease-in-out infinite;
+        border-radius: 2px;
+        opacity: 0.8;
+      }
+
+      @keyframes scan-move {
+        0% { top: 8px; opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { top: calc(100% - 11px); opacity: 0; }
+      }
+
       /* ===== モーダル共通 ===== */
       .modal {
         position: absolute;
@@ -958,9 +1002,12 @@
             <button class="close-x" id="closeQrBtn">×</button>
             <h3>AR QR CODE</h3>
             <p>スマホの標準カメラでスキャンすると、このページが開きます。</p>
-            <div style="margin: 20px 0; display:flex; justify-content:center; position: relative;">
-              <canvas id="qr-canvas" width="280" height="280"
-                      style="width:100%; max-width:280px; border:8px solid #fff; border-radius:12px; box-shadow:0 0 24px rgba(0,229,255,0.4); background: #fff;"></canvas>
+            <div style="margin: 20px 0; display:flex; justify-content:center;">
+              <div class="qr-container">
+                <div class="qr-scan-line"></div>
+                <canvas id="qr-canvas" width="280" height="280"
+                        style="width:280px; height:280px; border-radius:18px; background: #fff; display: block;"></canvas>
+              </div>
             </div>
             <p style="font-size:0.78rem; color:var(--text-dim);">
               📱 Android Chrome で開き、<strong style="color:var(--primary);">ENTER AR</strong> ボタンから AR を起動してください。

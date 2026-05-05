@@ -32,16 +32,6 @@ async function init() {
 
     let expressionCleanup: (() => void) | null = null;
 
-    scene.executeWhenReady(async () => {
-        await scene.whenReadyAsync(true);
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                hideLoading();
-                console.log("✅ Scene & Shaders ready, loading hidden");
-            });
-        });
-    });
-
     try {
         showLoading("0%");
         const result = await loadMmdModel(
@@ -63,9 +53,18 @@ async function init() {
             showLoading("Loading Audio...");
             await mmdRuntime.setAudioPlayer(audioPlayer);
             await setupAudio(appState.currentDanceId);
+
+            // Wait for shaders and meshes to be ready for rendering
+            await new Promise<void>(resolve => {
+                scene.executeWhenReady(() => {
+                    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+                });
+            });
         }
     } catch (e) {
         console.error("Load failed", e);
+    } finally {
+        hideLoading();
     }
 
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;

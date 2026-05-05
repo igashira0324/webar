@@ -139,7 +139,12 @@ export const setupAudio = async (danceId: string) => {
     try {
         const preset = DANCE_PRESETS[danceId];
         appState.audioPlayer.source = preset.music;
-        const audio = (appState.audioPlayer as any)._audio || (appState.audioPlayer as any).audio;
+        
+        let audio = (appState.audioPlayer as any)._audio || (appState.audioPlayer as any).audio;
+        if (!audio) {
+            audio = new Audio(preset.music);
+            audio.crossOrigin = "anonymous";
+        }
         
         if (audio) {
             audio.loop = false;
@@ -147,19 +152,24 @@ export const setupAudio = async (danceId: string) => {
             audio.addEventListener("ended", onAudioEnded);
             appState.internalAudio = audio;
             audio.preload = "auto";
+            audio.load?.();
             
             appState.vocalAudio = preset.vocal ? new Audio(preset.vocal) : null;
             if (appState.vocalAudio) {
                 appState.vocalAudio.loop = false;
                 appState.vocalAudio.preload = "auto";
+                appState.vocalAudio.load();
             }
             
             await Promise.race([
                 new Promise<void>(resolve => {
                     if (audio.readyState >= 3) resolve();
-                    else audio.oncanplaythrough = () => resolve();
+                    else {
+                        audio.addEventListener("canplaythrough", () => resolve(), { once: true });
+                        audio.addEventListener("loadeddata", () => resolve(), { once: true });
+                    }
                 }),
-                new Promise<void>(resolve => setTimeout(resolve, 5000))
+                new Promise<void>(resolve => setTimeout(resolve, 8000))
             ]);
         }
     } catch (e) {

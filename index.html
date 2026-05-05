@@ -106,9 +106,9 @@
         pointer-events: auto;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        padding: 16px 20px 12px;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px 20px 16px;
         background: linear-gradient(180deg, rgba(5, 5, 22, 0.85), rgba(5, 5, 22, 0.4));
         border-radius: 20px;
         border: 1px solid var(--glass-border);
@@ -144,13 +144,7 @@
       }
 
       .fab-row-container {
-        pointer-events: none;
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        display: flex;
-        justify-content: flex-end;
-        z-index: 1000;
+        display: none;
       }
 
       .stats-row {
@@ -849,18 +843,17 @@
     <div class="ui-overlay">
       <div id="ui-container">
         <header class="top-header">
-          <h1 class="brand">MMD(MikuMikuDance)</h1>
-          <span class="brand-sub">× WebXR Experience</span>
-          <span id="fps" style="display:none;"></span>
-        </header>
-
-        <div class="fab-row-container">
+          <div style="text-align: left; width: 100%;">
+            <h1 class="brand">MMD(MikuMikuDance)</h1>
+            <span class="brand-sub">× WebXR Experience</span>
+          </div>
           <div class="fab-group">
             <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
             <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
             <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
           </div>
-        </div>
+          <span id="fps" style="display:none;"></span>
+        </header>
 
         <!-- 中央：ガイド -->
         <div class="center-area">

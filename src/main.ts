@@ -54,17 +54,22 @@ async function init() {
             await mmdRuntime.setAudioPlayer(audioPlayer);
             await setupAudio(appState.currentDanceId);
 
-            // Wait for shaders and meshes to be ready for rendering
-            await new Promise<void>(resolve => {
-                scene.executeWhenReady(() => {
-                    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-                });
-            });
+            // Wait for shaders and meshes to be ready for rendering (with 10s timeout)
+            console.log("Waiting for scene readiness...");
+            await Promise.race([
+                new Promise<void>(resolve => {
+                    scene.executeWhenReady(() => {
+                        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+                    });
+                }),
+                new Promise<void>((_, reject) => setTimeout(() => reject(new Error("Scene ready timeout")), 10000))
+            ]).catch(err => console.warn("Scene readiness warning:", err));
         }
     } catch (e) {
-        console.error("Load failed", e);
+        console.error("Initialization failed", e);
     } finally {
         hideLoading();
+        console.log("Initialization flow complete.");
     }
 
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement;

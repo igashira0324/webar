@@ -1,4 +1,5 @@
 import { appState } from "./state";
+import { generateCoolQRCode } from "./qrController";
 
 export const openModal = (id: string) => {
     const el = document.getElementById(id);
@@ -47,7 +48,14 @@ export const setupModals = () => {
     settingsFab?.addEventListener("click", () => openModal("settings-modal"));
     document.getElementById("closeSettingsBtn")?.addEventListener("click", () => closeModal("settings-modal"));
     
-    qrFab?.addEventListener("click", () => openModal("qr-modal"));
+    qrFab?.addEventListener("click", () => {
+        openModal("qr-modal");
+        const canvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
+        if (canvas) {
+            // 現在のURLをQRコード化（localhost等の場合は適切なドメインに読み替えることも検討可）
+            generateCoolQRCode(canvas, window.location.href);
+        }
+    });
     document.getElementById("closeQrBtn")?.addEventListener("click", () => closeModal("qr-modal"));
     
     document.getElementById("closeArUnavailableBtn")?.addEventListener("click", () => closeModal("ar-unavailable-modal"));

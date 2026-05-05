@@ -103,21 +103,37 @@
 
       /* ===== ヘッダー ===== */
       .top-header {
-        pointer-events: auto;
+        pointer-events: none;
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
         gap: 12px;
-        padding: 16px 20px 16px;
+        max-width: 600px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      .brand-box {
+        pointer-events: auto;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        padding: 12px 24px;
         background: linear-gradient(180deg, rgba(5, 5, 22, 0.85), rgba(5, 5, 22, 0.4));
         border-radius: 20px;
         border: 1px solid var(--glass-border);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         box-shadow: 0 0 24px rgba(0, 229, 255, 0.15);
-        max-width: 600px;
-        margin: 0 auto;
-        width: 100%;
+        width: fit-content;
+      }
+
+      .header-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        width: fit-content;
       }
 
       .brand {
@@ -132,15 +148,11 @@
         text-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
         margin: 0;
         white-space: nowrap;
+        display: block;
       }
 
       .brand-sub {
-        display: block;
-        font-size: 0.65rem;
-        color: var(--text-dim);
-        margin-top: 4px;
-        letter-spacing: 1px;
-        font-family: 'Orbitron', sans-serif;
+        display: none;
       }
 
       .fab-row-container {
@@ -443,6 +455,7 @@
         display: flex;
         gap: 10px;
         pointer-events: auto;
+        padding-left: 2px;
       }
 
       /* 新規追加：モデル選択モーダル用スタイル */
@@ -843,14 +856,15 @@
     <div class="ui-overlay">
       <div id="ui-container">
         <header class="top-header">
-          <div style="text-align: left; width: 100%;">
-            <h1 class="brand">MMD(MikuMikuDance)</h1>
-            <span class="brand-sub">× WebXR Experience</span>
-          </div>
-          <div class="fab-group">
-            <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
-            <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
-            <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
+          <div class="header-content-wrapper">
+            <div class="brand-box">
+              <h1 class="brand">MMD(MikuMikuDance) × WebXR</h1>
+            </div>
+            <div class="fab-group">
+              <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
+              <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
+              <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
+            </div>
           </div>
           <span id="fps" style="display:none;"></span>
         </header>
@@ -944,9 +958,9 @@
             <button class="close-x" id="closeQrBtn">×</button>
             <h3>AR QR CODE</h3>
             <p>スマホの標準カメラでスキャンすると、このページが開きます。</p>
-            <div style="margin: 20px 0; display:flex; justify-content:center;">
-              <img src="assets/marker_qr.png" alt="QR Code"
-                   style="width:100%; max-width:280px; border:8px solid #fff; border-radius:12px; box-shadow:0 0 24px rgba(0,229,255,0.4);" />
+            <div style="margin: 20px 0; display:flex; justify-content:center; position: relative;">
+              <canvas id="qr-canvas" width="280" height="280"
+                      style="width:100%; max-width:280px; border:8px solid #fff; border-radius:12px; box-shadow:0 0 24px rgba(0,229,255,0.4); background: #fff;"></canvas>
             </div>
             <p style="font-size:0.78rem; color:var(--text-dim);">
               📱 Android Chrome で開き、<strong style="color:var(--primary);">ENTER AR</strong> ボタンから AR を起動してください。

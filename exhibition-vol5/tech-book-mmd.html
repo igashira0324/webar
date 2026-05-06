@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+<title>MMD × WebXR Experience 技術解説書</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060f; --bg2:#0e0a1f;
+  --cyan:#00f0ff; --magenta:#ff2bd6; --amber:#ffb347;
+  --text:#e8e8f5; --sub:#a8a8c8;
+  --card:rgba(19,19,42,0.8); --line:rgba(0,240,255,0.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;line-height:1.7;overflow-x:hidden}
+.bg-gradient{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background:radial-gradient(ellipse at 20% 0%,rgba(0,240,255,0.15),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(255,43,214,0.15),transparent 50%),linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
+.container{max-width:800px;margin:0 auto;padding:60px 24px}
+header{margin-bottom:48px;text-align:center}
+.cat{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:0.8rem;letter-spacing:4px;margin-bottom:12px}
+h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.8rem,5vw,2.8rem);font-weight:900;background:linear-gradient(90deg,var(--cyan),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.2;margin-bottom:16px}
+.abstract{color:var(--sub);font-size:1.1rem;margin-bottom:32px}
+
+section{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:32px;margin-bottom:32px;backdrop-filter:blur(10px)}
+h2{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:1.4rem;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+h2::before{content:"";width:4px;height:24px;background:var(--cyan);box-shadow:0 0 10px var(--cyan);border-radius:2px}
+p{margin-bottom:16px;color:var(--text)}
+ul{margin-bottom:16px;padding-left:20px;color:var(--sub)}
+li{margin-bottom:8px}
+code{background:rgba(0,240,255,0.1);color:var(--cyan);padding:2px 6px;border-radius:4px;font-family:monospace}
+.diagram{width:100%;height:240px;background:rgba(0,0,0,0.3);border-radius:16px;margin:24px 0;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line)}
+
+footer{text-align:center;padding:40px 0;color:var(--sub);font-size:0.9rem}
+.back-link{display:inline-block;margin-bottom:24px;color:var(--cyan);text-decoration:none;font-family:'Orbitron',sans-serif;font-size:0.8rem;border:1px solid var(--cyan);padding:8px 16px;border-radius:20px;transition:all 0.3s}
+.back-link:hover{background:var(--cyan);color:var(--bg);box-shadow:0 0 15px var(--cyan)}
+</style>
+</head>
+<body>
+<div class="bg-gradient"></div>
+<div class="container">
+  <a href="index.html" class="back-link">← BACK TO ARCHIVE</a>
+  <header>
+    <div class="cat">WEBAR / 3D RENDERING</div>
+    <h1>MMD × WebXR Experience</h1>
+    <p class="abstract">MikuMikuDanceモデルをブラウザだけで実空間に呼び出し、高品質なアニメーションを実現するWebAR実装の解説。</p>
+  </header>
+
+  <section>
+    <h2>コンセプト</h2>
+    <p>専用アプリのインストールを必要とせず、スマートフォンのブラウザ（Chrome/Safari）だけで動作するWebAR体験。MMDモデルの豊かな表現力をWebXR APIとBabylon.jsを組み合わせて実現しました。</p>
+  </section>
+
+  <section>
+    <h2>技術スタック</h2>
+    <ul>
+      <li><strong>Rendering Engine:</strong> Babylon.js (v6.x)</li>
+      <li><strong>WebXR Support:</strong> Babylon.js WebXR Experience Helper</li>
+      <li><strong>Model Loading:</strong> babylon-mmd (MMD-related file loader)</li>
+      <li><strong>Physics:</strong> Ammo.js (MMD 剛体物理シミュレーション)</li>
+      <li><strong>State Management:</strong> Vite + TypeScript</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>実装のポイント</h2>
+    <p>1. <strong>babylon-mmdの活用:</strong> PMX/VMDファイルを読み込み、MMD特有のボーン構造、モーフ、物理演算をブラウザ上で再現。</p>
+    <p>2. <strong>WebXR Hit Test:</strong> 床面を検知し、モデルを現実世界に固定。照明推定（Lighting Estimation）を反映させ、現実の光環境に馴染ませる調整を行っています。</p>
+    <p>3. <strong>パフォーマンス最適化:</strong> モバイル端末での動作を考慮し、テクスチャの圧縮（KTX2）や、物理演算の計算頻度を調整。60FPSを維持するための描画パイプラインの構築。</p>
+  </section>
+
+  <footer>
+    © 2026 igashira0324 ｜ なんでも生成AI展示会 VOL5
+  </footer>
+</div>
+</body>
+</html>

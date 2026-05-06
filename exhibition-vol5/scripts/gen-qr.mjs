@@ -2,8 +2,8 @@ import QRCode from 'qrcode';
 import fs from 'fs';
 import path from 'path';
 
-// URL to be encoded (User should replace this with their Vercel URL)
-const url = 'https://exhibition-vol5-archive.vercel.app/'; 
+// URL to be encoded (Likely Vercel URL based on repo name)
+const url = 'https://webar-igashira0324.vercel.app/exhibition-vol5/'; 
 
 const outputPath = path.join(process.cwd(), 'qr-archive.png');
 

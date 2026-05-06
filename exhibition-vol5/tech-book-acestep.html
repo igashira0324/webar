@@ -3,72 +3,217 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
-<title>ACE-Step ｜ Suno支援ツール 技術解説書</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<title>ACE-Step | Suno / Music Generation Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#06060f; --bg2:#130a2a;
-  --cyan:#00f0ff; --magenta:#ff2bd6; --amber:#ffb347;
+  --bg:#0a0515; --bg2:#1a0a2a;
+  --magenta:#ff2bd6; --amber:#ffb347; --purple:#9d50bb; --cyan:#00f0ff;
   --text:#e8e8f5; --sub:#a8a8c8;
-  --card:rgba(19,19,42,0.8); --line:rgba(255,43,214,0.25);
+  --card:rgba(40,10,60,0.6); --line:rgba(255,43,214,0.3);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;line-height:1.7;overflow-x:hidden}
-.bg-gradient{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background:radial-gradient(ellipse at 20% 0%,rgba(255,43,214,0.15),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(0,240,255,0.15),transparent 50%),linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
-.container{max-width:800px;margin:0 auto;padding:60px 24px}
-header{margin-bottom:48px;text-align:center}
-.cat{font-family:'Orbitron',sans-serif;color:var(--magenta);font-size:0.8rem;letter-spacing:4px;margin-bottom:12px}
-h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.8rem,5vw,2.8rem);font-weight:900;background:linear-gradient(90deg,var(--magenta),var(--amber));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.2;margin-bottom:16px}
-.abstract{color:var(--sub);font-size:1.1rem;margin-bottom:32px}
+body{
+  background:var(--bg); color:var(--text); font-family:'Noto Sans JP',sans-serif;
+  line-height:1.8; overflow-x:hidden; scroll-behavior:smooth;
+}
+.bg-gradient{
+  position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(255,43,214,0.15), transparent 40%),
+    radial-gradient(circle at 90% 90%, rgba(255,179,71,0.1), transparent 40%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+}
 
-section{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:32px;margin-bottom:32px;backdrop-filter:blur(10px)}
-h2{font-family:'Orbitron',sans-serif;color:var(--magenta);font-size:1.4rem;margin-bottom:20px;display:flex;align-items:center;gap:12px}
-h2::before{content:"";width:4px;height:24px;background:var(--magenta);box-shadow:0 0 10px var(--magenta);border-radius:2px}
-p{margin-bottom:16px;color:var(--text)}
-ul{margin-bottom:16px;padding-left:20px;color:var(--sub)}
-li{margin-bottom:8px}
-.code-block{background:rgba(0,0,0,0.4);padding:20px;border-radius:12px;font-family:monospace;font-size:0.9rem;border:1px solid rgba(255,255,255,0.05);margin:20px 0;overflow-x:auto;color:var(--cyan)}
+/* Music Animations */
+@keyframes equalize-1{0%,100%{height:10px}50%{height:40px}}
+@keyframes wave-anim{0%{transform:scaleY(1)}50%{transform:scaleY(0.4)}100%{transform:scaleY(1)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(0.98)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes rotate-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes data-flow{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
 
-footer{text-align:center;padding:40px 0;color:var(--sub);font-size:0.9rem}
-.back-link{display:inline-block;margin-bottom:24px;color:var(--magenta);text-decoration:none;font-family:'Orbitron',sans-serif;font-size:0.8rem;border:1px solid var(--magenta);padding:8px 16px;border-radius:20px;transition:all 0.3s}
-.back-link:hover{background:var(--magenta);color:var(--bg);box-shadow:0 0 15px var(--magenta)}
+.pulse{animation:pulse 2s ease-in-out infinite}
+.float{animation:float 4s ease-in-out infinite}
+.rotate-slow{animation:rotate-slow 30s linear infinite}
+
+.equalizer{display:flex; align-items:flex-end; gap:4px; height:50px; justify-content:center; margin:20px 0}
+.bar{width:8px; background:var(--magenta); border-radius:4px}
+.bar:nth-child(1){animation:equalize-1 1s ease-in-out infinite}
+.bar:nth-child(2){animation:equalize-1 1.2s ease-in-out infinite; background:var(--purple)}
+.bar:nth-child(3){animation:equalize-1 0.8s ease-in-out infinite; background:var(--amber)}
+.bar:nth-child(4){animation:equalize-1 1.4s ease-in-out infinite; background:var(--magenta)}
+.bar:nth-child(5){animation:equalize-1 1.1s ease-in-out infinite; background:var(--cyan)}
+
+/* Layout */
+nav{
+  position:fixed; top:0; left:0; width:100%; height:60px;
+  background:rgba(10,5,21,0.8); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line); z-index:100;
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px;
+}
+.nav-logo{font-family:'Orbitron',sans-serif; color:var(--magenta); font-weight:900; text-decoration:none}
+.container{max-width:900px; margin:0 auto; padding:100px 24px 60px}
+header{text-align:center; margin-bottom:80px}
+h1{
+  font-family:'Orbitron',sans-serif; font-size:clamp(1.8rem,6vw,3rem); font-weight:900;
+  background:linear-gradient(90deg, var(--magenta), var(--amber));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+
+.toc{
+  background:var(--card); border:1px solid var(--line); border-radius:24px;
+  padding:32px; margin-bottom:60px; backdrop-filter:blur(20px);
+}
+.toc-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px}
+.toc-link{color:var(--sub); text-decoration:none; font-size:0.9rem; display:flex; align-items:center; gap:8px}
+.toc-link:hover{color:var(--magenta)}
+
+.chapter{margin-bottom:80px; scroll-margin-top:80px}
+.content-box{
+  background:var(--card); border:1px solid var(--line); border-radius:24px;
+  padding:40px; backdrop-filter:blur(10px); position:relative; overflow:hidden;
+}
+.content-box::before{
+  content:""; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--magenta);
+}
+
+.svg-container{margin:32px 0; border:1px solid var(--line); border-radius:16px; background:rgba(0,0,0,0.3); padding:24px}
+.svg-container svg{width:100%; height:auto; display:block}
+
+footer{
+  border-top:1px solid var(--line); padding:60px 24px; text-align:center; color:var(--sub);
+}
 </style>
 </head>
 <body>
 <div class="bg-gradient"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">ACE-STEP ARCHIVE</a>
+  <div class="nav-links"></div>
+</nav>
+
 <div class="container">
-  <a href="index.html" class="back-link">← BACK TO ARCHIVE</a>
   <header>
-    <div class="cat">MUSIC / AI PIPELINE</div>
-    <h1>ACE-Step ｜ Suno支援ツール</h1>
-    <p class="abstract">ローカル音楽生成とクラウドAI（Suno）を融合させ、ハイクオリティな楽曲・MVを高速生成する「Dual-Brain」ワークフローの解説。</p>
+    <div class="equalizer">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+    <div class="cat">MUSIC AI / PROMPT PIPELINE</div>
+    <h1>ACE-Step | Suno<br>Music Generation</h1>
+    <p>生成AIなんでも展示会 Vol.5 | 技術解説書</p>
   </header>
 
-  <section>
-    <h2>コンセプト</h2>
-    <p>AI音楽生成の最前線では、表現力の高いクラウドAIと、制御性の高いローカルAIの使い分けが重要です。本プロジェクトは、Suno AIの楽曲生成を補助し、Seed-VC等のボイスチェンジャーや動画生成AIと連携させることで、一貫した音楽体験を提供します。</p>
+  <section class="toc">
+    <h2>CONTENTS</h2>
+    <div class="toc-grid">
+      <a href="#ch1" class="toc-link">01. COVER / 概要</a>
+      <a href="#ch2" class="toc-link">02. OVERVIEW / コンセプト</a>
+      <a href="#ch3" class="toc-link">03. WHY LOCAL / なぜローカルか</a>
+      <a href="#ch4" class="toc-link">04. ARCHITECTURE / 三層構造</a>
+      <a href="#ch5" class="toc-link">05. FEATURES / 主要機能</a>
+      <a href="#ch6" class="toc-link">06. PROMPT / プロンプト生成</a>
+      <a href="#ch7" class="toc-link">07. MV PRODUCTION / 動画生成</a>
+      <a href="#ch8" class="toc-link">08. FULL FLOW / 処理フロー</a>
+      <a href="#ch9" class="toc-link">09. MODELS / 使用モデル</a>
+      <a href="#ch10" class="toc-link">10. GUIDE / 展示ガイド</a>
+      <a href="#ch11" class="toc-link">11. CREDITS / クレジット</a>
+    </div>
   </section>
 
-  <section>
-    <h2>技術構成</h2>
-    <ul>
-      <li><strong>Music Generation:</strong> Suno AI (v3.5/v4) + ACE-Step (Local Orchestrator)</li>
-      <li><strong>Voice Processing:</strong> Seed-VC (Zero-shot Voice Conversion)</li>
-      <li><strong>MV Creation:</strong> Kling AI / Runway Gen-3 (Cinematic Clips)</li>
-      <li><strong>Automation:</strong> Python-based Prompt Pipeline</li>
-    </ul>
+  <!-- CHAPTER 01 -->
+  <section id="ch1" class="chapter">
+    <h2 class="chapter-title">01. COVER / 概要</h2>
+    <div class="content-box">
+      <p>本書は、AI音楽生成プラットフォーム「Suno」とローカルAI群を組み合わせ、高品質な楽曲と映像をシームレスに生成する「ACE-Step」ワークフローの技術解説書です。</p>
+      <div class="svg-container">
+        <svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+          <rect width="400" height="100" rx="10" fill="rgba(0,0,0,0.4)"/>
+          <path d="M40 50 Q200 10, 360 50" stroke="var(--magenta)" fill="none" stroke-width="2" class="pulse"/>
+          <path d="M40 50 Q200 90, 360 50" stroke="var(--amber)" fill="none" stroke-width="2" class="pulse"/>
+          <text x="200" y="55" text-anchor="middle" fill="white" font-family="Orbitron" font-size="14">AI MUSIC WAVE</text>
+        </svg>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>ワークフローの深掘り</h2>
-    <p>1. <strong>プロンプト・エンジニアリング:</strong> 楽曲のメタデータを解析し、音楽理論に基づいた指示語をSunoに流し込むことで、意図に近いメロディラインを導き出します。</p>
-    <p>2. <strong>ボイス・スタック:</strong> Sunoで生成されたボーカルパートを、Seed-VCを用いて特定のキャラクターの声質に変換。これにより、AI音楽に「キャラクター性」を付与します。</p>
-    <p>3. <strong>ビジュアル同期:</strong> 楽曲のBPMやエナジーレベルを解析し、動画生成AIへのプロンプトを動的に変更。聴覚と視覚が高度に同期したミュージックビデオを生成します。</p>
+  <!-- CHAPTER 02 -->
+  <section id="ch2" class="chapter">
+    <h2 class="chapter-title">02. OVERVIEW / コンセプト</h2>
+    <div class="content-box">
+      <p>「クリエイターの意図をAIでブーストする」をコンセプトに、楽曲構成の自動提案、歌詞の文脈解析、そしてキャラクター性を付与するボイススタック技術を統合しています。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 03 -->
+  <section id="ch3" class="chapter">
+    <h2 class="chapter-title">03. WHY LOCAL / なぜローカルか</h2>
+    <div class="content-box">
+      <p>クラウドAIだけでは困難な「特定キャラクターの声質固定（Seed-VC）」や「非公開データの学習」をローカル環境で行うことで、オリジナリティとプライバシーを確保します。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 04 -->
+  <section id="ch4" class="chapter">
+    <h2 class="chapter-title">04. ARCHITECTURE / 三層構造</h2>
+    <div class="content-box">
+      <p>システムは「オーケストレーター（ACE-Step）」「生成エンジン（Suno/Seed-VC）」「ビジュアライザー（ComfyUI）」の三層で構成されます。</p>
+      <div class="svg-container">
+        <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg">
+          <rect x="100" y="20" width="200" height="50" rx="10" fill="var(--magenta)" opacity="0.3" stroke="var(--magenta)"/>
+          <text x="200" y="50" text-anchor="middle" fill="white">ACE-Step (UI/Control)</text>
+          <path d="M200 70 V100" stroke="var(--line)" stroke-dasharray="5,5"/>
+          <rect x="50" y="100" width="300" height="50" rx="10" fill="var(--purple)" opacity="0.3" stroke="var(--purple)"/>
+          <text x="200" y="130" text-anchor="middle" fill="white">Suno / Seed-VC (Engines)</text>
+          <path d="M200 150 V180" stroke="var(--line)" stroke-dasharray="5,5"/>
+          <rect x="100" y="180" width="200" height="50" rx="10" fill="var(--amber)" opacity="0.3" stroke="var(--amber)"/>
+          <text x="200" y="210" text-anchor="middle" fill="white">ComfyUI (Visualization)</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 08 -->
+  <section id="ch8" class="chapter">
+    <h2 class="chapter-title">08. FULL FLOW / 処理フロー</h2>
+    <div class="content-box">
+      <div class="svg-container">
+        <svg viewBox="0 0 500 200" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="80" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--magenta)"/>
+          <path d="M100 100 H150" stroke="var(--magenta)" stroke-width="2" class="data-flow" stroke-dasharray="5,5"/>
+          <rect x="150" y="80" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--purple)"/>
+          <path d="M230 100 H280" stroke="var(--purple)" stroke-width="2" class="data-flow" stroke-dasharray="5,5"/>
+          <rect x="280" y="80" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--amber)"/>
+          <path d="M360 100 H410" stroke="var(--amber)" stroke-width="2" class="data-flow" stroke-dasharray="5,5"/>
+          <rect x="410" y="80" width="70" height="40" rx="5" fill="var(--card)" stroke="var(--cyan)"/>
+        </svg>
+      </div>
+    </div>
   </section>
 
   <footer>
-    © 2026 igashira0324 ｜ 生成AIなんでも展示会 Vol.5
+    <div class="footer-logo">ACE-STEP TECHNICAL GUIDE</div>
+    <p>© 2026 igashira0324 | 生成AIなんでも展示会 Vol.5 | 2026.05.06(水) | すみだ産業会館 8F</p>
   </footer>
 </div>
+
+<script>
+  // Simple intersection observer
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = 1;
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.chapter').forEach(ch => {
+    ch.style.opacity = 0;
+    ch.style.transform = 'translateY(20px)';
+    ch.style.transition = 'all 0.6s ease-out';
+    observer.observe(ch);
+  });
+</script>
 </body>
 </html>

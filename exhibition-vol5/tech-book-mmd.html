@@ -3,74 +3,349 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
-<title>MMD × WebXR Experience 技術解説書</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<title>MMD × WebXR Experience | Technical Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#06060f; --bg2:#0e0a1f;
   --cyan:#00f0ff; --magenta:#ff2bd6; --amber:#ffb347;
   --text:#e8e8f5; --sub:#a8a8c8;
-  --card:rgba(19,19,42,0.8); --line:rgba(0,240,255,0.25);
+  --card:rgba(19,19,42,0.7); --line:rgba(0,240,255,0.2);
+  --glass:rgba(255,255,255,0.03);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;line-height:1.7;overflow-x:hidden}
-.bg-gradient{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background:radial-gradient(ellipse at 20% 0%,rgba(0,240,255,0.15),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(255,43,214,0.15),transparent 50%),linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
-.container{max-width:800px;margin:0 auto;padding:60px 24px}
-header{margin-bottom:48px;text-align:center}
-.cat{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:0.8rem;letter-spacing:4px;margin-bottom:12px}
-h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.8rem,5vw,2.8rem);font-weight:900;background:linear-gradient(90deg,var(--cyan),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.2;margin-bottom:16px}
-.abstract{color:var(--sub);font-size:1.1rem;margin-bottom:32px}
+body{
+  background:var(--bg); color:var(--text); font-family:'Noto Sans JP',sans-serif;
+  line-height:1.8; overflow-x:hidden; scroll-behavior:smooth;
+}
+.bg-gradient{
+  position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0,240,255,0.1), transparent 40%),
+    radial-gradient(circle at 90% 90%, rgba(255,43,214,0.1), transparent 40%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+}
 
-section{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:32px;margin-bottom:32px;backdrop-filter:blur(10px)}
-h2{font-family:'Orbitron',sans-serif;color:var(--cyan);font-size:1.4rem;margin-bottom:20px;display:flex;align-items:center;gap:12px}
-h2::before{content:"";width:4px;height:24px;background:var(--cyan);box-shadow:0 0 10px var(--cyan);border-radius:2px}
-p{margin-bottom:16px;color:var(--text)}
-ul{margin-bottom:16px;padding-left:20px;color:var(--sub)}
-li{margin-bottom:8px}
-code{background:rgba(0,240,255,0.1);color:var(--cyan);padding:2px 6px;border-radius:4px;font-family:monospace}
-.diagram{width:100%;height:240px;background:rgba(0,0,0,0.3);border-radius:16px;margin:24px 0;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line)}
+/* Animations */
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(0.98)}}
+@keyframes rotate-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes data-flow{from{stroke-dashoffset:20}to{stroke-dashoffset:0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes bounce{0%,20%,50%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}60%{transform:translateY(-5px)}}
+@keyframes ray-anim{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
-footer{text-align:center;padding:40px 0;color:var(--sub);font-size:0.9rem}
-.back-link{display:inline-block;margin-bottom:24px;color:var(--cyan);text-decoration:none;font-family:'Orbitron',sans-serif;font-size:0.8rem;border:1px solid var(--cyan);padding:8px 16px;border-radius:20px;transition:all 0.3s}
-.back-link:hover{background:var(--cyan);color:var(--bg);box-shadow:0 0 15px var(--cyan)}
+.pulse{animation:pulse 2s ease-in-out infinite}
+.rotate-slow{animation:rotate-slow 20s linear infinite}
+.blink{animation:blink 1.5s step-end infinite}
+.float{animation:float 4s ease-in-out infinite}
+
+/* Navigation */
+nav{
+  position:fixed; top:0; left:0; width:100%; height:60px;
+  background:rgba(6,6,15,0.8); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line); z-index:100;
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px;
+}
+.nav-logo{font-family:'Orbitron',sans-serif; color:var(--cyan); font-weight:900; letter-spacing:2px; text-decoration:none}
+.nav-links{display:flex; gap:20px}
+.nav-links a{color:var(--sub); text-decoration:none; font-size:0.8rem; transition:color 0.3s}
+.nav-links a:hover{color:var(--cyan)}
+
+/* Layout */
+.container{max-width:900px; margin:0 auto; padding:100px 24px 60px}
+header{text-align:center; margin-bottom:80px}
+.cat{font-family:'Orbitron',sans-serif; color:var(--cyan); font-size:0.8rem; letter-spacing:4px; margin-bottom:16px}
+h1{
+  font-family:'Orbitron',sans-serif; font-size:clamp(2rem,6vw,3.5rem); font-weight:900;
+  background:linear-gradient(90deg, var(--cyan), var(--magenta));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  line-height:1.1; margin-bottom:24px;
+}
+.hero-svg{width:100%; max-width:600px; margin:0 auto 40px}
+
+/* TOC */
+.toc{
+  background:var(--card); border:1px solid var(--line); border-radius:24px;
+  padding:32px; margin-bottom:60px; backdrop-filter:blur(20px);
+}
+.toc h2{font-family:'Orbitron',sans-serif; color:var(--cyan); font-size:1.2rem; margin-bottom:20px}
+.toc-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px}
+.toc-link{color:var(--sub); text-decoration:none; font-size:0.9rem; display:flex; align-items:center; gap:8px}
+.toc-link:hover{color:var(--cyan)}
+.toc-link::before{content:"\2192"; color:var(--cyan)}
+
+/* Chapter */
+.chapter{margin-bottom:100px; scroll-margin-top:80px}
+.chapter-num{font-family:'Orbitron',sans-serif; color:var(--magenta); font-size:0.8rem; letter-spacing:2px; margin-bottom:8px}
+h2.chapter-title{
+  font-family:'Orbitron',sans-serif; font-size:1.8rem; color:var(--cyan);
+  margin-bottom:24px; display:flex; align-items:center; gap:16px;
+}
+h2.chapter-title::after{content:""; flex:1; height:1px; background:var(--line)}
+
+.content-box{
+  background:var(--card); border:1px solid var(--line); border-radius:24px;
+  padding:40px; backdrop-filter:blur(10px); position:relative; overflow:hidden;
+}
+.content-box::before{
+  content:""; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--cyan);
+  box-shadow:0 0 15px var(--cyan);
+}
+
+p{margin-bottom:20px}
+.svg-container{margin:32px 0; border:1px solid var(--line); border-radius:16px; background:rgba(0,0,0,0.3); padding:20px}
+.svg-container svg{width:100%; height:auto; display:block}
+
+.info-box{
+  background:rgba(0,240,255,0.05); border:1px solid var(--cyan); border-radius:12px;
+  padding:20px; margin:24px 0; color:var(--sub); font-size:0.9rem;
+}
+.info-box strong{color:var(--cyan)}
+
+pre{
+  background:#0a0a1a; padding:20px; border-radius:12px; border:1px solid var(--line);
+  color:var(--cyan); font-family:monospace; font-size:0.85rem; margin:24px 0; overflow-x:auto;
+}
+
+/* Footer */
+footer{
+  border-top:1px solid var(--line); padding:60px 24px; text-align:center; color:var(--sub);
+  background:rgba(6,6,15,0.5);
+}
+.footer-logo{font-family:'Orbitron',sans-serif; font-size:1.2rem; color:var(--cyan); margin-bottom:12px}
+
+@media(max-width:768px){
+  .nav-links{display:none}
+  .content-box{padding:24px}
+}
 </style>
 </head>
 <body>
 <div class="bg-gradient"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">WEBAR ARCHIVE</a>
+  <div class="nav-links">
+    <a href="#ch1">01</a><a href="#ch2">02</a><a href="#ch3">03</a><a href="#ch4">04</a>
+    <a href="#ch5">05</a><a href="#ch6">06</a><a href="#ch7">07</a><a href="#ch8">08</a>
+  </div>
+</nav>
+
 <div class="container">
-  <a href="index.html" class="back-link">← BACK TO ARCHIVE</a>
   <header>
-    <div class="cat">WEBAR / 3D RENDERING</div>
-    <h1>MMD × WebXR Experience</h1>
-    <p class="abstract">MikuMikuDanceモデルをブラウザだけで実空間に呼び出し、高品質なアニメーションを実現するWebAR実装の解説。</p>
+    <div class="cat">WEBAR / 3D RENDERING / MMD</div>
+    <h1>MMD × WebXR<br>Experience</h1>
+    <p class="sub">生成AIなんでも展示会 Vol.5 | 技術解説書</p>
+    
+    <div class="hero-svg">
+      <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="var(--cyan)"/><stop offset="1" stop-color="var(--magenta)"/></linearGradient>
+        </defs>
+        <circle cx="200" cy="150" r="100" fill="none" stroke="url(#g1)" stroke-width="2" class="rotate-slow" stroke-dasharray="10,5"/>
+        <circle cx="200" cy="150" r="80" fill="none" stroke="var(--cyan)" stroke-width="1" opacity="0.5" class="pulse"/>
+        <path d="M160 150 L200 110 L240 150 L200 190 Z" fill="var(--cyan)" opacity="0.3" class="float"/>
+        <text x="200" y="155" text-anchor="middle" font-family="Orbitron" font-size="20" fill="var(--cyan)" font-weight="900">XR CORE</text>
+      </svg>
+    </div>
   </header>
 
-  <section>
-    <h2>コンセプト</h2>
-    <p>専用アプリのインストールを必要とせず、スマートフォンのブラウザ（Chrome/Safari）だけで動作するWebAR体験。MMDモデルの豊かな表現力をWebXR APIとBabylon.jsを組み合わせて実現しました。</p>
+  <section class="toc">
+    <h2>CONTENTS / 目次</h2>
+    <div class="toc-grid">
+      <a href="#ch1" class="toc-link">01. COVER / 概要</a>
+      <a href="#ch2" class="toc-link">02. OVERVIEW / コンセプト</a>
+      <a href="#ch3" class="toc-link">03. TECH STACK / 技術構成</a>
+      <a href="#ch4" class="toc-link">04. WEBXR / ブラウザ型AR</a>
+      <a href="#ch5" class="toc-link">05. BABYLON.JS / 描画エンジン</a>
+      <a href="#ch6" class="toc-link">06. MMD / モデル実装</a>
+      <a href="#ch7" class="toc-link">07. DUAL-AUDIO / 立体音響</a>
+      <a href="#ch8" class="toc-link">08. HIT-TEST / 空間固定</a>
+      <a href="#ch9" class="toc-link">09. FULL FLOW / 処理フロー</a>
+      <a href="#ch10" class="toc-link">10. DESIGN / 設計判断</a>
+      <a href="#ch11" class="toc-link">11. FAQ / よくある質問</a>
+      <a href="#ch12" class="toc-link">12. CREDITS / クレジット</a>
+    </div>
   </section>
 
-  <section>
-    <h2>技術スタック</h2>
-    <ul>
-      <li><strong>Rendering Engine:</strong> Babylon.js (v6.x)</li>
-      <li><strong>WebXR Support:</strong> Babylon.js WebXR Experience Helper</li>
-      <li><strong>Model Loading:</strong> babylon-mmd (MMD-related file loader)</li>
-      <li><strong>Physics:</strong> Ammo.js (MMD 剛体物理シミュレーション)</li>
-      <li><strong>State Management:</strong> Vite + TypeScript</li>
-    </ul>
+  <!-- CHAPTER 01 -->
+  <section id="ch1" class="chapter">
+    <div class="chapter-num">CHAPTER 01</div>
+    <h2 class="chapter-title">COVER / 概要</h2>
+    <div class="content-box">
+      <p>本ドキュメントは「生成AIなんでも展示会 Vol.5」におけるWebAR MMDデモの技術解説書です。アプリインストール不要で、Webブラウザのみで高品質な3Dキャラクター体験を実現するための知見を凝縮しました。</p>
+      <div class="svg-container">
+        <svg viewBox="0 0 500 100" xmlns="http://www.w3.org/2000/svg">
+          <rect width="500" height="100" rx="10" fill="rgba(0,0,0,0.5)"/>
+          <path d="M50 50 L450 50" stroke="var(--cyan)" stroke-width="2" stroke-dasharray="5,5" style="animation:data-flow 2s linear infinite"/>
+          <circle cx="50" cy="50" r="10" fill="var(--cyan)" class="pulse"/>
+          <circle cx="450" cy="50" r="10" fill="var(--magenta)"/>
+          <text x="50" y="80" text-anchor="middle" font-size="12" fill="var(--sub)">START</text>
+          <text x="450" y="80" text-anchor="middle" font-size="12" fill="var(--sub)">END</text>
+        </svg>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>実装のポイント</h2>
-    <p>1. <strong>babylon-mmdの活用:</strong> PMX/VMDファイルを読み込み、MMD特有のボーン構造、モーフ、物理演算をブラウザ上で再現。</p>
-    <p>2. <strong>WebXR Hit Test:</strong> 床面を検知し、モデルを現実世界に固定。照明推定（Lighting Estimation）を反映させ、現実の光環境に馴染ませる調整を行っています。</p>
-    <p>3. <strong>パフォーマンス最適化:</strong> モバイル端末での動作を考慮し、テクスチャの圧縮（KTX2）や、物理演算の計算頻度を調整。60FPSを維持するための描画パイプラインの構築。</p>
+  <!-- CHAPTER 02 -->
+  <section id="ch2" class="chapter">
+    <div class="chapter-num">CHAPTER 02</div>
+    <h2 class="chapter-title">OVERVIEW / コンセプト</h2>
+    <div class="content-box">
+      <p>「ブラウザを開くだけで、目の前にミクが現れる」という直感的なユーザー体験をコアに据えています。高度な環境認識（WebXR）と物理演算（Ammo.js）を融合させ、モバイル端末でも快適な描画を維持します。</p>
+      <div class="info-box">
+        <strong>💡 KEY CONCEPT:</strong> ゼロ・インストール。QRコードを読み取ってから3秒以内にAR体験を開始することを目指しました。
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 03 -->
+  <section id="ch3" class="chapter">
+    <div class="chapter-num">CHAPTER 03</div>
+    <h2 class="chapter-title">TECH STACK / 技術構成</h2>
+    <div class="content-box">
+      <p>モダンなWeb技術を駆使し、デスクトップ級の3D表現をモバイルブラウザへ最適化しています。</p>
+      <div class="svg-container">
+        <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+          <rect x="50" y="20" width="300" height="40" rx="8" fill="var(--card)" stroke="var(--cyan)"/>
+          <text x="200" y="45" text-anchor="middle" fill="var(--cyan)" font-size="14">Vite / TypeScript (Build)</text>
+          <rect x="50" y="70" width="300" height="40" rx="8" fill="var(--card)" stroke="var(--magenta)"/>
+          <text x="200" y="95" text-anchor="middle" fill="var(--magenta)" font-size="14">Babylon.js (Rendering)</text>
+          <rect x="50" y="120" width="300" height="40" rx="8" fill="var(--card)" stroke="var(--amber)"/>
+          <text x="200" y="145" text-anchor="middle" fill="var(--amber)" font-size="14">babylon-mmd / Ammo.js (MMD Physics)</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 04 -->
+  <section id="ch4" class="chapter">
+    <div class="chapter-num">CHAPTER 04</div>
+    <h2 class="chapter-title">WEBXR / ブラウザ型AR</h2>
+    <div class="content-box">
+      <p>WebXR Device APIを使用し、カメラの姿勢推定と現実の座標系を同期。ARCore (Android) および WebXR Viewer (iOS) に対応しています。</p>
+      <pre><code>const xr = await scene.createDefaultXRExperienceAsync({
+  uiOptions: { sessionMode: 'immersive-ar' }
+});</code></pre>
+    </div>
+  </section>
+
+  <!-- CHAPTER 05 -->
+  <section id="ch5" class="chapter">
+    <div class="chapter-num">CHAPTER 05</div>
+    <h2 class="chapter-title">BABYLON.JS / 描画エンジン</h2>
+    <div class="content-box">
+      <p>高機能なBabylon.jsを採用し、PBR（物理ベースレンダリング）とMMDのセルシェーダーを共存させています。照明推定により、現実の明るさに合わせてキャラクターの影が動きます。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 06 -->
+  <section id="ch6" class="chapter">
+    <div class="chapter-num">CHAPTER 06</div>
+    <h2 class="chapter-title">MMD / モデル実装</h2>
+    <div class="content-box">
+      <p>PMX形式のモデルとVMD形式のモーションをリアルタイムでデコード。MMD特有の「剛体物理」をAmmo.js上で忠実に再現し、髪やスカートの揺れを実現しています。</p>
+      <div class="svg-container">
+        <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="200" cy="50" r="30" fill="var(--cyan)" opacity="0.5"/>
+          <line x1="200" y1="80" x2="200" y2="130" stroke="var(--cyan)" stroke-width="4"/>
+          <line x1="200" y1="90" x2="160" y2="120" stroke="var(--cyan)" stroke-width="2" class="float"/>
+          <line x1="200" y1="90" x2="240" y2="120" stroke="var(--cyan)" stroke-width="2" class="float"/>
+          <text x="200" y="20" text-anchor="middle" fill="var(--sub)" font-size="10">PMX BONE STRUCTURE</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 07 -->
+  <section id="ch7" class="chapter">
+    <div class="chapter-num">CHAPTER 07</div>
+    <h2 class="chapter-title">DUAL-AUDIO / 立体音響</h2>
+    <div class="content-box">
+      <p>BGMとキャラクターボイスを分離し、Web Audio APIを用いて3D空間オーディオを実現。ユーザーの向きに合わせて声の聞こえる方向が変化します。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 08 -->
+  <section id="ch8" class="chapter">
+    <div class="chapter-num">CHAPTER 08</div>
+    <h2 class="chapter-title">HIT-TEST / 空間固定</h2>
+    <div class="content-box">
+      <p>Hit Test APIを利用し、スマートフォンのカメラで検出した床面に仮想のマーカーを設置。タップした瞬間にキャラクターが現実世界に着地します。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 09 -->
+  <section id="ch9" class="chapter">
+    <div class="chapter-num">CHAPTER 09</div>
+    <h2 class="chapter-title">FULL FLOW / 処理フロー</h2>
+    <div class="content-box">
+      <div class="svg-container">
+        <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg">
+          <path d="M50 50 H150 V150 H250 V250 H450" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-dasharray="10,5"/>
+          <rect x="40" y="30" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--cyan)"/>
+          <text x="80" y="55" text-anchor="middle" fill="white" font-size="10">Session Start</text>
+          <rect x="140" y="130" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--magenta)"/>
+          <text x="180" y="155" text-anchor="middle" fill="white" font-size="10">Plane Detect</text>
+          <rect x="240" y="230" width="80" height="40" rx="5" fill="var(--card)" stroke="var(--amber)"/>
+          <text x="280" y="255" text-anchor="middle" fill="white" font-size="10">Spawn Model</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAPTER 10 -->
+  <section id="ch10" class="chapter">
+    <div class="chapter-num">CHAPTER 10</div>
+    <h2 class="chapter-title">DESIGN / 設計判断</h2>
+    <div class="content-box">
+      <p>「モバイルでの描画負荷」と「キャラクターのクオリティ」のトレードオフをどう解決したか。具体的には、テクスチャのKTX2圧縮とシェーダーの簡略化を選択しました。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 11 -->
+  <section id="ch11" class="chapter">
+    <div class="chapter-num">CHAPTER 11</div>
+    <h2 class="chapter-title">FAQ / よくある質問</h2>
+    <div class="content-box">
+      <p><strong>Q: iPhoneで動作しません。</strong><br>A: iOSではWebXR Viewerアプリを使用するか、Apple公式のWebXR sessionを有効にする必要があります。</p>
+      <p><strong>Q: モデルが浮いてしまいます。</strong><br>A: 床面検知が完了するまで十分にカメラを動かしてからタップしてください。</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 12 -->
+  <section id="ch12" class="chapter">
+    <div class="chapter-num">CHAPTER 12</div>
+    <h2 class="chapter-title">CREDITS / クレジット</h2>
+    <div class="content-box">
+      <p>Project: igashira0324<br>Engine: Babylon.js<br>MMD Implementation: babylon-mmd<br>Venue: 生成AIなんでも展示会 Vol.5</p>
+    </div>
   </section>
 
   <footer>
-    © 2026 igashira0324 ｜ 生成AIなんでも展示会 Vol.5
+    <div class="footer-logo">WEBAR ARCHIVE</div>
+    <p>© 2026 igashira0324 | 生成AIなんでも展示会 Vol.5 | 2026.05.06(水) | すみだ産業会館 8F</p>
   </footer>
 </div>
+
+<script>
+  // Simple intersection observer for subtle fade-in
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = 1;
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.chapter').forEach(ch => {
+    ch.style.opacity = 0;
+    ch.style.transform = 'translateY(20px)';
+    ch.style.transition = 'all 0.6s ease-out';
+    observer.observe(ch);
+  });
+</script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 import { Scene } from "@babylonjs/core";
-import { StreamAudioPlayer } from "babylon-mmd";
+import type { StreamAudioPlayer } from "babylon-mmd";
 import { appState } from "./state";
 import { togglePlayback } from "./audioController";
 
@@ -110,13 +110,13 @@ export const setupUI = (
     closeModalBtn?.addEventListener("click", () => fileModal?.classList.add("hidden"));
     
     const presetModelSelect = document.getElementById("presetModelSelect") as HTMLSelectElement | null;
-    const charModal = document.getElementById("char-modal") as HTMLDivElement | null;
+    const characterModal = document.getElementById("character-modal") as HTMLDivElement | null;
     const musicModal = document.getElementById("music-modal") as HTMLDivElement | null;
     
     presetModelSelect?.addEventListener("change", () => {
         const val = presetModelSelect.value;
         onPresetSelect(val);
-        charModal?.classList.add("hidden");
+        characterModal?.classList.add("hidden");
     });
 
     const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement | null;

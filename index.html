@@ -879,7 +879,7 @@
       }
     </style>
   </head>
-    <body data-ver="v2.16-force-ui-refresh">
+    <body data-ver="v3.0">
     <div id="ar-overlay"></div>
     <div id="app">
       <canvas id="renderCanvas"></canvas>
@@ -911,8 +911,8 @@
               <button id="musicFab" class="fab-btn" title="ダンス曲変更">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
               </button>
-              <button id="charFab" class="fab-btn" title="キャラ変更">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <button id="characterFab" class="fab-btn" title="キャラ変更">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="11" cy="7" r="4"></circle><path d="M23 11l-2 2-2-2"></path><path d="M21 13V9"></path></svg>
               </button>
               <button id="settingsFab" class="fab-btn" title="詳細設定">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -972,15 +972,20 @@
               <option value="trend2025_a">トレンドメドレー2025 (A)</option>
               <option value="trend2025_b">トレンドメドレー2025 (B)</option>
             </select>
+
+            <label class="toggle-row" style="margin-top:16px;">
+              <input type="checkbox" id="loopToggle" checked />
+              <span>🔁 自動ループ再生 (2s)</span>
+            </label>
           </div>
         </div>
 
         <!-- キャラ選択モーダル -->
-        <div id="char-modal" class="modal hidden">
+        <div id="character-modal" class="modal hidden">
           <div class="modal-content">
-            <button class="close-x" id="closeCharBtn">×</button>
+            <button class="close-x" id="closeCharacterBtn">×</button>
             <h3>AVATAR MODEL</h3>
-            <p>使用するキャラクターを選択してください。</p>
+            <p>登場させるキャラを選んでください。</p>
 
             <div class="section-title">PRESET MODELS</div>
             <select id="presetModelSelect" class="neon-select" style="width:100%; margin: 10px 0 20px;">
@@ -1015,10 +1020,6 @@
             </div>
 
             <div class="section-title">SYSTEM</div>
-            <label class="toggle-row">
-              <input type="checkbox" id="loopToggle" checked />
-              <span>🔁 自動ループ再生 (2s)</span>
-            </label>
             <label class="toggle-row">
               <input type="checkbox" id="lipsyncToggle" checked />
               <span>🎵 リップシンク (音楽連動)</span>

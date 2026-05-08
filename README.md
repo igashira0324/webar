@@ -13,33 +13,32 @@ MMD (PMX) モデルと VMD モーションをブラウザ上で再生し、WebAR
 
 ## セットアップ
 
-1.  依存関係のインストール:
+1.  **初期設定 (Makefile 推奨):**
     ```bash
-    npm install
+    make setup
     ```
+    ※ 依存関係のインストールに加え、`npmmirror` レジストリの設定と Havok 物理演算 WASM の配備を自動で行います。
 
-2.  アセットの配置:
+2.  **アセットの配置:**
     `public/assets/` 配下に以下のようにファイルを配置してください。
-    - `public/assets/model/model.pmx` (モデル本体)
-    - `public/assets/model/textures/` (テクスチャ類)
+    - `public/assets/model/miku.pmx` (モデル本体: デフォルト設定)
     - `public/assets/motion/dance.vmd` (モーションファイル)
-    - `public/assets/audio/music.mp3` (任意: 音声ファイル)
 
 ## 起動方法
 
 ### 開発用 (HTTP)
-PC ブラウザでのプレビュー確認用です。
+PC ブラウザでのデバッグ用です。
 ```bash
-npm run dev
+make dev
 ```
 
 ### 展示用 / AR 用 (HTTPS / LAN)
 スマホからアクセスして WebAR を使用するために、HTTPS で起動します。
 ```bash
-npm run dev:https
+make dev-https
 ```
-起動後、表示される IP アドレス (例: `https://192.168.x.x:5173`) にスマホからアクセスしてください。
-※ 初回アクセス時に「この接続はプライベートではありません」と表示される場合は、「詳細設定」から「続行」を選択してください。
+起動後、表示される LAN IP アドレス (例: `https://192.168.x.x:5173`) にスマホからアクセスしてください。
+※ HTTPS が必須です（Vite の `basic-ssl` プラグインを使用）。
 
 ## WebAR の使い方 (Android)
 

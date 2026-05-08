@@ -905,9 +905,21 @@
               <h1 class="brand">MMD(MikuMikuDance) × WebXR</h1>
             </div>
             <div class="fab-group">
-              <button id="infoFab" class="fab-btn" title="このアプリについて">ℹ</button>
-              <button id="settingsFab" class="fab-btn" title="設定">⚙</button>
-              <button id="qrFab" class="fab-btn" title="QRコード">📱</button>
+              <button id="infoFab" class="fab-btn" title="このアプリについて">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              </button>
+              <button id="musicFab" class="fab-btn" title="ダンス曲変更">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </button>
+              <button id="charFab" class="fab-btn" title="キャラ変更">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </button>
+              <button id="settingsFab" class="fab-btn" title="詳細設定">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+              <button id="qrFab" class="fab-btn" title="QRコード">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              </button>
             </div>
           </div>
           <span id="fps" style="display:none;"></span>
@@ -946,11 +958,49 @@
           </div>
         </div>
 
-        <!-- 設定モーダル（新デザイン） -->
+        <!-- ダンス曲選択モーダル -->
+        <div id="music-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeMusicBtn">×</button>
+            <h3>DANCE & MUSIC</h3>
+            <p>ダンス曲を選択してください。読み込みに数秒かかる場合があります。</p>
+            
+            <div class="section-title">SELECT SONG</div>
+            <select id="danceSelect" class="neon-select" style="width:100%; margin: 10px 0 20px;">
+              <option value="dindondan">Din Don Dan (歌声あり)</option>
+              <option value="nightoffire">NIGHT OF FIRE (インスト)</option>
+              <option value="trend2025_a">トレンドメドレー2025 (A)</option>
+              <option value="trend2025_b">トレンドメドレー2025 (B)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- キャラ選択モーダル -->
+        <div id="char-modal" class="modal hidden">
+          <div class="modal-content">
+            <button class="close-x" id="closeCharBtn">×</button>
+            <h3>AVATAR MODEL</h3>
+            <p>使用するキャラクターを選択してください。</p>
+
+            <div class="section-title">PRESET MODELS</div>
+            <select id="presetModelSelect" class="neon-select" style="width:100%; margin: 10px 0 20px;">
+              <option value="original">Default Miku (602e)</option>
+              <option value="v_miku_full">V Miku Full (602e High-End)</option>
+              <option value="sour_snow">Sour Snow Miku v1.02</option>
+              <option value="onasu">Onasu Sakura Miku</option>
+              <option value="riverside">Riverside Miku v2.02</option>
+            </select>
+
+            <div class="section-title">CUSTOM</div>
+            <button id="fileSelectToggle" class="secondary-btn" style="width:100%;">📁 MMDファイルをロード</button>
+          </div>
+        </div>
+
+        <!-- 詳細設定モーダル -->
         <div id="settings-modal" class="modal hidden">
           <div class="modal-content">
             <button class="close-x" id="closeSettingsBtn">×</button>
-            <h3>SETTINGS</h3>
+            <h3>ADVANCED SETTINGS</h3>
 
             <div class="playback-row-title">
               <div class="section-title" style="margin-bottom: 0;">PLAYBACK</div>
@@ -964,24 +1014,7 @@
               <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="flex-grow: 1;" />
             </div>
 
-            <div class="section-title">DANCE & MUSIC</div>
-            <select id="danceSelect" class="neon-select" style="width:100%; margin-bottom: 15px;">
-              <option value="dindondan">Din Don Dan (歌声あり)</option>
-              <option value="nightoffire">NIGHT OF FIRE (インスト)</option>
-              <option value="trend2025_a">トレンドメドレー2025 (A)</option>
-              <option value="trend2025_b">トレンドメドレー2025 (B)</option>
-            </select>
-
-            <div class="section-title">AVATAR MODEL</div>
-            <select id="presetModelSelect" class="neon-select" style="width:100%; margin-bottom: 15px;">
-              <option value="original">Default Miku (602e)</option>
-              <option value="v_miku_full">V Miku Full (602e High-End)</option>
-              <option value="sour_snow">Sour Snow Miku v1.02</option>
-              <option value="onasu">Onasu Sakura Miku</option>
-              <option value="riverside">Riverside Miku v2.02</option>
-            </select>
-
-            <div class="section-title">ADVANCED</div>
+            <div class="section-title">SYSTEM</div>
             <label class="toggle-row">
               <input type="checkbox" id="loopToggle" checked />
               <span>🔁 自動ループ再生 (2s)</span>
@@ -990,9 +1023,6 @@
               <input type="checkbox" id="lipsyncToggle" checked />
               <span>🎵 リップシンク (音楽連動)</span>
             </label>
-
-            <div class="section-title">CUSTOM</div>
-            <button id="fileSelectToggle" class="secondary-btn" style="width:100%;">📁 MMDファイルをロード</button>
           </div>
         </div>
 

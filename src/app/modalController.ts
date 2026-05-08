@@ -19,6 +19,8 @@ const bindBackdrop = (id: string) => {
 
 export const setupModals = () => {
     const infoFab = document.getElementById("infoFab");
+    const musicFab = document.getElementById("musicFab");
+    const charFab = document.getElementById("charFab");
     const settingsFab = document.getElementById("settingsFab");
     const qrFab = document.getElementById("qrFab");
 
@@ -45,6 +47,12 @@ export const setupModals = () => {
     infoFab?.addEventListener("click", () => openModal("info-modal"));
     document.getElementById("closeInfoBtn")?.addEventListener("click", () => closeModal("info-modal"));
     
+    musicFab?.addEventListener("click", () => openModal("music-modal"));
+    document.getElementById("closeMusicBtn")?.addEventListener("click", () => closeModal("music-modal"));
+
+    charFab?.addEventListener("click", () => openModal("char-modal"));
+    document.getElementById("closeCharBtn")?.addEventListener("click", () => closeModal("char-modal"));
+
     settingsFab?.addEventListener("click", () => openModal("settings-modal"));
     document.getElementById("closeSettingsBtn")?.addEventListener("click", () => closeModal("settings-modal"));
     
@@ -61,6 +69,8 @@ export const setupModals = () => {
     document.getElementById("closeArUnavailableBtn")?.addEventListener("click", () => closeModal("ar-unavailable-modal"));
     
     bindBackdrop("info-modal");
+    bindBackdrop("music-modal");
+    bindBackdrop("char-modal");
     bindBackdrop("settings-modal");
     bindBackdrop("qr-modal");
     bindBackdrop("ar-unavailable-modal");

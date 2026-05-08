@@ -110,10 +110,18 @@ export const setupUI = (
     closeModalBtn?.addEventListener("click", () => fileModal?.classList.add("hidden"));
     
     const presetModelSelect = document.getElementById("presetModelSelect") as HTMLSelectElement | null;
+    const charModal = document.getElementById("char-modal") as HTMLDivElement | null;
+    const musicModal = document.getElementById("music-modal") as HTMLDivElement | null;
+    
     presetModelSelect?.addEventListener("change", () => {
         const val = presetModelSelect.value;
         onPresetSelect(val);
-        fileModal?.classList.add("hidden");
+        charModal?.classList.add("hidden");
+    });
+
+    const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement | null;
+    danceSelect?.addEventListener("change", () => {
+        musicModal?.classList.add("hidden");
     });
 
     loadFilesBtn?.addEventListener("click", () => {

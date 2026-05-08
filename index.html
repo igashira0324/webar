@@ -914,9 +914,6 @@
               <button id="characterFab" class="fab-btn" title="キャラ変更">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="11" cy="7" r="4"></circle><path d="M23 11l-2 2-2-2"></path><path d="M21 13V9"></path></svg>
               </button>
-              <button id="settingsFab" class="fab-btn" title="詳細設定">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-              </button>
               <button id="qrFab" class="fab-btn" title="QRコード">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
               </button>
@@ -958,12 +955,12 @@
           </div>
         </div>
 
-        <!-- ダンス曲選択モーダル -->
+        <!-- ダンス曲選択モーダル（設定統合版） -->
         <div id="music-modal" class="modal hidden">
           <div class="modal-content">
             <button class="close-x" id="closeMusicBtn">×</button>
             <h3>DANCE & MUSIC</h3>
-            <p>ダンス曲を選択してください。読み込みに数秒かかる場合があります。</p>
+            <p>ダンス曲の選択と、再生の詳細設定が可能です。</p>
             
             <div class="section-title">SELECT SONG</div>
             <select id="danceSelect" class="neon-select" style="width:100%; margin: 10px 0 20px;">
@@ -973,10 +970,29 @@
               <option value="trend2025_b">トレンドメドレー2025 (B)</option>
             </select>
 
-            <label class="toggle-row" style="margin-top:16px;">
-              <input type="checkbox" id="loopToggle" checked />
-              <span>🔁 自動ループ再生 (2s)</span>
-            </label>
+            <div class="playback-row-title">
+              <div class="section-title" style="margin-bottom: 0;">PLAYBACK</div>
+              <div class="frame-counter">
+                <span id="seekVal">0</span> / <span id="durationVal">0</span>
+              </div>
+            </div>
+            
+            <div class="playback-controls">
+              <button id="playPauseBtn" class="play-pause-circle" aria-label="Play/Pause">▶</button>
+              <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="flex-grow: 1;" />
+            </div>
+
+            <div class="section-title">SYSTEM</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label class="toggle-row">
+                <input type="checkbox" id="loopToggle" checked />
+                <span>🔁 自動ループ再生 (2s)</span>
+              </label>
+              <label class="toggle-row">
+                <input type="checkbox" id="lipsyncToggle" checked />
+                <span>🎵 リップシンク (音楽連動)</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -998,32 +1014,6 @@
 
             <div class="section-title">CUSTOM</div>
             <button id="fileSelectToggle" class="secondary-btn" style="width:100%;">📁 MMDファイルをロード</button>
-          </div>
-        </div>
-
-        <!-- 詳細設定モーダル -->
-        <div id="settings-modal" class="modal hidden">
-          <div class="modal-content">
-            <button class="close-x" id="closeSettingsBtn">×</button>
-            <h3>ADVANCED SETTINGS</h3>
-
-            <div class="playback-row-title">
-              <div class="section-title" style="margin-bottom: 0;">PLAYBACK</div>
-              <div class="frame-counter">
-                <span id="seekVal">0</span> / <span id="durationVal">0</span>
-              </div>
-            </div>
-            
-            <div class="playback-controls">
-              <button id="playPauseBtn" class="play-pause-circle" aria-label="Play/Pause">▶</button>
-              <input type="range" id="seekSlider" min="0" max="100" step="1" value="0" class="neon-range" style="flex-grow: 1;" />
-            </div>
-
-            <div class="section-title">SYSTEM</div>
-            <label class="toggle-row">
-              <input type="checkbox" id="lipsyncToggle" checked />
-              <span>🎵 リップシンク (音楽連動)</span>
-            </label>
           </div>
         </div>
 

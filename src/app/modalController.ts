@@ -21,7 +21,6 @@ export const setupModals = () => {
     const infoFab = document.getElementById("infoFab");
     const musicFab = document.getElementById("musicFab");
     const characterFab = document.getElementById("characterFab");
-    const settingsFab = document.getElementById("settingsFab");
     const qrFab = document.getElementById("qrFab");
 
     document.getElementById("arLaunchBtn")?.addEventListener("click", async () => {
@@ -53,9 +52,6 @@ export const setupModals = () => {
     characterFab?.addEventListener("click", () => openModal("character-modal"));
     document.getElementById("closeCharacterBtn")?.addEventListener("click", () => closeModal("character-modal"));
 
-    settingsFab?.addEventListener("click", () => openModal("settings-modal"));
-    document.getElementById("closeSettingsBtn")?.addEventListener("click", () => closeModal("settings-modal"));
-    
     qrFab?.addEventListener("click", () => {
         openModal("qr-modal");
         const canvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
@@ -71,7 +67,6 @@ export const setupModals = () => {
     bindBackdrop("info-modal");
     bindBackdrop("music-modal");
     bindBackdrop("character-modal");
-    bindBackdrop("settings-modal");
     bindBackdrop("qr-modal");
     bindBackdrop("ar-unavailable-modal");
 };

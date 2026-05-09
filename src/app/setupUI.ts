@@ -27,8 +27,6 @@ export const setupUI = (
     const controlPanel = document.getElementById("control-panel") as HTMLDivElement | null;
     const minimizeBtn = document.getElementById("minimizeBtn") as HTMLButtonElement | null;
     const showSettingsBtn = document.getElementById("showSettingsBtn") as HTMLButtonElement | null;
-    const showMarkerBtn = document.getElementById("qrFab") as HTMLButtonElement | null;
-    const markerModal = document.getElementById("qr-modal") as HTMLDivElement | null;
     const closeMarkerBtn = document.getElementById("closeQrBtn") as HTMLButtonElement | null;
 
     const S_BASE = 1.0;
@@ -119,10 +117,7 @@ export const setupUI = (
         characterModal?.classList.add("hidden");
     });
 
-    const danceSelect = document.getElementById("danceSelect") as HTMLSelectElement | null;
-    danceSelect?.addEventListener("change", () => {
-        musicModal?.classList.add("hidden");
-    });
+
 
     loadFilesBtn?.addEventListener("click", () => {
         const pmx = pmxInput?.files?.[0];
@@ -146,8 +141,7 @@ export const setupUI = (
         showSettingsBtn?.classList.add("hidden");
     });
 
-    showMarkerBtn?.addEventListener("click", () => markerModal?.classList.remove("hidden"));
-    closeMarkerBtn?.addEventListener("click", () => markerModal?.classList.add("hidden"));
+
 
     // ===== Initial Duration Update =====
     setTimeout(updateDuration, 1000);

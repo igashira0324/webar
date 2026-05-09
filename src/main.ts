@@ -83,6 +83,7 @@ async function init() {
             showLoading("Loading Audio...");
             await setupAudio(newId);
             if (motion) mmdRuntime.setManualAnimationDuration(motion.endFrame);
+            document.getElementById("music-modal")?.classList.add("hidden");
         } finally {
             hideLoading();
         }
@@ -121,7 +122,15 @@ async function init() {
             "v_miku_full": "assets/model/presets/v_miku_full/model.pmx",
             "sour_snow": "assets/model/presets/snow/model.pmx",
             "onasu": "assets/model/presets/sakura/model.pmx",
-            "riverside": "assets/model/presets/riverside/model.pmx"
+            "riverside": "assets/model/presets/riverside/model.pmx",
+            "crown_knight": "assets/model/presets/crown_knight/model.pmx",
+            "vampire_lolita": "assets/model/presets/vampire_lolita/model.pmx",
+            "onasu_whiterose": "assets/model/presets/onasu_whiterose/model.pmx",
+            "onasu_v04": "assets/model/presets/onasu_v04/model.pmx",
+            "onasu_cosmos": "assets/model/presets/onasu_cosmos/model.pmx",
+            "higanbana": "assets/model/presets/higanbana/model.pmx",
+            "snow_miku_2011": "assets/model/presets/snow_miku_2011/model.pmx",
+            "euphonie": "assets/model/presets/euphonie/model.pmx"
         };
         const pmxPath = presets[presetId];
         if (!pmxPath || !appState.currentModel) return;

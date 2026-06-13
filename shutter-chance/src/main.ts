@@ -37,12 +37,16 @@ let lyricDisplay: LyricDisplay | null = null;
 let lyric3d: Lyric3D | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
-let glowLayer: any = null; // サビ長押し極限発光演出用のグローバル参照
-let isHolding = false; // 画面長押し（ホールド）中フラグ
-let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
+let glowLayer: any = null;
+let isHolding = false;
+let currentPosition = 0;      // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
-let lastWordObjText = ""; // 3D歌詞の重複ポップアップを防ぐためのトラッキング
+let lastWordObjText = "";     // 3D歌詞の重複ポップアップ防止トラッキング
+
+// ── フリーズモード（光のシャッターで時を止める）
+let isFrozen = false;          // フリーズ中フラグ
+let frozenPosition = 0;        // フリーズ時に保存した再生位置
 
 // 撮影枚数（コレクション型の記念記録）
 let photoCount = 0;
@@ -184,6 +188,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     },
     onStop: () => {
       isPlaying = false;
+      // フリーズモード中だった場合も解除
+      if (isFrozen) exitFreezeMode();
       // 3D歌詞をクリア
       lyric3d?.clear();
       // 曲終了 → ギャラリー表示
@@ -210,7 +216,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     const pos = currentPosition;
     onTick(pos);
 
-    if (!isPlaying || !mmdRuntime) return;
+    // フリーズ中はMMDアニメーションを進めない（その瞬間のポーズで静止）
+    if (!isPlaying || !mmdRuntime || isFrozen) return;
     mmdRuntime.seekAnimation((pos / 1000) * 30, true);
   });
 
@@ -219,11 +226,21 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   lyric3d = new Lyric3D(scene);
   shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
 
-  // 撮影コールバック（記念コレクション型 — 判定なし）
+  // 撮影コールバック：
+  //   再生中 → フリーズモード（時を止める）に入る
+  //   フリーズ中 → 撮影して再開
   shutterSystem.setManualShutterCallback(() => {
-    // 現在表示中の歌詞と一緒に撮影するだけ（スコア・判定なし）
-    const lyric = document.getElementById("lyric-word")?.textContent ?? "";
-    shutterSystem?.shoot(lyric);
+    if (!isPlaying) return; // 停止中は無視
+
+    if (!isFrozen) {
+      // 初回タップ → 時を止める
+      enterFreezeMode();
+    } else {
+      // 2回目タップ → 決定的瞬間を撮影 → 再開
+      const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+      shutterSystem?.shoot(lyric);
+      exitFreezeMode();
+    }
   });
 
   // 写真追加時に枚数カウントを更新
@@ -254,6 +271,11 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   });
   document.getElementById("credits-close")?.addEventListener("click", () => {
     document.getElementById("credits-modal")?.classList.add("hidden");
+  });
+
+  // ⑩ フリーズ「▶ 再開」ボタン
+  document.getElementById("freeze-resume-btn")?.addEventListener("click", () => {
+    exitFreezeMode();
   });
 
   // ⑩ AR起動ボタン（ARモード時）
@@ -378,6 +400,69 @@ function triggerBeatPulse(): void {
     void vfFrame.offsetWidth;
     vfFrame.classList.add("beat-pulse-glow");
   }
+}
+
+// ──────────────────────────────────────────────
+// フリーズモード（光のシャッターで時を止める）
+// ──────────────────────────────────────────────
+
+/**
+ * フリーズモードに入る
+ * - TextAlive の再生を一時停止してミクのポーズを固定
+ * - 3D歌詞のアニメーションも止める
+ * - フリーズUI（撮影ボタン・再開ボタン・閃光）を表示
+ */
+function enterFreezeMode(): void {
+  if (isFrozen) return;
+  isFrozen = true;
+  frozenPosition = currentPosition;
+
+  // TextAlive 一時停止（ミクのポーズも onBeforeRender で止まる）
+  taSync?.pause();
+  isPlaying = false;
+
+  // 3D歌詞を止める
+  lyric3d?.setFrozen(true);
+
+  // 閃光エフェクト
+  const flash = document.getElementById("flash");
+  if (flash) {
+    flash.style.opacity = "1";
+    flash.style.background = "radial-gradient(ellipse at center, rgba(200,240,255,0.95) 0%, rgba(100,200,255,0.6) 40%, transparent 70%)";
+    setTimeout(() => { if (flash) flash.style.opacity = "0"; }, 300);
+  }
+
+  // フリーズUI を表示
+  const freezeUi = document.getElementById("freeze-ui");
+  if (freezeUi) freezeUi.classList.remove("hidden");
+
+  // 再生ボタンテキストを「▶ 再生」に更新
+  const playBtn = document.getElementById("play-btn");
+  if (playBtn) playBtn.textContent = "▶ 再生";
+
+  // GlowLayer を強めて「止まった世界」感を演出
+  if (glowLayer) glowLayer.intensity = 2.0;
+}
+
+/**
+ * フリーズモードを解除して再生を再開する
+ */
+function exitFreezeMode(): void {
+  if (!isFrozen) return;
+  isFrozen = false;
+
+  // 3D歌詞を再開
+  lyric3d?.setFrozen(false);
+
+  // フリーズUI を隠す
+  const freezeUi = document.getElementById("freeze-ui");
+  if (freezeUi) freezeUi.classList.add("hidden");
+
+  // TextAlive 再生を再開
+  taSync?.play();
+
+  // GlowLayer を通常輝度に戻す
+  if (glowLayer) glowLayer.intensity = 0.8;
 }
 
 /**

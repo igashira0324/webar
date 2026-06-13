@@ -433,6 +433,53 @@
     }
     .credits-body ul { padding-left: 18px; }
 
+    #freeze-ui {
+      position: absolute; inset: 52px 0 0 0; z-index: 80;
+      pointer-events: none; display: flex;
+      flex-direction: column; align-items: center; justify-content: flex-end;
+      padding-bottom: 80px;
+    }
+    #freeze-ui.hidden { display: none !important; }
+    #freeze-overlay {
+      position: absolute; inset: 0;
+      border: 3px solid rgba(100,200,255,0.7);
+      box-shadow: inset 0 0 60px rgba(100,200,255,0.25), 0 0 40px rgba(100,200,255,0.3);
+      border-radius: 4px;
+      pointer-events: none;
+      animation: freezePulse 2s ease-in-out infinite;
+    }
+    @keyframes freezePulse {
+      0%,100% { border-color: rgba(100,200,255,0.5); box-shadow: inset 0 0 40px rgba(100,200,255,0.15); }
+      50%      { border-color: rgba(200,240,255,0.9); box-shadow: inset 0 0 80px rgba(180,230,255,0.4); }
+    }
+    #freeze-guide {
+      position: relative; z-index: 1; text-align: center;
+      background: rgba(4,8,20,0.75); backdrop-filter: blur(12px);
+      border: 1px solid rgba(100,200,255,0.4); border-radius: 12px;
+      padding: 12px 24px; margin-bottom: 16px;
+    }
+    #freeze-label {
+      font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 700;
+      color: #a5f3fc; letter-spacing: 3px;
+      animation: freezeLabelBlink 1.2s ease-in-out infinite;
+    }
+    @keyframes freezeLabelBlink {
+      0%,100% { opacity: 1; } 50% { opacity: 0.5; }
+    }
+    #freeze-hint {
+      font-size: 0.75rem; color: rgba(165,243,252,0.7); margin-top: 6px;
+      font-family: 'Orbitron', sans-serif;
+    }
+    #freeze-resume-btn {
+      position: relative; z-index: 1; pointer-events: auto;
+      padding: 10px 28px; border-radius: 24px;
+      background: rgba(100,200,255,0.15); backdrop-filter: blur(10px);
+      border: 1px solid rgba(100,200,255,0.6); color: #a5f3fc;
+      font-family: 'Orbitron', sans-serif; font-size: 0.78rem; cursor: pointer;
+      letter-spacing: 2px; transition: all 0.2s;
+    }
+    #freeze-resume-btn:hover { background: rgba(100,200,255,0.3); }
+
     /* ── AR overlay ── */
     #ar-overlay {
       position: absolute; inset: 52px 0 0 0; z-index: 55;
@@ -510,6 +557,16 @@
 
   <!-- Flash overlay -->
   <div id="flash"></div>
+
+  <!-- フリーズモード UI（時を止めている間だけ表示） -->
+  <div id="freeze-ui" class="hidden">
+    <div id="freeze-overlay"></div>
+    <div id="freeze-guide">
+      <div id="freeze-label">⏸ 時が止まった</div>
+      <div id="freeze-hint">アングルを変えて…もう一度タップで撮影</div>
+    </div>
+    <button id="freeze-resume-btn">▶ 再開</button>
+  </div>
 
   <!-- ルール説明オーバーレイ: onReady後に3秒表示して自動消える -->
   <div id="rule-overlay" class="hidden">

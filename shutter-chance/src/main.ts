@@ -1,6 +1,6 @@
 /**
  * main.ts  — shutter-chance/src/main.ts
- * 「Shutter Chance AR ― ミクと撮る一瞬」 エントリポイント
+ * 「Lyric Spark AR ― 手のひらの中で歌詞が弾ける」エントリポイント
  *
  * 処理フロー:
  *   1. AR可否判定
@@ -9,7 +9,7 @@
  *   4. ミク(MMD)モデル + VMDロード
  *   5. TextAlive Player 初期化・楽曲ロード
  *   6. TextAlive position をマスタークロックとしてレンダーループに注入
- *   7. サビ演出・歌詞オーバーレイ制御
+ *   7. 歌詞演出・ビートパルス制御
  */
 import { Scene } from "@babylonjs/core";
 import { MmdRuntime } from "babylon-mmd";
@@ -24,8 +24,7 @@ import { checkARSupport, setupFallbackBanner, showARCapableMessage } from "./arF
 // ──────────────────────────────────────────────
 // 定数
 // ──────────────────────────────────────────────
-const MIKU_PMX = "/assets/model/miku.pmx"; // 既存アセットを流用（絶対パス指定）
-// 要確認: 「シャッターチャンス」専用VMDがあればここを変更
+const MIKU_PMX = "/assets/model/miku.pmx";
 const DANCE_VMD = "/assets/motion/dindondan.vmd";
 const AR_URL = "https://webar-coral.vercel.app/shutter-chance/";
 
@@ -40,18 +39,8 @@ let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロッ�
 let isPlaying = false;
 let lastBeatIndex = -1;
 
-// タイミングゲームの得点状態
-let score = 0;
-let perfectCount = 0;
-let goodCount = 0;
-let missCount = 0;
-
-// ── タイミング判定算・リング収束で共有する定数 ──
-// この値を変えるとリングの「今だ！」為の発光範囲とPERFECT判定が同時に変わる
-/** リングが「今だ！」になる範囲（ms）= PERFECT判定と完全一致 */
-const HIT_WINDOW = 120;
-/** GOOD判定の上限（ms）*/
-const GOOD_WINDOW = 300;
+// 撮影枚数（コレクション型の記念記録）
+let photoCount = 0;
 
 // ──────────────────────────────────────────────
 // 初期化
@@ -85,19 +74,16 @@ function showModeSelect(arSupported: boolean): void {
     arBtn.title = "この端末はAR非対応です";
   }
 
-  // Hide the loading screen so that the mode-select screen is visible and clickable
   document.getElementById("loading")?.classList.add("hidden");
   modeSelect.classList.remove("hidden");
 
   arBtn.addEventListener("click", () => {
     modeSelect.classList.add("hidden");
-    // Show loading screen again while loading model assets
     document.getElementById("loading")?.classList.remove("hidden");
     startApp("ar");
   });
   studioBtn.addEventListener("click", () => {
     modeSelect.classList.add("hidden");
-    // Show loading screen again while loading model assets
     document.getElementById("loading")?.classList.remove("hidden");
     startApp("studio");
   });
@@ -106,63 +92,52 @@ function showModeSelect(arSupported: boolean): void {
 // ──────────────────────────────────────────────
 // アプリ本体起動
 // ──────────────────────────────────────────────
-async function startApp(mode: "ar" | "studio") {
-  const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-  setStatusMessage("ロード中...");
-  showLoadingBar(true);
+async function startApp(mode: "ar" | "studio"): Promise<void> {
+  setStatusMessage("シーンを初期化中...");
 
-  // ③ Babylon.js シーン構築
-  let enterAR: (() => Promise<void>) | undefined;
+  // ① シーン作成
   let scene: Scene;
-  let shadowGenerator: any;
+  let canvas: HTMLCanvasElement;
+  let enterAR: (() => void) | null = null;
 
   if (mode === "ar") {
-    const bundle = await createARScene(canvas);
-    scene = bundle.scene;
-    shadowGenerator = bundle.shadowGenerator;
-    enterAR = bundle.enterAR;
+    const result = await createARScene();
+    scene = result.scene;
+    canvas = result.canvas;
+    enterAR = result.enterAR ?? null;
+    setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   } else {
-    const bundle = await createStudioScene(canvas);
-    scene = bundle.scene;
-    shadowGenerator = bundle.shadowGenerator;
+    const result = await createStudioScene();
+    scene = result.scene;
+    canvas = result.canvas;
+    setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   }
 
-  // AR非対応環境 → フォールバックバナー表示
-  if (mode === "studio") {
-    setupFallbackBanner("ar-fallback-banner", AR_URL);
-    document.body.classList.add("has-fallback-banner");
+  // ② GlowLayer（歌詞の発光演出用）
+  try {
+    const { GlowLayer } = await import("@babylonjs/core");
+    const gl = new GlowLayer("glow", scene);
+    gl.intensity = 0.8;
+  } catch (e) {
+    console.warn("GlowLayer unavailable:", e);
   }
 
-  // ④ MMDランタイム + ミクモデル + VMDロード
+  // ③ MMDランタイム + ミクモデル + VMDロード
   mmdRuntime = new MmdRuntime(scene);
-  mmdRuntime.register(scene); // 必須: これでランタイムがシーンの毎フレーム更新サイクルに組み込まれる
+  mmdRuntime.register(scene); // シーンの毎フレーム更新サイクルに組み込む
 
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
   try {
-    const result = await loadMmdModel(
-      scene,
-      mmdRuntime,
-      MIKU_PMX,
-      DANCE_VMD,
-      shadowGenerator,
-      undefined,
-      (ev) => {
-        if (ev.lengthComputable && ev.total > 0) {
-          updateLoadingProgress(Math.floor((ev.loaded / ev.total) * 100));
-        }
-      }
-    );
-
-    mmdModel = result.model;
-    mmdModel.mesh.scaling.setAll(0.07);
-    mmdModel.mesh.position.y = 0.5;
+    mmdModel = await loadMmdModel(scene, MIKU_PMX, DANCE_VMD, mmdRuntime);
+    setStatusMessage("ミク読み込み完了");
+    updateLoadingProgress(60);
   } catch (e) {
-    console.error("Model load failed:", e);
+    console.error("MMD load failed:", e);
     setStatusMessage("⚠ モデルの読み込みに失敗しました");
   }
 
-  // ⑤ TextAlive 初期化
+  // ④ TextAlive 初期化
   setStatusMessage("楽曲を読み込み中...");
   const mediaEl = document.getElementById("textalive-media")!;
 
@@ -173,8 +148,8 @@ async function startApp(mode: "ar" | "studio") {
       showMainUI();
       // 歌詞表示を有効化
       lyricDisplay?.show();
-      // ルール説明オーバーレイを3秒表示→フェードアウト（初回起動時のみ）
-      showRuleOverlay();
+      // ウェルカムオーバーレイを表示（3秒後に自動消える）
+      showWelcomeOverlay();
     },
     onPlay: () => {
       isPlaying = true;
@@ -192,25 +167,23 @@ async function startApp(mode: "ar" | "studio") {
       setTimeout(() => openGallery(), 1500);
     },
     onTimeUpdate: (pos) => {
-      // onTimeUpdate は TextAlive が再生の進行に合わせて確実に発火するコールバック
+      // onTimeUpdate は TextAlive が再生進行に合わせて確実に発火するコールバック
       currentPosition = pos;
     },
     onError: (e) => {
       console.error("[TextAlive]", e);
       setStatusMessage("⚠ 楽曲の読み込みに失敗しました（ネットワーク確認）");
       showLoadingBar(false);
-      showMainUI(); // エラーでもUI表示
+      showMainUI();
     },
   });
 
   await taSync.init(mediaEl);
 
-  // ⑥ currentPosition （onTimeUpdate から更新）をマスタークロックとしてMMD同期
-  // timer.position が込まない環境でも onTimeUpdate は確実に発火するため、こちらを使う
+  // ⑤ currentPosition をマスタークロックとして毎フレームMMD同期
   scene.onBeforeRenderObservable.add(() => {
     if (!taSync?.isReady) return;
 
-    // currentPosition を常に使う（isPlaying 時は onTimeUpdate が更新する）
     const pos = currentPosition;
     onTick(pos);
 
@@ -218,50 +191,24 @@ async function startApp(mode: "ar" | "studio") {
     mmdRuntime.seekAnimation((pos / 1000) * 30, true);
   });
 
-  // ⑦ サブシステム初期化
+  // ⑥ サブシステム初期化
   lyricDisplay = new LyricDisplay("lyric-word", "lyric-phrase");
   shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
 
-  // 手動撮影コールバック（判定基準を climaxTime に統一）
+  // 撮影コールバック（記念コレクション型 — 判定なし）
   shutterSystem.setManualShutterCallback(() => {
-    const lyric = lyricDisplay ? (document.getElementById("lyric-word")?.textContent ?? "") : "";
-
-    // climaxTime を判定基準とする（リングの「今だ！」と完全一致）
-    let rating: "PERFECT" | "GOOD" | "MISS" = "MISS";
-    if (taSync && taSync.isReady) {
-      const pos = currentPosition; // onTimeUpdateで更新される精度の高い値
-      const climaxTime = taSync.getPhraseClimaxTime(pos);
-      if (climaxTime !== null) {
-        const offset = Math.abs(pos - climaxTime);
-        if (offset <= HIT_WINDOW) {
-          rating = "PERFECT"; // リングが「今だ！」になった瞬間と同じ範囲
-        } else if (offset <= GOOD_WINDOW) {
-          rating = "GOOD";
-        }
-      }
-    }
-    shutterSystem?.shoot(lyric, rating);
+    // 現在表示中の歌詞と一緒に撮影するだけ（スコア・判定なし）
+    const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+    shutterSystem?.shoot(lyric);
   });
 
-  // 撮影成功時のスコア処理・HUD更新コールバック
-  shutterSystem.setOnPhotoCapturedCallback((photo) => {
-    const rating = photo.rating ?? "MISS";
-    if (rating === "PERFECT") {
-      score += 1000;
-      perfectCount++;
-      showRatingPop("PERFECT", "+1000");
-    } else if (rating === "GOOD") {
-      score += 500;
-      goodCount++;
-      showRatingPop("GOOD", "+500");
-    } else if (rating === "MISS") {
-      missCount++;
-      showRatingPop("MISS", "");
-    }
-    updateGameHUD();
+  // 写真追加時に枚数カウントを更新
+  shutterSystem.setOnPhotoCapturedCallback(() => {
+    photoCount++;
+    updatePhotoCount();
   });
 
-  // ⑧ 再生ボタン
+  // ⑦ 再生ボタン
   const playBtn = document.getElementById("play-btn");
   playBtn?.addEventListener("click", () => {
     if (isPlaying) {
@@ -271,13 +218,13 @@ async function startApp(mode: "ar" | "studio") {
     }
   });
 
-  // ⑨ ギャラリーボタン
+  // ⑧ ギャラリーボタン
   document.getElementById("gallery-btn")?.addEventListener("click", openGallery);
   document.getElementById("gallery-close")?.addEventListener("click", () => {
     document.getElementById("gallery-modal")?.classList.add("hidden");
   });
 
-  // ⑩ クレジットボタン
+  // ⑨ クレジットボタン
   document.getElementById("credits-btn")?.addEventListener("click", () => {
     document.getElementById("credits-modal")?.classList.remove("hidden");
   });
@@ -285,7 +232,7 @@ async function startApp(mode: "ar" | "studio") {
     document.getElementById("credits-modal")?.classList.add("hidden");
   });
 
-  // ⑪ AR起動ボタン（ARモード時）
+  // ⑩ AR起動ボタン（ARモード時）
   if (mode === "ar" && enterAR) {
     const arStartBtn = document.getElementById("ar-start-btn");
     if (arStartBtn) {
@@ -293,9 +240,6 @@ async function startApp(mode: "ar" | "studio") {
       arStartBtn.addEventListener("click", () => enterAR!());
     }
   }
-
-  // ⑫ 戻るリンク
-  // （index.htmlのナビで対応済み）
 }
 
 // ──────────────────────────────────────────────
@@ -309,24 +253,15 @@ function onTick(position: number): void {
   const phrase = taSync.getCurrentPhrase(position);
   lyricDisplay?.update(word, phrase);
 
-  // ビート検出とパルス演出
+  // ビート検出とパルス演出（歌詞とビューファインダーをビートに合わせて光らせる）
   const beat = taSync.getCurrentBeat(position);
   if (beat && beat.index !== lastBeatIndex) {
     lastBeatIndex = beat.index;
     triggerBeatPulse();
   }
 
-  // サビ中: シャッターターゲット（予告リング）制御
+  // シャッターシステム（ビューファインダー表示制御）
   const isInChorus = taSync.isInChorus(position);
-  if (isInChorus) {
-    const climaxTime = taSync.getPhraseClimaxTime(position);
-    updateShutterTarget(position, climaxTime);
-  } else {
-    // サビ外は予告リングを非表示
-    hideShutterTarget();
-  }
-
-  // シャッターシステム
   const currentChorusStart = taSync.getCurrentChorusStart(position);
   const nextChorus = taSync.getNextChorusStart(position);
   shutterSystem?.update(position, isInChorus, currentChorusStart, nextChorus, word ?? "");
@@ -340,11 +275,10 @@ function openGallery(): void {
   const modal = document.getElementById("gallery-modal");
   if (modal) {
     modal.classList.remove("hidden");
-    // 写真がない場合のメッセージ
     const grid = document.getElementById("gallery-grid");
     if (grid && grid.children.length === 0) {
       grid.innerHTML = `<p style="color:#a0b0d0;text-align:center;padding:40px;">
-        まだ写真がありません。<br>サビのタイミングでシャッターが切られます！
+        まだ思い出がありません。<br>📷 画面をタップして歌詞の瞬間を残そう！
       </p>`;
     }
   }
@@ -353,137 +287,45 @@ function openGallery(): void {
 // ──────────────────────────────────────────────
 // UIヘルパー
 // ──────────────────────────────────────────────
-function updateGameHUD(): void {
-  const scoreEl = document.getElementById("hud-score");
-  const perfEl = document.getElementById("hud-perf-count");
-  const goodEl = document.getElementById("hud-good-count");
-  const missEl = document.getElementById("hud-miss-count");
 
-  if (scoreEl) scoreEl.textContent = score.toString();
-  if (perfEl) perfEl.textContent = perfectCount.toString();
-  if (goodEl) goodEl.textContent = goodCount.toString();
-  if (missEl) missEl.textContent = missCount.toString();
+/** 撮影枚数表示を更新する */
+function updatePhotoCount(): void {
+  const el = document.getElementById("photo-count");
+  if (el) el.textContent = `📷 ${photoCount}枚`;
 }
 
-function showRatingPop(rating: "PERFECT" | "GOOD" | "MISS", scoreText: string): void {
-  const el = document.getElementById("game-rating");
-  if (!el) return;
-
-  // メインテキスト: PERFECT! / GOOD! / MISS
-  el.className = `rating-pop animate ${rating.toLowerCase()}`;
-  el.innerHTML = `<span class="rating-label">${rating}!</span>`
-    + (scoreText ? `<span class="rating-score">${scoreText}</span>` : "");
-
-  setTimeout(() => {
-    el.classList.remove("animate");
-  }, 900);
-}
-
+/** ビートに合わせて歌詞とビューファインダーをパルス発光させる */
 function triggerBeatPulse(): void {
-  // Pulse the lyric word
   const lyricWord = document.getElementById("lyric-word");
   if (lyricWord) {
     lyricWord.classList.remove("beat-pulse");
-    void lyricWord.offsetWidth; // Force reflow
+    void lyricWord.offsetWidth; // reflow でアニメーション再開
     lyricWord.classList.add("beat-pulse");
   }
 
-  // Pulse the viewfinder frame (glow effect)
   const vfFrame = document.querySelector(".vf-frame") as HTMLElement;
   if (vfFrame) {
     vfFrame.classList.remove("beat-pulse-glow");
-    void vfFrame.offsetWidth; // Force reflow
+    void vfFrame.offsetWidth;
     vfFrame.classList.add("beat-pulse-glow");
   }
 }
 
 /**
- * シャッターターゲットリングの表示を更新する。
- * climaxTime に向かってリングが収束し、「今だ！」の前後に発光する。
- * 判定定数 HIT_WINDOW/GOOD_WINDOW をリング制御と共有する。
+ * ウェルカムオーバーレイを表示し、3秒後に自動フェードアウト。
+ * リリックアプリの世界観をひと言で伝える。
  */
-function updateShutterTarget(position: number, climaxTime: number | null): void {
-  const ring = document.getElementById("shutter-ring");
-  const center = document.getElementById("shutter-center");
-  const tapLabel = document.getElementById("shutter-tap-label");
-  if (!ring || !center) return;
-
-  if (climaxTime === null) {
-    hideShutterTarget();
-    return;
-  }
-
-  const remaining = climaxTime - position; // ms
-  const MAX_AHEAD = 2500; // リングを出始めるからの時間(ms)
-
-  if (remaining > MAX_AHEAD || remaining < -HIT_WINDOW * 2) {
-    // 遠すぎるまたは過ぎた → 非表示
-    hideShutterTarget();
-    return;
-  }
-
-  // リングと中心枚を表示
-  ring.style.display = "block";
-  center.style.display = "block";
-
-  if (Math.abs(remaining) <= HIT_WINDOW) {
-    // 「今だ！」 — PERFECT判定範囲と完全一致してマゼンタ発光
-    ring.style.transform = "translate(-50%, -50%) scale(1.0)";
-    ring.style.opacity = "1";
-    ring.style.borderColor = "#e879f9";
-    ring.style.boxShadow = "0 0 32px 10px #e879f9, 0 0 80px 28px rgba(232,121,249,0.5)";
-    center.style.borderColor = "#e879f9";
-    center.style.boxShadow = "0 0 20px 6px #e879f9";
-    // TAPラベルを山形大に点滅させる
-    if (tapLabel) {
-      tapLabel.style.display = "block";
-      tapLabel.classList.add("tap-now");
-    }
-  } else {
-    // 収束中: remaining が大きいほどリングが大きく薄い
-    const t = Math.max(0, Math.min(1, 1 - remaining / MAX_AHEAD)); // 0（遠）→1（密着）
-    const scale = 2.0 - t * 1.0; // 2.0 → 1.0
-    const opacity = 0.3 + t * 0.7; // 0.3 → 1.0
-    ring.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
-    ring.style.opacity = opacity.toFixed(3);
-    ring.style.borderColor = "#22d3ee";
-    ring.style.boxShadow = `0 0 ${8 + t * 16}px ${2 + t * 6}px #22d3ee`;
-    center.style.borderColor = "#22d3ee";
-    center.style.boxShadow = "0 0 8px 2px #22d3ee";
-    // TAPラベルは残り500ms未満で登場
-    if (tapLabel) {
-      tapLabel.classList.remove("tap-now");
-      tapLabel.style.display = remaining < 500 ? "block" : "none";
-    }
-  }
-}
-
-/** シャッターターゲットリングを非表示にする */
-function hideShutterTarget(): void {
-  const ring = document.getElementById("shutter-ring");
-  const center = document.getElementById("shutter-center");
-  const tapLabel = document.getElementById("shutter-tap-label");
-  if (ring) ring.style.display = "none";
-  if (center) center.style.display = "none";
-  if (tapLabel) { tapLabel.style.display = "none"; tapLabel.classList.remove("tap-now"); }
-}
-
-/**
- * ゲームルール説明オーバーレイを表示し、3秒後に自動フェードアウト。
- * startApp 後に onReady のタイミングで一度だけ呼ぶ。
- */
-function showRuleOverlay(): void {
+function showWelcomeOverlay(): void {
   const el = document.getElementById("rule-overlay");
   if (!el) return;
   el.classList.remove("hidden");
   el.classList.add("fade-in");
-  // 3秒後にフェードアウト
   setTimeout(() => {
     el.classList.add("fade-out");
     setTimeout(() => {
       el.classList.add("hidden");
       el.classList.remove("fade-in", "fade-out");
-    }, 600); // フェードアウトアニメーション時間
+    }, 600);
   }, 3000);
 }
 

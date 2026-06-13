@@ -7,7 +7,7 @@ export type ShutterPhoto = {
   dataUrl: string;
   timestamp: number;
   lyric: string;
-  rating?: "PERFECT" | "GOOD" | "MISS" | "AUTO";
+  // rating は廃止 — コレクション型のため判定なし
 };
 
 export class ShutterSystem {
@@ -127,8 +127,8 @@ export class ShutterSystem {
     this.viewfinderEl.classList.remove("visible", "locked");
   }
 
-  /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成 */
-  async shoot(currentLyric: string, rating: "PERFECT" | "GOOD" | "MISS" | "AUTO" = "AUTO"): Promise<void> {
+  /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成（記念コレクション用） */
+  async shoot(currentLyric: string): Promise<void> {
     if (this.shutterCooldown) return;
     this.shutterCooldown = true;
 
@@ -146,7 +146,7 @@ export class ShutterSystem {
         dataUrl,
         timestamp: Date.now(),
         lyric: currentLyric,
-        rating,
+        // rating なし — 思い出コレクションとして保存
       };
       this.photos.push(photo);
       this.addPolaroidToStack(photo);
@@ -218,32 +218,13 @@ export class ShutterSystem {
     caption.className = "polaroid-caption";
     caption.textContent = photo.lyric || "♪";
 
-    // レーティング星の表示
-    const ratingEl = document.createElement("div");
-    ratingEl.className = `polaroid-rating ${photo.rating?.toLowerCase() ?? "auto"}`;
-    if (photo.rating === "PERFECT" || photo.rating === "AUTO") {
-      ratingEl.innerHTML = "⭐⭐⭐ PERFECT";
-    } else if (photo.rating === "GOOD") {
-      ratingEl.innerHTML = "⭐⭐ GOOD";
-    } else {
-      ratingEl.innerHTML = "⭐ MISS";
-    }
-    ratingEl.style.fontSize = "8px";
-    ratingEl.style.marginTop = "2px";
-    ratingEl.style.fontWeight = "bold";
-    ratingEl.style.textAlign = "center";
-    if (photo.rating === "PERFECT" || photo.rating === "AUTO") ratingEl.style.color = "var(--cyan)";
-    else if (photo.rating === "GOOD") ratingEl.style.color = "var(--pink)";
-    else ratingEl.style.color = "var(--amber)";
-
     polaroid.appendChild(img);
     polaroid.appendChild(caption);
-    polaroid.appendChild(ratingEl);
 
     // 新しい写真は一番上に
     this.photoStackEl.insertBefore(polaroid, this.photoStackEl.firstChild);
 
-    // 枚数が多すぎたらスタックから古いものを非表示（メモリ節約）
+    // 枚数が多すぎたら古いものをフェードアウト（メモリ節約）
     if (this.photoStackEl.children.length > 5) {
       const last = this.photoStackEl.lastChild;
       if (last) (last as HTMLElement).style.opacity = "0.3";
@@ -255,7 +236,7 @@ export class ShutterSystem {
     return [...this.photos];
   }
 
-  /** ギャラリーモーダルに写真を展開 */
+  /** ギャラリーモーダルに写真を展開（思い出コレクション表示） */
   showGallery(galleryGridId: string): void {
     const grid = document.getElementById(galleryGridId);
     if (!grid) return;
@@ -271,33 +252,15 @@ export class ShutterSystem {
       const saveBtn = document.createElement("a");
       saveBtn.className = "save-btn";
       saveBtn.href = photo.dataUrl;
-      saveBtn.download = `shutter-chance-${i + 1}.png`;
+      saveBtn.download = `lyric-spark-${i + 1}.png`;
       saveBtn.textContent = "💾 保存";
 
       const cap = document.createElement("div");
       cap.className = "gallery-caption";
       cap.textContent = photo.lyric || "♪";
 
-      // レーティング表示
-      const ratingEl = document.createElement("div");
-      ratingEl.className = `gallery-rating ${photo.rating?.toLowerCase() ?? "auto"}`;
-      if (photo.rating === "PERFECT" || photo.rating === "AUTO") {
-        ratingEl.innerHTML = "⭐⭐⭐ PERFECT";
-        ratingEl.style.color = "var(--cyan)";
-      } else if (photo.rating === "GOOD") {
-        ratingEl.innerHTML = "⭐⭐ GOOD";
-        ratingEl.style.color = "var(--pink)";
-      } else {
-        ratingEl.innerHTML = "⭐ MISS";
-        ratingEl.style.color = "var(--amber)";
-      }
-      ratingEl.style.fontSize = "0.7rem";
-      ratingEl.style.margin = "4px 0";
-      ratingEl.style.fontWeight = "bold";
-
       item.appendChild(img);
       item.appendChild(cap);
-      item.appendChild(ratingEl);
       item.appendChild(saveBtn);
       grid.appendChild(item);
     });

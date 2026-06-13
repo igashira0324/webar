@@ -37,6 +37,8 @@ let lyricDisplay: LyricDisplay | null = null;
 let lyric3d: Lyric3D | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
+let glowLayer: any = null; // サビ長押し極限発光演出用のグローバル参照
+let isHolding = false; // 画面長押し（ホールド）中フラグ
 let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
@@ -119,8 +121,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   // ② GlowLayer（歌詞の発光演出用）
   try {
     const { GlowLayer } = await import("@babylonjs/core");
-    const gl = new GlowLayer("glow", scene);
-    gl.intensity = 0.8;
+    glowLayer = new GlowLayer("glow", scene);
+    glowLayer.intensity = 0.8;
   } catch (e) {
     console.warn("GlowLayer unavailable:", e);
   }
@@ -246,6 +248,20 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       arStartBtn.addEventListener("click", () => enterAR!());
     }
   }
+
+  // ⑪ サビ中の長押し（ホールド）演出イベントリスナー
+  const startHold = () => {
+    if (taSync?.isReady && taSync.isInChorus(currentPosition)) {
+      isHolding = true;
+    }
+  };
+  const stopHold = () => {
+    isHolding = false;
+  };
+  canvas.addEventListener("pointerdown", startHold);
+  canvas.addEventListener("pointerup", stopHold);
+  canvas.addEventListener("pointercancel", stopHold);
+  canvas.addEventListener("pointerout", stopHold);
 }
 
 // ──────────────────────────────────────────────
@@ -255,6 +271,21 @@ function onTick(position: number): void {
   if (!taSync?.isReady) return;
 
   const isInChorus = taSync.isInChorus(position);
+
+  // サビホールドガイドの表示・非表示制御
+  const holdGuide = document.getElementById("chorus-hold-guide");
+  if (holdGuide) {
+    holdGuide.style.display = isInChorus ? "block" : "none";
+  }
+
+  // サビ長押し極限発光演出
+  if (isInChorus && isHolding) {
+    if (glowLayer) glowLayer.intensity = 2.4; // ネオン極限発光
+    lyric3d?.spawnHoldSparks(); // 3D空間にネオン火花を四散
+  } else {
+    if (glowLayer) glowLayer.intensity = isInChorus ? 1.2 : 0.8;
+    if (!isInChorus) isHolding = false; // サビ外ではホールド無効
+  }
 
   // 1. 3D空間の歌詞ポップアップ制御
   const wordObj = taSync.getCurrentWordObj(position);

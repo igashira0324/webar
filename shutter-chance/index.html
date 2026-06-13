@@ -339,6 +339,32 @@
       text-overflow: ellipsis;
     }
 
+    /* ── サビ用ホールドガイド ── */
+    #chorus-hold-guide {
+      position: absolute;
+      bottom: 20%; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 900;
+      color: #ffd700;
+      text-shadow: 0 0 10px #ffd700, 0 0 20px #e879f9;
+      pointer-events: none;
+      animation: pulseNeon 0.8s ease-in-out infinite alternate;
+      z-index: 410;
+      letter-spacing: 2px;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(232, 121, 249, 0.5);
+      box-shadow: 0 0 15px rgba(232, 121, 249, 0.3);
+      display: none; /* JSでサビ時に表示 */
+    }
+    @keyframes pulseNeon {
+      from { transform: translateX(-50%) scale(0.95); opacity: 0.7; }
+      to { transform: translateX(-50%) scale(1.05); opacity: 1; }
+    }
+
     /* ── Fallback banner ── */
     #ar-fallback-banner {
       position: absolute; bottom: 0; left: 0; right: 0; z-index: 80;
@@ -478,6 +504,8 @@
       <div class="vf-corner br"></div>
       <div class="vf-label">AF ○ SHUTTER CHANCE</div>
     </div>
+    <!-- サビ用の長押しガイド -->
+    <div id="chorus-hold-guide">🔥 TOUCH & HOLD FOR GLOW 🔥</div>
   </div>
 
   <!-- Flash overlay -->

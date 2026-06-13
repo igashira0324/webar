@@ -112,6 +112,18 @@ export class TextAliveSync {
     return phrase?.text ?? null;
   }
 
+  /** 現在の発声中のフレーズ情報（テキスト、開始・終了時間）を返す（なければ null）*/
+  getCurrentPhraseInfo(position: number): { text: string; startTime: number; endTime: number } | null {
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);
+    if (!phrase) return null;
+    return {
+      text: phrase.text,
+      startTime: phrase.startTime,
+      endTime: phrase.endTime,
+    };
+  }
+
   /**
    * 現在フレーズの「決めの瞬間」時刻(ms)を返す。
    * フレーズの最後の単語の startTime を「シャッターチャンス」と定義。

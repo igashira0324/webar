@@ -39,6 +39,15 @@ interface LyricWord {
   frozenAt: number | null;
 }
 
+interface SparkParticle {
+  mesh: Mesh;
+  velocity: Vector3;
+  spawnTime: number;
+  duration: number;
+}
+
+
+
 export class Lyric3D {
   private scene: Scene;
   private container: TransformNode;
@@ -50,6 +59,14 @@ export class Lyric3D {
 
   private activeWords: LyricWord[] = [];   // rising / falling
   private settledWords: LyricWord[] = [];  // settled
+
+  // ── フィナーレ演出（舞い上がり）関連
+  private finaleWords: LyricWord[] = [];
+  private finaleActive = false;
+  private finaleStartTime = 0;
+
+  // ── タップエフェクト（光の粒）関連
+  private sparks: SparkParticle[] = [];
 
   // ── 発声フェーズの継続時間 (ms)
   private readonly RISE_DURATION = 2000;
@@ -69,15 +86,24 @@ export class Lyric3D {
     this.container = new TransformNode("lyric3DContainer", this.scene);
     this._syncContainerParent();
 
-    // タップ弾け: PointerObservable でピックされたメッシュを判定
+    // タップ弾け・堆積歌詞タップ演出: PointerObservable でピックされたメッシュを判定
     this.scene.onPointerObservable.add((pi) => {
       if (pi.type !== PointerEventTypes.POINTERTAP) return;
       const pickedMesh = pi.pickInfo?.pickedMesh;
       if (!pickedMesh) return;
-      const hit =
-        this.activeWords.find(w => w.mesh === pickedMesh) ??
-        this.settledWords.find(w => w.mesh === pickedMesh);
-      if (hit && !hit.exploded) this._explode(hit);
+
+      // 堆積（settled）状態の歌詞をタップした場合
+      const settledHit = this.settledWords.find(w => w.mesh === pickedMesh);
+      if (settledHit) {
+        this._triggerSettledTapEffect(settledHit);
+        return;
+      }
+
+      // 発声・降下（active）状態の歌詞をタップした場合
+      const activeHit = this.activeWords.find(w => w.mesh === pickedMesh);
+      if (activeHit && !activeHit.exploded) {
+        this._explode(activeHit);
+      }
     });
   }
 
@@ -115,8 +141,9 @@ export class Lyric3D {
 
     // ── Plane メッシュ
     const charCount = [...text].length;
-    const pw = Math.max(0.9, charCount * (isChorus ? 0.55 : 0.42));
-    const ph = isChorus ? 1.0 : 0.8;
+    // 長いフレーズが来ても巨大になりすぎないよう制限（幅最大2.8m）
+    const pw = Math.max(0.8, Math.min(2.8, charCount * (isChorus ? 0.22 : 0.18)));
+    const ph = isChorus ? 0.7 : 0.55;
     const plane = MeshBuilder.CreatePlane("lyric", { width: pw, height: ph }, this.scene);
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
     plane.parent = this.container;
@@ -134,13 +161,17 @@ export class Lyric3D {
     plane.material = mat;
 
     // ── テクスチャ / テキスト
-    const texW = Math.max(512, charCount * 120);
-    const texH = isChorus ? 300 : 240;
+    // 解像度も大きくなりすぎないように制限（最大1024）
+    const texW = Math.max(512, Math.min(1024, charCount * 60));
+    const texH = isChorus ? 200 : 160;
     const tex = AdvancedDynamicTexture.CreateForMesh(plane, texW, texH, false);
     const tb = new TextBlock();
     tb.text = text;
     tb.fontFamily = "'Orbitron', 'Noto Sans JP', sans-serif";
-    tb.fontSize = isChorus ? "130px" : "110px";
+    // 文字数に応じてフォントサイズを動的に縮小する
+    const baseFontSize = isChorus ? 100 : 80;
+    const calculatedFontSize = Math.max(36, Math.min(baseFontSize, Math.floor((texW / charCount) * 1.3)));
+    tb.fontSize = `${calculatedFontSize}px`;
     tb.fontWeight = "bold";
     tb.color = isChorus ? "#f0abfc" : "#67e8f9";
     tb.shadowColor = isChorus ? "rgba(240,171,252,0.9)" : "rgba(103,232,249,0.9)";
@@ -182,6 +213,62 @@ export class Lyric3D {
 
     const now = Date.now();
 
+    // ── Sparks の更新（タップ時の光の粒）
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const s = this.sparks[i];
+      const elapsed = now - s.spawnTime;
+      if (elapsed >= s.duration) {
+        s.mesh.dispose();
+        s.mesh.material?.dispose();
+        this.sparks.splice(i, 1);
+      } else {
+        s.velocity.y -= 0.08; // 簡易重力
+        s.mesh.position.addInPlace(s.velocity.scale(0.016));
+        const t = elapsed / s.duration;
+        s.mesh.visibility = 1 - t;
+        s.mesh.scaling.setAll(1 - t * 0.5);
+      }
+    }
+
+    // ── フィナーレ演出（舞い上がり）の更新
+    if (this.finaleActive) {
+      const elapsed = now - this.finaleStartTime;
+      const DURATION = 3000; // 3秒間舞い上がる
+      
+      if (elapsed >= DURATION) {
+        // フィナーレ終了、すべてのメッシュを破棄
+        this.finaleWords.forEach(w => this._dispose(w));
+        this.finaleWords = [];
+        this.finaleActive = false;
+        console.log("[Lyric3D] Finale ended, all words disposed.");
+      } else {
+        const t = elapsed / DURATION; // 0〜1
+        const easedRise = Math.pow(t, 1.5); // 加速上昇
+        
+        for (const w of this.finaleWords) {
+          // 上方へ舞い上がる
+          const startY = (w as any)._finaleStartY ?? w.mesh.position.y;
+          if ((w as any)._finaleStartY === undefined) {
+            (w as any)._finaleStartY = startY;
+          }
+          w.mesh.position.y = startY + easedRise * 3.5;
+          
+          // 中心（0, 0）から少し外側に広がる
+          const dir = new Vector3(w.mesh.position.x, 0, w.mesh.position.z).normalize();
+          w.mesh.position.addInPlace(dir.scale(0.012)); // 徐々に広がる
+          
+          // フェードアウト
+          w.textBlock.alpha = Math.max(0, (w.textBlock.alpha ?? 0.45) * (1 - t * 0.08));
+          w.mesh.visibility = 1 - t;
+          
+          // 舞い上がり中もビートパルスは一応反応するように
+          w.beatScale *= 0.85;
+          w.mesh.scaling.setAll(Math.max(0, (0.55 + w.beatScale) * (1 - t * 0.4)));
+        }
+      }
+      return; // フィナーレ中は通常の activeWords 等の更新はスキップ
+    }
+
     // ── activeWords (rising / falling) の処理
     for (let i = this.activeWords.length - 1; i >= 0; i--) {
       const w = this.activeWords[i];
@@ -214,9 +301,26 @@ export class Lyric3D {
       }
     }
 
-    // ── settledWords のビートパルス減衰
+    // ── settledWords の更新
     for (const w of this.settledWords) {
-      w.beatScale *= 0.82;
+      if ((w as any).tapEffectActive) {
+        (w as any).tapEffectProgress += 0.06; // アニメーション速度
+        const progress = (w as any).tapEffectProgress;
+        if (progress >= 1.0) {
+          (w as any).tapEffectActive = false;
+          // 元の色に戻す
+          w.material.emissiveColor = w.isChorus
+            ? new Color3(0.95, 0.3, 1.0)
+            : new Color3(0.0, 0.85, 1.0);
+          w.textBlock.color = w.isChorus ? "#f0abfc" : "#67e8f9";
+          w.beatScale = 0;
+        } else {
+          // スケールバウンド（一瞬大きく膨らんで戻る）
+          w.beatScale = Math.sin(progress * Math.PI) * 0.45; // 最大+0.45
+        }
+      } else {
+        w.beatScale *= 0.82;
+      }
       const baseScale = 0.55;
       w.mesh.scaling.setAll(Math.max(0, baseScale + w.beatScale));
     }
@@ -224,12 +328,15 @@ export class Lyric3D {
 
   /** ビートに合わせて全アクティブ単語を一瞬拡大 */
   triggerBeatPulse(): void {
+    if (this.finaleActive) return;
     for (const w of this.activeWords) {
       if (!w.exploded) w.beatScale = 0.18;
     }
     // 積もっている単語もかすかに反応
     for (const w of this.settledWords) {
-      w.beatScale = 0.07;
+      if (!(w as any).tapEffectActive) {
+        w.beatScale = 0.07;
+      }
     }
   }
 
@@ -241,11 +348,33 @@ export class Lyric3D {
   /** ホールド火花（Phase 2 で実装予定のスタブ） */
   spawnHoldSparks(): void { /* Phase 2 で実装 */ }
 
-  /** 全単語（active + settled）を破棄してリセット */
-  clear(): void {
-    [...this.activeWords, ...this.settledWords].forEach(w => this._dispose(w));
+  /** 曲終わりの舞い上がり演出をトリガーする */
+  triggerFinale(): void {
+    if (this.finaleActive) return;
+    this.finaleActive = true;
+    this.finaleStartTime = Date.now();
+    
+    // 全単語をフィナーレ用リストに退避
+    this.finaleWords = [...this.activeWords, ...this.settledWords];
     this.activeWords = [];
     this.settledWords = [];
+    
+    console.log(`[Lyric3D] Finale triggered. Total words rising: ${this.finaleWords.length}`);
+  }
+
+  /** 全単語（active + settled + finale + sparks）を破棄してリセット */
+  clear(): void {
+    [...this.activeWords, ...this.settledWords, ...this.finaleWords].forEach(w => this._dispose(w));
+    this.activeWords = [];
+    this.settledWords = [];
+    this.finaleWords = [];
+    
+    this.sparks.forEach(s => {
+      s.mesh.dispose();
+      s.mesh.material?.dispose();
+    });
+    this.sparks = [];
+    this.finaleActive = false;
   }
 
   // ────────────────────────────────────────
@@ -377,5 +506,44 @@ export class Lyric3D {
     w.texture.dispose();
     w.material.dispose();
     w.mesh.dispose();
+  }
+
+  /** 堆積した歌詞をタップしたときの光エフェクトとバウンド */
+  private _triggerSettledTapEffect(w: LyricWord): void {
+    if ((w as any).tapEffectActive) return;
+    (w as any).tapEffectActive = true;
+    (w as any).tapEffectProgress = 0;
+    
+    // 一時的に超発光マゼンタ（または白）に変更
+    w.material.emissiveColor = new Color3(1.5, 0.4, 1.5);
+    w.textBlock.color = "#ffffff";
+
+    // 周囲に光の粒（Spark）を散らす
+    const pos = w.mesh.position;
+    for (let i = 0; i < 5; i++) {
+      const spark = MeshBuilder.CreateBox("spark", { size: 0.04 }, this.scene);
+      const mat = new StandardMaterial("spark-mat", this.scene);
+      mat.disableLighting = true;
+      // サビかどうかに応じて逆のネオン色に
+      mat.emissiveColor = w.isChorus ? new Color3(0.0, 0.9, 1.0) : new Color3(1.0, 0.4, 0.9);
+      spark.material = mat;
+      spark.position.copyFrom(pos);
+
+      // 3Dランダムな方向に速度を決定
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 0.8;
+      const velocity = new Vector3(
+        Math.cos(angle) * speed,
+        0.4 + Math.random() * 0.9, // 上方向
+        Math.sin(angle) * speed
+      );
+
+      this.sparks.push({
+        mesh: spark,
+        velocity,
+        spawnTime: Date.now(),
+        duration: 400 + Math.random() * 300
+      });
+    }
   }
 }

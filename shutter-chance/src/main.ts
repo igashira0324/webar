@@ -42,7 +42,8 @@ let isHolding = false;
 let currentPosition = 0;      // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
-let lastWordObjText = "";     // 3D歌詞の重複ポップアップ防止トラッキング
+let lastPhraseStartTime = -1; // 3D歌詞の重複ポップアップ防止用フレーズ開始時刻トラッキング
+let finaleTriggered = false;   // 曲終わりのフィナーレ演出が発火したかどうかのフラグ
 
 // ── フリーズモード（光のシャッターで時を止める）
 let isFrozen = false;          // フリーズ中フラグ
@@ -186,6 +187,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       // 時止めボタンを表示
       freezeShootBtnEl?.classList.remove("hidden");
       updateFreezeShootBtn();
+      // 再生開始時にフィナーレフラグをリセット
+      finaleTriggered = false;
     },
     onPause: () => {
       isPlaying = false;
@@ -200,8 +203,10 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       if (isFrozen) exitFreezeMode();
       // 時止めボタンを非表示
       freezeShootBtnEl?.classList.add("hidden");
-      // 3D歌詞をクリア
-      lyric3d?.clear();
+      // 3D歌詞をクリア（フィナーレ演出中であれば消去をスキップして余韻を残す）
+      if (!finaleTriggered) {
+        lyric3d?.clear();
+      }
       // 曲終了 → ギャラリー表示
       setTimeout(() => openGallery(), 1500);
     },
@@ -294,6 +299,14 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     exitFreezeMode();
   });
 
+  // ⑪ Fキーによるフィナーレ演出（舞い上がり）のデバッグ強制発火用ショートカット
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "KeyF" && !e.repeat) {
+      console.log("[main] Debug key F: Triggering finale manually");
+      triggerFinale();
+    }
+  });
+
   // ⑩ AR起動ボタン（ARモード時）
   if (mode === "ar" && enterAR) {
     const arStartBtn = document.getElementById("ar-start-btn");
@@ -341,15 +354,20 @@ function onTick(position: number): void {
   isHolding = false;
 
   // 1. 3D空間の歌詞ポップアップ制御
-  const wordObj = taSync.getCurrentWordObj(position);
-  if (wordObj) {
-    if (wordObj.text !== lastWordObjText) {
-      lastWordObjText = wordObj.text;
-      // 3D空間に単語をポップアップ（表示時間は lyric3d 内部で管理）
-      lyric3d?.spawnWord(wordObj.text, 0, isInChorus);
+  const phraseInfo = taSync.getCurrentPhraseInfo(position);
+  if (phraseInfo) {
+    if (phraseInfo.startTime !== lastPhraseStartTime) {
+      lastPhraseStartTime = phraseInfo.startTime;
+      const text = phraseInfo.text.trim();
+      // 助詞単独（1文字の「の」「を」「て」「に」「は」「が」「と」「も」「で」「や」「た」「し」など）はスキップするフィルタ
+      const particleFilter = /^[のをてにはがともでやたし]$/;
+      if (text.length > 0 && !particleFilter.test(text)) {
+        // 3D空間にフレーズをポップアップ（表示時間は lyric3d 内部で管理）
+        lyric3d?.spawnWord(text, 0, isInChorus);
+      }
     }
   } else {
-    lastWordObjText = "";
+    lastPhraseStartTime = -1;
   }
 
   // 毎フレーム 3D歌詞のアニメーション（フェードアウト、上昇等）を更新
@@ -372,6 +390,22 @@ function onTick(position: number): void {
   const currentChorusStart = taSync.getCurrentChorusStart(position);
   const nextChorus = taSync.getNextChorusStart(position);
   shutterSystem?.update(position, isInChorus, currentChorusStart, nextChorus, word ?? "");
+
+  // 3. 曲終わりの舞い上がりエンディング演出の監視
+  if (taSync?.isReady && !finaleTriggered) {
+    const duration = taSync.getDuration();
+    if (duration > 0 && (duration - position) < 2500) {
+      triggerFinale();
+    }
+  }
+}
+
+/** 曲終わりの舞い上がりフィナーレ演出をトリガーする */
+function triggerFinale(): void {
+  if (finaleTriggered) return;
+  finaleTriggered = true;
+  console.log("[main] Triggering Finale Lyric Rise...");
+  lyric3d?.triggerFinale();
 }
 
 // ──────────────────────────────────────────────

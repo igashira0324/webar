@@ -97,13 +97,14 @@ export class ShutterSystem {
       this.showViewfinder();
     }
 
-    // サビ突入: 自動シャッター（サビごとに1回）
+    // サビ中: 自動撮影は廃止。ビューファインダー枠の表示のみ行う。
+    // 撮影はプレイヤーのタップ/スペースキーのみで発生する（スコアを操作と直結させるため）
     if (isInChorus && currentChorusStart !== -1) {
-      // 現在のサビ開始時刻をキーとして1度だけシャッターを切る
-      if (currentChorusStart !== this.lastChorusStart && !this.shutterCooldown) {
+      // 新しいサビに入ったときにだけ lastChorusStart を更新（状態管理のため残す）
+      if (currentChorusStart !== this.lastChorusStart) {
         this.lastChorusStart = currentChorusStart;
-        this.shoot(currentLyric, "AUTO");
       }
+      // ビューファインダー枠はサビ中も表示し続ける（「チャンス区間」の視覚的提示）
     } else if (!isInChorus) {
       // サビ外でビューファインダーを非表示
       if (this.viewfinderVisible) {

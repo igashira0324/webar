@@ -46,6 +46,13 @@ let perfectCount = 0;
 let goodCount = 0;
 let missCount = 0;
 
+// ── タイミング判定算・リング収束で共有する定数 ──
+// この値を変えるとリングの「今だ！」為の発光範囲とPERFECT判定が同時に変わる
+/** リングが「今だ！」になる範囲（ms）= PERFECT判定と完全一致 */
+const HIT_WINDOW = 120;
+/** GOOD判定の上限（ms）*/
+const GOOD_WINDOW = 300;
+
 // ──────────────────────────────────────────────
 // 初期化
 // ──────────────────────────────────────────────
@@ -215,23 +222,20 @@ async function startApp(mode: "ar" | "studio") {
   lyricDisplay = new LyricDisplay("lyric-word", "lyric-phrase");
   shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
 
-  // 手動撮影コールバック
+  // 手動撮影コールバック（判定基準を climaxTime に統一）
   shutterSystem.setManualShutterCallback(() => {
     const lyric = lyricDisplay ? (document.getElementById("lyric-word")?.textContent ?? "") : "";
-    
-    // リズム判定計算
+
+    // climaxTime を判定基準とする（リングの「今だ！」と完全一致）
     let rating: "PERFECT" | "GOOD" | "MISS" = "MISS";
     if (taSync && taSync.isReady) {
-      const pos = taSync.getPosition();
-      const beat = taSync.getCurrentBeat(pos);
-      if (beat) {
-        const distToCurrentBeat = Math.abs(pos - beat.startTime);
-        const distToNextBeat = Math.abs(pos - (beat.startTime + beat.duration));
-        const timingOffset = Math.min(distToCurrentBeat, distToNextBeat);
-        
-        if (timingOffset < 80) {
-          rating = "PERFECT";
-        } else if (timingOffset < 180) {
+      const pos = currentPosition; // onTimeUpdateで更新される精度の高い値
+      const climaxTime = taSync.getPhraseClimaxTime(pos);
+      if (climaxTime !== null) {
+        const offset = Math.abs(pos - climaxTime);
+        if (offset <= HIT_WINDOW) {
+          rating = "PERFECT"; // リングが「今だ！」になった瞬間と同じ範囲
+        } else if (offset <= GOOD_WINDOW) {
           rating = "GOOD";
         }
       }
@@ -241,18 +245,18 @@ async function startApp(mode: "ar" | "studio") {
 
   // 撮影成功時のスコア処理・HUD更新コールバック
   shutterSystem.setOnPhotoCapturedCallback((photo) => {
-    const rating = photo.rating === "AUTO" ? "PERFECT" : (photo.rating ?? "MISS");
+    const rating = photo.rating ?? "MISS";
     if (rating === "PERFECT") {
       score += 1000;
       perfectCount++;
-      showRatingPop("PERFECT");
+      showRatingPop("PERFECT", "+1000");
     } else if (rating === "GOOD") {
       score += 500;
       goodCount++;
-      showRatingPop("GOOD");
+      showRatingPop("GOOD", "+500");
     } else if (rating === "MISS") {
       missCount++;
-      showRatingPop("MISS");
+      showRatingPop("MISS", "");
     }
     updateGameHUD();
   });
@@ -361,15 +365,18 @@ function updateGameHUD(): void {
   if (missEl) missEl.textContent = missCount.toString();
 }
 
-function showRatingPop(rating: "PERFECT" | "GOOD" | "MISS"): void {
+function showRatingPop(rating: "PERFECT" | "GOOD" | "MISS", scoreText: string): void {
   const el = document.getElementById("game-rating");
   if (!el) return;
+
+  // メインテキスト: PERFECT! / GOOD! / MISS
   el.className = `rating-pop animate ${rating.toLowerCase()}`;
-  el.textContent = rating + "!";
-  
+  el.innerHTML = `<span class="rating-label">${rating}!</span>`
+    + (scoreText ? `<span class="rating-score">${scoreText}</span>` : "");
+
   setTimeout(() => {
     el.classList.remove("animate");
-  }, 800);
+  }, 900);
 }
 
 function triggerBeatPulse(): void {
@@ -393,10 +400,12 @@ function triggerBeatPulse(): void {
 /**
  * シャッターターゲットリングの表示を更新する。
  * climaxTime に向かってリングが収束し、「今だ！」の前後に発光する。
+ * 判定定数 HIT_WINDOW/GOOD_WINDOW をリング制御と共有する。
  */
 function updateShutterTarget(position: number, climaxTime: number | null): void {
   const ring = document.getElementById("shutter-ring");
   const center = document.getElementById("shutter-center");
+  const tapLabel = document.getElementById("shutter-tap-label");
   if (!ring || !center) return;
 
   if (climaxTime === null) {
@@ -405,33 +414,34 @@ function updateShutterTarget(position: number, climaxTime: number | null): void 
   }
 
   const remaining = climaxTime - position; // ms
-
-  // 待機時間の上限: 2500ms 先からリングを出す
-  const MAX_AHEAD = 2500;
-  // 「今だ！」判定範囲: クライマックスの ±120ms 以内
-  const HIT_WINDOW = 120;
+  const MAX_AHEAD = 2500; // リングを出始めるからの時間(ms)
 
   if (remaining > MAX_AHEAD || remaining < -HIT_WINDOW * 2) {
-    // 遠すぎる / 過ぎた → 非表示
+    // 遠すぎるまたは過ぎた → 非表示
     hideShutterTarget();
     return;
   }
 
-  // 表示する
+  // リングと中心枚を表示
   ring.style.display = "block";
   center.style.display = "block";
 
   if (Math.abs(remaining) <= HIT_WINDOW) {
-    // 「今だ！」 — リングが中心枚と重なり、強いグロー
+    // 「今だ！」 — PERFECT判定範囲と完全一致してマゼンタ発光
     ring.style.transform = "translate(-50%, -50%) scale(1.0)";
     ring.style.opacity = "1";
     ring.style.borderColor = "#e879f9";
-    ring.style.boxShadow = "0 0 24px 8px #e879f9, 0 0 60px 20px rgba(232,121,249,0.5)";
+    ring.style.boxShadow = "0 0 32px 10px #e879f9, 0 0 80px 28px rgba(232,121,249,0.5)";
     center.style.borderColor = "#e879f9";
-    center.style.boxShadow = "0 0 16px 4px #e879f9";
+    center.style.boxShadow = "0 0 20px 6px #e879f9";
+    // TAPラベルを山形大に点滅させる
+    if (tapLabel) {
+      tapLabel.style.display = "block";
+      tapLabel.classList.add("tap-now");
+    }
   } else {
     // 収束中: remaining が大きいほどリングが大きく薄い
-    const t = Math.max(0, Math.min(1, 1 - remaining / MAX_AHEAD)); // 0（1遠）→1（くっつく）
+    const t = Math.max(0, Math.min(1, 1 - remaining / MAX_AHEAD)); // 0（遠）→1（密着）
     const scale = 2.0 - t * 1.0; // 2.0 → 1.0
     const opacity = 0.3 + t * 0.7; // 0.3 → 1.0
     ring.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
@@ -440,6 +450,11 @@ function updateShutterTarget(position: number, climaxTime: number | null): void 
     ring.style.boxShadow = `0 0 ${8 + t * 16}px ${2 + t * 6}px #22d3ee`;
     center.style.borderColor = "#22d3ee";
     center.style.boxShadow = "0 0 8px 2px #22d3ee";
+    // TAPラベルは残り500ms未満で登場
+    if (tapLabel) {
+      tapLabel.classList.remove("tap-now");
+      tapLabel.style.display = remaining < 500 ? "block" : "none";
+    }
   }
 }
 
@@ -447,8 +462,10 @@ function updateShutterTarget(position: number, climaxTime: number | null): void 
 function hideShutterTarget(): void {
   const ring = document.getElementById("shutter-ring");
   const center = document.getElementById("shutter-center");
+  const tapLabel = document.getElementById("shutter-tap-label");
   if (ring) ring.style.display = "none";
   if (center) center.style.display = "none";
+  if (tapLabel) { tapLabel.style.display = "none"; tapLabel.classList.remove("tap-now"); }
 }
 
 /**

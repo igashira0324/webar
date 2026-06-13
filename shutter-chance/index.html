@@ -201,6 +201,27 @@
       box-shadow: 0 0 8px 2px #22d3ee;
       pointer-events: none;
       z-index: 450;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* TAP!ラベル: 「今だ！」の成┌迄に登場し点滅 */
+    #shutter-tap-label {
+      display: none;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 900;
+      color: #22d3ee;
+      text-shadow: 0 0 8px #22d3ee;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+    }
+    @keyframes tapNowPulse {
+      0%,100% { transform: scale(1.0); opacity: 1; color: #e879f9; text-shadow: 0 0 12px #e879f9; }
+      50%      { transform: scale(1.4); opacity: 0.7; color: #fff; text-shadow: 0 0 20px #e879f9; }
+    }
+    #shutter-tap-label.tap-now {
+      animation: tapNowPulse 0.25s ease-in-out infinite;
     }
 
     /* ── ルール説明オーバーレイ ── */
@@ -216,6 +237,47 @@
       pointer-events: none;
     }
     #rule-overlay.hidden { display: none; }
+
+    /* ゲームレーティングポップ */
+    #game-rating {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    /* メインラベル: PERFECT! / GOOD! / MISS */
+    .rating-label {
+      display: block;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+    /* スコア加算テキスト: +1000 / +500 */
+    .rating-score {
+      display: block;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-top: 4px;
+      opacity: 0.9;
+    }
+    @keyframes ratingPop {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.6); }
+      20%  { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+      80%  { opacity: 1; transform: translate(-50%,-50%) scale(1.0); }
+      100% { opacity: 0; transform: translate(-50%,-50%) scale(0.9); }
+    }
+    .rating-pop.animate { animation: ratingPop 0.9s ease-out forwards; }
+    /* 各レーティングの色 */
+    .rating-pop.perfect .rating-label { color: #ffd700; text-shadow: 0 0 16px #ffd700, 0 0 40px rgba(255,215,0,0.6); }
+    .rating-pop.perfect .rating-score { color: #ffd700; }
+    .rating-pop.good    .rating-label { color: #22d3ee; text-shadow: 0 0 12px #22d3ee; }
+    .rating-pop.good    .rating-score { color: #22d3ee; }
+    .rating-pop.miss    .rating-label { color: #888;    font-size: 1.3rem; }
+    .rating-pop.miss    .rating-score { display: none; }
+
     #rule-overlay .rule-box {
       max-width: 520px;
       padding: 36px 40px;
@@ -529,7 +591,9 @@
 
   <!-- シャッターターゲット（予告リング）: JSのupdateShutterTarget()で制御される -->
   <div id="shutter-ring"></div>
-  <div id="shutter-center"></div>
+  <div id="shutter-center">
+    <span id="shutter-tap-label">TAP!</span>
+  </div>
 
   <!-- ルール説明オーバーレイ: onReady後に3秒表示して自動消える -->
   <div id="rule-overlay" class="hidden">

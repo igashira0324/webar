@@ -2,7 +2,7 @@ const QRCode = require('qrcode');
 
 QRCode.toFile(
   'public/assets/marker_qr.png',
-  'https://webar-git-master-igashira0324s-projects.vercel.app/', // Fixed to stable master domain
+  'https://webar-coral.vercel.app/', // Vercel本番ドメインに統一
   {
     color: {
       dark: '#000000',

@@ -2,10 +2,13 @@ import QRCode from 'qrcode';
 import fs from 'fs';
 import path from 'path';
 
-// URL to be encoded (Likely Vercel URL based on repo name)
-const url = 'https://webar-igashira0324.vercel.app/exhibition-vol5/'; 
+import { fileURLToPath } from 'url';
 
-const outputPath = path.join(process.cwd(), 'qr-archive.png');
+// URL to be encoded (Likely Vercel URL based on repo name)
+const url = 'https://webar-coral.vercel.app/exhibition-vol5/'; 
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const outputPath = path.resolve(__dirname, '../qr-archive.png');
 
 async function generateQR() {
   try {

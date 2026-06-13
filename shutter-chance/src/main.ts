@@ -307,8 +307,8 @@ function onTick(position: number): void {
   if (wordObj) {
     if (wordObj.text !== lastWordObjText) {
       lastWordObjText = wordObj.text;
-      // 3D空間に単語をポップアップ（3000ms 固定寿命で、確実に見せる）
-      lyric3d?.spawnWord(wordObj.text, 3000, isInChorus);
+      // 3D空間に単語をポップアップ（表示時間は lyric3d 内部で管理）
+      lyric3d?.spawnWord(wordObj.text, 0, isInChorus);
     }
   } else {
     lastWordObjText = "";
@@ -326,7 +326,8 @@ function onTick(position: number): void {
   const beat = taSync.getCurrentBeat(position);
   if (beat && beat.index !== lastBeatIndex) {
     lastBeatIndex = beat.index;
-    triggerBeatPulse();
+    triggerBeatPulse();         // DOM歌詞 / ビューファインダーのパルス
+    lyric3d?.triggerBeatPulse(); // 3D歌詞パネルも一瞬拡大させる
   }
 
   // シャッターシステム（ビューファインダー表示制御）

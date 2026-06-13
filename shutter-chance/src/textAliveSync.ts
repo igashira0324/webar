@@ -155,6 +155,11 @@ export class TextAliveSync {
     return this.player?.video?.duration ?? 0;
   }
 
+  /** 現在の再生位置(ms)を返す */
+  getPosition(): number {
+    return this.player?.timer?.position ?? 0;
+  }
+
   getPlayer(): Player | null {
     return this.player;
   }

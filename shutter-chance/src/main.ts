@@ -38,6 +38,13 @@ let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
 let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
+let lastBeatIndex = -1;
+
+// タイミングゲームの得点状態
+let score = 0;
+let perfectCount = 0;
+let goodCount = 0;
+let missCount = 0;
 
 // ──────────────────────────────────────────────
 // 初期化
@@ -121,7 +128,8 @@ async function startApp(mode: "ar" | "studio") {
 
   // ④ MMDランタイム + ミクモデル + VMDロード
   mmdRuntime = new MmdRuntime(scene);
-  mmdRuntime.register(scene);
+  // NOTE: 手動で毎フレームのアニメーション・物理・IKの更新サイクルを制御するため、
+  // mmdRuntime.register(scene) による自動登録は意図的に行いません。
 
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
@@ -174,8 +182,8 @@ async function startApp(mode: "ar" | "studio") {
       setTimeout(() => openGallery(), 1500);
     },
     onTimeUpdate: (pos) => {
+      // currentPosition はフォールバック用。精度の高い位置は onBeforeRenderObservable で取得する
       currentPosition = pos;
-      onTick(pos);
     },
     onError: (e) => {
       console.error("[TextAlive]", e);
@@ -187,16 +195,25 @@ async function startApp(mode: "ar" | "studio") {
 
   await taSync.init(mediaEl);
 
-  // ⑥ TextAlive position (mediaEl.currentTime) をマスタークロックとしてMMD同期
+  // ⑥ TextAlive timer.position をマスタークロックとして毎フレームMMD同期
+  // onTimeUpdate より高精度な timer.position を使い、歌詞・シャッター・MMD骨格を一括更新する
   scene.onBeforeRenderObservable.add(() => {
+    if (!taSync?.isReady) return;
+
+    // isPlaying でなくても位置更新はする（シーク後の静止フレーム表示のため）
+    const pos = isPlaying ? taSync.getPosition() : currentPosition;
+    onTick(pos);
+
     if (!isPlaying || !mmdRuntime) return;
-    const media = document.getElementById("textalive-media") as HTMLAudioElement;
-    if (media) {
-      const pos = media.currentTime * 1000;
-      currentPosition = pos;
-      onTick(pos);
-      const targetFrame = (pos / 1000) * 30;
-      mmdRuntime.seekAnimation(targetFrame, true);
+    currentPosition = pos;
+    const targetFrame = (pos / 1000) * 30;
+
+    // seekAnimation(forceEvaluate=true) でモーション評価 → beforePhysics/afterPhysics で IK・物理解決
+    mmdRuntime.seekAnimation(targetFrame, true);
+    const models = mmdRuntime.models;
+    for (let i = 0; i < models.length; ++i) {
+      models[i].beforePhysics(targetFrame);
+      models[i].afterPhysics();
     }
   });
 
@@ -207,7 +224,43 @@ async function startApp(mode: "ar" | "studio") {
   // 手動撮影コールバック
   shutterSystem.setManualShutterCallback(() => {
     const lyric = lyricDisplay ? (document.getElementById("lyric-word")?.textContent ?? "") : "";
-    shutterSystem?.shoot(lyric);
+    
+    // リズム判定計算
+    let rating: "PERFECT" | "GOOD" | "MISS" = "MISS";
+    if (taSync && taSync.isReady) {
+      const pos = taSync.getPosition();
+      const beat = taSync.getCurrentBeat(pos);
+      if (beat) {
+        const distToCurrentBeat = Math.abs(pos - beat.startTime);
+        const distToNextBeat = Math.abs(pos - (beat.startTime + beat.duration));
+        const timingOffset = Math.min(distToCurrentBeat, distToNextBeat);
+        
+        if (timingOffset < 80) {
+          rating = "PERFECT";
+        } else if (timingOffset < 180) {
+          rating = "GOOD";
+        }
+      }
+    }
+    shutterSystem?.shoot(lyric, rating);
+  });
+
+  // 撮影成功時のスコア処理・HUD更新コールバック
+  shutterSystem.setOnPhotoCapturedCallback((photo) => {
+    const rating = photo.rating === "AUTO" ? "PERFECT" : (photo.rating ?? "MISS");
+    if (rating === "PERFECT") {
+      score += 1000;
+      perfectCount++;
+      showRatingPop("PERFECT");
+    } else if (rating === "GOOD") {
+      score += 500;
+      goodCount++;
+      showRatingPop("GOOD");
+    } else if (rating === "MISS") {
+      missCount++;
+      showRatingPop("MISS");
+    }
+    updateGameHUD();
   });
 
   // ⑧ 再生ボタン
@@ -258,6 +311,13 @@ function onTick(position: number): void {
   const phrase = taSync.getCurrentPhrase(position);
   lyricDisplay?.update(word, phrase);
 
+  // ビート検出とパルス演出
+  const beat = taSync.getCurrentBeat(position);
+  if (beat && beat.index !== lastBeatIndex) {
+    lastBeatIndex = beat.index;
+    triggerBeatPulse();
+  }
+
   // シャッターシステム
   const isInChorus = taSync.isInChorus(position);
   const currentChorusStart = taSync.getCurrentChorusStart(position);
@@ -286,6 +346,47 @@ function openGallery(): void {
 // ──────────────────────────────────────────────
 // UIヘルパー
 // ──────────────────────────────────────────────
+function updateGameHUD(): void {
+  const scoreEl = document.getElementById("hud-score");
+  const perfEl = document.getElementById("hud-perf-count");
+  const goodEl = document.getElementById("hud-good-count");
+  const missEl = document.getElementById("hud-miss-count");
+
+  if (scoreEl) scoreEl.textContent = score.toString();
+  if (perfEl) perfEl.textContent = perfectCount.toString();
+  if (goodEl) goodEl.textContent = goodCount.toString();
+  if (missEl) missEl.textContent = missCount.toString();
+}
+
+function showRatingPop(rating: "PERFECT" | "GOOD" | "MISS"): void {
+  const el = document.getElementById("game-rating");
+  if (!el) return;
+  el.className = `rating-pop animate ${rating.toLowerCase()}`;
+  el.textContent = rating + "!";
+  
+  setTimeout(() => {
+    el.classList.remove("animate");
+  }, 800);
+}
+
+function triggerBeatPulse(): void {
+  // Pulse the lyric word
+  const lyricWord = document.getElementById("lyric-word");
+  if (lyricWord) {
+    lyricWord.classList.remove("beat-pulse");
+    void lyricWord.offsetWidth; // Force reflow
+    lyricWord.classList.add("beat-pulse");
+  }
+
+  // Pulse the viewfinder frame (glow effect)
+  const vfFrame = document.querySelector(".vf-frame") as HTMLElement;
+  if (vfFrame) {
+    vfFrame.classList.remove("beat-pulse-glow");
+    void vfFrame.offsetWidth; // Force reflow
+    vfFrame.classList.add("beat-pulse-glow");
+  }
+}
+
 function setStatusMessage(msg: string): void {
   const el = document.getElementById("status-message");
   if (el) el.textContent = msg;

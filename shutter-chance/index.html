@@ -154,8 +154,26 @@
       from { filter: blur(8px); opacity: 0.3; }
       to   { filter: blur(0);   opacity: 1; }
     }
-    .lyric-fade-out { opacity: 0 !important; transition: opacity 0.2s; }
+     .lyric-fade-out { opacity: 0 !important; transition: opacity 0.2s; }
     .lyric-fade-in  { opacity: 1 !important; transition: opacity 0.3s; }
+
+    @keyframes beat-pulse {
+      0% { transform: scale(1); filter: brightness(1); }
+      20% { transform: scale(1.08); filter: brightness(1.25); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .beat-pulse {
+      animation: beat-pulse 0.2s ease-out forwards;
+    }
+
+    @keyframes beat-pulse-glow {
+      0% { box-shadow: 0 0 10px rgba(0,229,255,0.3); border-color: var(--cyan); }
+      15% { box-shadow: 0 0 35px rgba(0,229,255,0.8); border-color: #00ff88; }
+      100% { box-shadow: 0 0 10px rgba(0,229,255,0.3); border-color: var(--cyan); }
+    }
+    .beat-pulse-glow {
+      animation: beat-pulse-glow 0.3s ease-out forwards;
+    }
 
     /* ── Controls ── */
     #controls {
@@ -210,7 +228,35 @@
     #viewfinder.locked .vf-frame { border-color: #00ff88; box-shadow: 0 0 30px rgba(0,255,136,0.7); }
     #viewfinder.locked .vf-label { color: #00ff88; content: "AF ■"; }
     #viewfinder.locked .vf-corner { border-color: #00ff88; }
+    /* ── Game HUD ── */
+    #game-hud {
+      position: absolute; top: 12px; right: 12px; z-index: 55; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; text-align: right;
+      background: var(--glass); padding: 8px 14px; border-radius: 12px;
+      border: 1px solid var(--border); backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    #game-hud.hidden { display: none; }
+    .hud-item { font-size: 1.1rem; font-weight: 900; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+    .hud-stats { font-size: 0.65rem; display: flex; gap: 8px; color: var(--text); }
+    .hud-perf { color: var(--cyan); }
+    .hud-good { color: var(--pink); }
+    .hud-miss { color: var(--amber); }
 
+    /* ── Pop rating ── */
+    .rating-pop {
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+      font-family: 'Orbitron', sans-serif; font-size: 1.8rem; font-weight: 900;
+      opacity: 0; pointer-events: none; z-index: 90;
+      text-shadow: 0 0 15px currentColor;
+      transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .rating-pop.animate {
+      opacity: 1; transform: translate(-50%, -50%) scale(1);
+    }
+    .rating-pop.perfect { color: var(--cyan); }
+    .rating-pop.good { color: var(--pink); }
+    .rating-pop.miss { color: var(--amber); }
     /* ── Flash ── */
     #flash {
       position: absolute; inset: 0; z-index: 200; pointer-events: none;
@@ -324,6 +370,34 @@
   </style>
 </head>
 <body>
+  <div id="debug-log-console" style="position:fixed; bottom:0; left:0; width:100%; max-height:200px; overflow-y:auto; background:rgba(0,0,0,0.85); color:#ff5555; font-family:monospace; font-size:11px; z-index:99999; pointer-events:none; padding:8px;"></div>
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      const el = document.getElementById("debug-log-console");
+      if (el) {
+        el.innerHTML += '<div style="color:#ff3333;">[ERROR] ' + msg + ' (' + url + ':' + line + ':' + col + ')</div>';
+      }
+      return false;
+    };
+    console.error = (function(oldError) {
+      return function() {
+        const el = document.getElementById("debug-log-console");
+        if (el) {
+          el.innerHTML += '<div style="color:#ffaa00;">[CONSOLE.ERROR] ' + Array.from(arguments).join(' ') + '</div>';
+        }
+        oldError.apply(console, arguments);
+      };
+    })(console.error);
+    console.log = (function(oldLog) {
+      return function() {
+        const el = document.getElementById("debug-log-console");
+        if (el) {
+          el.innerHTML += '<div style="color:#ffffff;">[CONSOLE.LOG] ' + Array.from(arguments).join(' ') + '</div>';
+        }
+        oldLog.apply(console, arguments);
+      };
+    })(console.log);
+  </script>
 <nav>
   <a href="/" class="nav-back">← もどる</a>
   <span class="nav-title">📷 SHUTTER CHANCE AR</span>
@@ -354,6 +428,16 @@
 
   <!-- Main UI (visible after load) -->
   <div id="main-ui" class="hidden">
+    <!-- Game HUD -->
+    <div id="game-hud">
+      <div class="hud-item">SCORE: <span id="hud-score">0</span></div>
+      <div class="hud-stats">
+        <span class="hud-perf">PERF: <span id="hud-perf-count">0</span></span>
+        <span class="hud-good">GOOD: <span id="hud-good-count">0</span></span>
+        <span class="hud-miss">MISS: <span id="hud-miss-count">0</span></span>
+      </div>
+    </div>
+
     <!-- Lyrics overlay -->
     <div id="lyric-overlay">
       <div id="lyric-phrase"></div>
@@ -377,6 +461,7 @@
       <div class="vf-corner bl"></div>
       <div class="vf-corner br"></div>
       <div class="vf-label">AF ○ SHUTTER CHANCE</div>
+      <div id="game-rating" class="rating-pop"></div>
     </div>
   </div>
 

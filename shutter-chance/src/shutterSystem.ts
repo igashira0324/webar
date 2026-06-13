@@ -7,6 +7,7 @@ export type ShutterPhoto = {
   dataUrl: string;
   timestamp: number;
   lyric: string;
+  rating?: "PERFECT" | "GOOD" | "MISS" | "AUTO";
 };
 
 export class ShutterSystem {
@@ -23,6 +24,7 @@ export class ShutterSystem {
 
   // ユーザー手動撮影（サビ中タップ/スペース）
   private onManualShutter: (() => void) | null = null;
+  private onPhotoCaptured: ((photo: ShutterPhoto) => void) | null = null;
 
   constructor(
     viewfinderId: string,
@@ -39,11 +41,27 @@ export class ShutterSystem {
     document.addEventListener("keydown", (e) => {
       if (e.code === "Space" && !e.repeat) this.triggerManualShutter();
     });
-    canvas.addEventListener("pointerup", () => this.triggerManualShutter());
+    document.addEventListener("pointerup", (e) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest("#controls") ||
+        target.closest(".ctrl-btn") ||
+        target.closest("#mode-select") ||
+        target.closest("#gallery-modal") ||
+        target.closest("#credits-modal")
+      ) {
+        return;
+      }
+      this.triggerManualShutter();
+    });
   }
 
   setManualShutterCallback(cb: () => void): void {
     this.onManualShutter = cb;
+  }
+
+  setOnPhotoCapturedCallback(cb: (photo: ShutterPhoto) => void): void {
+    this.onPhotoCaptured = cb;
   }
 
   private triggerManualShutter(): void {
@@ -84,7 +102,7 @@ export class ShutterSystem {
       // 現在のサビ開始時刻をキーとして1度だけシャッターを切る
       if (currentChorusStart !== this.lastChorusStart && !this.shutterCooldown) {
         this.lastChorusStart = currentChorusStart;
-        this.shoot(currentLyric);
+        this.shoot(currentLyric, "AUTO");
       }
     } else if (!isInChorus) {
       // サビ外でビューファインダーを非表示
@@ -109,7 +127,7 @@ export class ShutterSystem {
   }
 
   /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成 */
-  async shoot(currentLyric: string): Promise<void> {
+  async shoot(currentLyric: string, rating: "PERFECT" | "GOOD" | "MISS" | "AUTO" = "AUTO"): Promise<void> {
     if (this.shutterCooldown) return;
     this.shutterCooldown = true;
 
@@ -127,9 +145,15 @@ export class ShutterSystem {
         dataUrl,
         timestamp: Date.now(),
         lyric: currentLyric,
+        rating,
       };
       this.photos.push(photo);
       this.addPolaroidToStack(photo);
+
+      // コールバック通知
+      if (this.onPhotoCaptured) {
+        this.onPhotoCaptured(photo);
+      }
     }
 
     // ④ ビューファインダーを閉じる
@@ -193,8 +217,27 @@ export class ShutterSystem {
     caption.className = "polaroid-caption";
     caption.textContent = photo.lyric || "♪";
 
+    // レーティング星の表示
+    const ratingEl = document.createElement("div");
+    ratingEl.className = `polaroid-rating ${photo.rating?.toLowerCase() ?? "auto"}`;
+    if (photo.rating === "PERFECT" || photo.rating === "AUTO") {
+      ratingEl.innerHTML = "⭐⭐⭐ PERFECT";
+    } else if (photo.rating === "GOOD") {
+      ratingEl.innerHTML = "⭐⭐ GOOD";
+    } else {
+      ratingEl.innerHTML = "⭐ MISS";
+    }
+    ratingEl.style.fontSize = "8px";
+    ratingEl.style.marginTop = "2px";
+    ratingEl.style.fontWeight = "bold";
+    ratingEl.style.textAlign = "center";
+    if (photo.rating === "PERFECT" || photo.rating === "AUTO") ratingEl.style.color = "var(--cyan)";
+    else if (photo.rating === "GOOD") ratingEl.style.color = "var(--pink)";
+    else ratingEl.style.color = "var(--amber)";
+
     polaroid.appendChild(img);
     polaroid.appendChild(caption);
+    polaroid.appendChild(ratingEl);
 
     // 新しい写真は一番上に
     this.photoStackEl.insertBefore(polaroid, this.photoStackEl.firstChild);
@@ -234,8 +277,26 @@ export class ShutterSystem {
       cap.className = "gallery-caption";
       cap.textContent = photo.lyric || "♪";
 
+      // レーティング表示
+      const ratingEl = document.createElement("div");
+      ratingEl.className = `gallery-rating ${photo.rating?.toLowerCase() ?? "auto"}`;
+      if (photo.rating === "PERFECT" || photo.rating === "AUTO") {
+        ratingEl.innerHTML = "⭐⭐⭐ PERFECT";
+        ratingEl.style.color = "var(--cyan)";
+      } else if (photo.rating === "GOOD") {
+        ratingEl.innerHTML = "⭐⭐ GOOD";
+        ratingEl.style.color = "var(--pink)";
+      } else {
+        ratingEl.innerHTML = "⭐ MISS";
+        ratingEl.style.color = "var(--amber)";
+      }
+      ratingEl.style.fontSize = "0.7rem";
+      ratingEl.style.margin = "4px 0";
+      ratingEl.style.fontWeight = "bold";
+
       item.appendChild(img);
       item.appendChild(cap);
+      item.appendChild(ratingEl);
       item.appendChild(saveBtn);
       grid.appendChild(item);
     });

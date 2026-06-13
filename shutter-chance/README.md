@@ -64,8 +64,7 @@ npm run build
 `shutter-chance/src/textAliveSync.ts` の以下の箇所に取得したトークンを設定してください：
 
 ```typescript
-// TODO: ここにTextAlive App tokenを設定
-const APP_TOKEN = "あなたのトークン";
+const APP_TOKEN = "1NQ6doQkcHMm1MpI";
 ```
 
 App Token は [developer.textalive.jp](https://developer.textalive.jp) で取得できます。

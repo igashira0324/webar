@@ -12,7 +12,7 @@
  *   7. サビ演出・歌詞オーバーレイ制御
  */
 import { Scene } from "@babylonjs/core";
-import { MmdRuntime, StreamAudioPlayer } from "babylon-mmd";
+import { MmdRuntime } from "babylon-mmd";
 import { loadMmdModel } from "../../src/app/loadMmdModel";
 
 import { createStudioScene, createARScene } from "./sceneSetup";
@@ -36,7 +36,6 @@ let taSync: TextAliveSync | null = null;
 let lyricDisplay: LyricDisplay | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
-let audioPlayer: StreamAudioPlayer | null = null;
 let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 
@@ -72,14 +71,20 @@ function showModeSelect(arSupported: boolean): void {
     arBtn.title = "この端末はAR非対応です";
   }
 
+  // Hide the loading screen so that the mode-select screen is visible and clickable
+  document.getElementById("loading")?.classList.add("hidden");
   modeSelect.classList.remove("hidden");
 
   arBtn.addEventListener("click", () => {
     modeSelect.classList.add("hidden");
+    // Show loading screen again while loading model assets
+    document.getElementById("loading")?.classList.remove("hidden");
     startApp("ar");
   });
   studioBtn.addEventListener("click", () => {
     modeSelect.classList.add("hidden");
+    // Show loading screen again while loading model assets
+    document.getElementById("loading")?.classList.remove("hidden");
     startApp("studio");
   });
 }
@@ -116,8 +121,6 @@ async function startApp(mode: "ar" | "studio") {
   // ④ MMDランタイム + ミクモデル + VMDロード
   mmdRuntime = new MmdRuntime(scene);
   mmdRuntime.register(scene);
-  audioPlayer = new StreamAudioPlayer(scene);
-  await mmdRuntime.setAudioPlayer(audioPlayer);
 
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
@@ -146,8 +149,7 @@ async function startApp(mode: "ar" | "studio") {
 
   // ⑤ TextAlive 初期化
   setStatusMessage("楽曲を読み込み中...");
-  // StreamAudioPlayerの内部HTMLAudioElementをTextAliveのmediaElementとして使用する
-  const audio = (audioPlayer as any)._audio || (audioPlayer as any).audio;
+  const mediaEl = document.getElementById("textalive-media")!;
 
   taSync = new TextAliveSync({
     onReady: () => {
@@ -159,17 +161,14 @@ async function startApp(mode: "ar" | "studio") {
       isPlaying = true;
       const btn = document.getElementById("play-btn");
       if (btn) btn.textContent = "⏸ 一時停止";
-      mmdRuntime?.playAnimation();
     },
     onPause: () => {
       isPlaying = false;
       const btn = document.getElementById("play-btn");
       if (btn) btn.textContent = "▶ 再生";
-      mmdRuntime?.pauseAnimation();
     },
     onStop: () => {
       isPlaying = false;
-      mmdRuntime?.pauseAnimation();
       // 曲終了 → ギャラリー表示
       setTimeout(() => openGallery(), 1500);
     },
@@ -185,20 +184,19 @@ async function startApp(mode: "ar" | "studio") {
     },
   });
 
-  if (audio) {
-    await taSync.init(audio as any);
-  } else {
-    // フォールバックとしてDOM上の要素を使用
-    const mediaEl = document.getElementById("textalive-media")!;
-    await taSync.init(mediaEl);
-  }
+  await taSync.init(mediaEl);
 
-  // ⑥ 毎フレーム、オーディオプレイヤーのcurrentTimeに基づいて演出と歌詞を同期
+  // ⑥ TextAlive position (mediaEl.currentTime) をマスタークロックとしてMMD同期
   scene.onBeforeRenderObservable.add(() => {
-    if (!isPlaying || !audioPlayer) return;
-    const pos = audioPlayer.currentTime * 1000;
-    currentPosition = pos;
-    onTick(pos);
+    if (!isPlaying || !mmdRuntime) return;
+    const media = document.getElementById("textalive-media") as HTMLAudioElement;
+    if (media) {
+      const pos = media.currentTime * 1000;
+      currentPosition = pos;
+      onTick(pos);
+      const targetFrame = (pos / 1000) * 30;
+      mmdRuntime.seekAnimation(targetFrame, true);
+    }
   });
 
   // ⑦ サブシステム初期化
@@ -261,8 +259,9 @@ function onTick(position: number): void {
 
   // シャッターシステム
   const isInChorus = taSync.isInChorus(position);
+  const currentChorusStart = taSync.getCurrentChorusStart(position);
   const nextChorus = taSync.getNextChorusStart(position);
-  shutterSystem?.update(position, isInChorus, nextChorus, word ?? "");
+  shutterSystem?.update(position, isInChorus, currentChorusStart, nextChorus, word ?? "");
 }
 
 // ──────────────────────────────────────────────

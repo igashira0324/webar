@@ -157,23 +157,35 @@ export class TextAliveSync {
     };
   }
 
-  /** 単語が付属語（助詞・助動詞）であるか判定する */
+  /** 単語が付属語（助詞・助動詞・接続助詞など）であるか判定する */
   private _isAuxiliaryWord(word: any): boolean {
     if (!word) return false;
     const text = word.text.trim();
     if (text.length === 0) return false;
 
-    // 1. 品詞による判定 (TextAliveの日本語解析では pos が "助詞" または "助動詞" など)
-    const pos = word.pos || "";
-    if (pos === "助詞" || pos === "助動詞" || pos === "P" || pos === "M" || pos === "particle" || pos === "auxiliary-verb") {
+    // 1. 品詞による判定
+    const pos = (word.pos || "").toLowerCase();
+    const rawPos = (word.rawPos || "").toLowerCase();
+    if (
+      pos.includes("助詞") || pos.includes("助動詞") || pos.includes("接尾") ||
+      pos === "p" || pos === "m" || pos === "particle" || pos === "auxiliary-verb" ||
+      pos === "suffix" ||
+      rawPos.includes("助詞") || rawPos.includes("助動詞") || rawPos.includes("接尾")
+    ) {
       return true;
     }
 
-    // 2. 文字列パターンによる判定 (品詞が取得できない、または別の文字で返ってきた場合のためのセーフティネット)
-    // ひらがな1〜2文字の典型的な助詞・助動詞
-    const particleFilter = /^[のをてにはがともでやたしだなどにもかへより]$/;
-    if (particleFilter.test(text)) {
-      return true;
+    // 2. 文字列パターンによる判定
+    // 品詞が明確に自立語（名詞、動詞、形容詞、副詞など）でない場合、ひらがな（＋っ、ー）で構成される1〜3文字を付属語と判定する
+    const isNounOrVerb = pos === "n" || pos === "v" || pos === "a" || pos === "av" ||
+                         pos.includes("名詞") || pos.includes("動詞") || pos.includes("形容") || pos.includes("副詞") ||
+                         rawPos.includes("名詞") || rawPos.includes("動詞") || rawPos.includes("形容") || rawPos.includes("副詞");
+
+    if (!isNounOrVerb) {
+      const hiraganaRegex = /^[ぁ-んーっ]{1,3}$/;
+      if (hiraganaRegex.test(text)) {
+        return true;
+      }
     }
 
     return false;

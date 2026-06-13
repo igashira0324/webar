@@ -41,6 +41,7 @@ interface LyricWord {
 
 interface SparkParticle {
   mesh: Mesh;
+  texture: AdvancedDynamicTexture;
   velocity: Vector3;
   spawnTime: number;
   duration: number;
@@ -64,6 +65,10 @@ export class Lyric3D {
   private finaleWords: LyricWord[] = [];
   private finaleActive = false;
   private finaleStartTime = 0;
+
+  // ── 舞い上がり後に漂い続ける歌詞（ホバリング）関連
+  private hoveringWords: LyricWord[] = [];
+  private hoveringActive = false;
 
   // ── タップエフェクト（光の粒）関連
   private sparks: SparkParticle[] = [];
@@ -140,10 +145,13 @@ export class Lyric3D {
     const pos = this._findFreeSpawnPos();
 
     // ── Plane メッシュ
-    const charCount = [...text].length;
-    // 長いフレーズが来ても巨大になりすぎないよう制限（幅最大2.8m）
-    const pw = Math.max(0.8, Math.min(2.8, charCount * (isChorus ? 0.22 : 0.18)));
-    const ph = isChorus ? 0.7 : 0.55;
+    const hasNewLine = text.includes("\n");
+    const lines = text.split("\n");
+    const maxLineCharCount = Math.max(...lines.map(line => [...line].length));
+
+    // 長いフレーズが来ても巨大になりすぎないよう制限。改行時は高さを1.6倍にする。
+    const pw = Math.max(0.8, Math.min(2.5, maxLineCharCount * (isChorus ? 0.22 : 0.18)));
+    const ph = (isChorus ? 0.7 : 0.55) * (hasNewLine ? 1.6 : 1.0);
     const plane = MeshBuilder.CreatePlane("lyric", { width: pw, height: ph }, this.scene);
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
     plane.parent = this.container;
@@ -161,16 +169,17 @@ export class Lyric3D {
     plane.material = mat;
 
     // ── テクスチャ / テキスト
-    // 解像度も大きくなりすぎないように制限（最大1024）
-    const texW = Math.max(512, Math.min(1024, charCount * 60));
-    const texH = isChorus ? 200 : 160;
+    // 解像度も大きくなりすぎないように制限。改行時は高さを1.6倍にする。
+    const texW = Math.max(512, Math.min(1024, maxLineCharCount * 60));
+    const texH = (isChorus ? 200 : 160) * (hasNewLine ? 1.6 : 1.0);
     const tex = AdvancedDynamicTexture.CreateForMesh(plane, texW, texH, false);
     const tb = new TextBlock();
     tb.text = text;
+    tb.textWrapping = true; // 折り返し・改行を有効化
     tb.fontFamily = "'Orbitron', 'Noto Sans JP', sans-serif";
-    // 文字数に応じてフォントサイズを動的に縮小する
-    const baseFontSize = isChorus ? 100 : 80;
-    const calculatedFontSize = Math.max(36, Math.min(baseFontSize, Math.floor((texW / charCount) * 1.3)));
+    // 最長行の文字数に応じてフォントサイズを動的に縮小する
+    const baseFontSize = isChorus ? 90 : 70;
+    const calculatedFontSize = Math.max(32, Math.min(baseFontSize, Math.floor((texW / maxLineCharCount) * 1.2)));
     tb.fontSize = `${calculatedFontSize}px`;
     tb.fontWeight = "bold";
     tb.color = isChorus ? "#f0abfc" : "#67e8f9";
@@ -218,6 +227,7 @@ export class Lyric3D {
       const s = this.sparks[i];
       const elapsed = now - s.spawnTime;
       if (elapsed >= s.duration) {
+        s.texture.dispose();
         s.mesh.dispose();
         s.mesh.material?.dispose();
         this.sparks.splice(i, 1);
@@ -230,17 +240,51 @@ export class Lyric3D {
       }
     }
 
+    // ── ホバリング歌詞（舞い上がり完了後）の更新
+    if (this.hoveringActive) {
+      for (const w of this.hoveringWords) {
+        // 各単語に浮遊用パラメータの初期化
+        if ((w as any)._hoverAngle === undefined) {
+          const pos = w.mesh.position;
+          (w as any)._hoverRadius = Math.max(0.8, Math.min(2.5, Math.sqrt(pos.x * pos.x + pos.z * pos.z)));
+          (w as any)._hoverAngle = Math.atan2(pos.z, pos.x);
+          (w as any)._hoverBaseY = pos.y;
+          (w as any)._hoverPhaseOffset = Math.random() * Math.PI * 2;
+          (w as any)._hoverSpeed = 0.2 + Math.random() * 0.4;
+          (w as any)._hoverRotSpeed = (Math.random() > 0.5 ? 1 : -1) * (0.01 + Math.random() * 0.03);
+        }
+
+        // 極めてゆっくりとミク（0, 0）の周りを旋回
+        (w as any)._hoverAngle += (w as any)._hoverRotSpeed * 0.005;
+        const radius = (w as any)._hoverRadius;
+        const angle = (w as any)._hoverAngle;
+        w.mesh.position.x = Math.cos(angle) * radius;
+        w.mesh.position.z = Math.sin(angle) * radius;
+
+        // サイン波で上下にゆらゆら揺れる
+        const phase = (w as any)._hoverPhaseOffset + now * 0.001 * (w as any)._hoverSpeed;
+        w.mesh.position.y = (w as any)._hoverBaseY + Math.sin(phase) * 0.12;
+
+        // 淡い表示を維持（アルファ 0.35 付近、スケール 0.45 付近）
+        w.beatScale *= 0.85;
+        w.textBlock.alpha = 0.35 + w.beatScale * 0.5; // ビートで少し輝く
+        w.mesh.visibility = 1.0;
+        w.mesh.scaling.setAll(0.45 + w.beatScale * 0.25);
+      }
+    }
+
     // ── フィナーレ演出（舞い上がり）の更新
     if (this.finaleActive) {
       const elapsed = now - this.finaleStartTime;
       const DURATION = 3000; // 3秒間舞い上がる
       
       if (elapsed >= DURATION) {
-        // フィナーレ終了、すべてのメッシュを破棄
-        this.finaleWords.forEach(w => this._dispose(w));
+        // フィナーレ終了 → ホバリング（星座モード）へ移行
+        this.hoveringWords = [...this.finaleWords];
         this.finaleWords = [];
         this.finaleActive = false;
-        console.log("[Lyric3D] Finale ended, all words disposed.");
+        this.hoveringActive = true;
+        console.log(`[Lyric3D] Finale transition to hovering. Total words remaining: ${this.hoveringWords.length}`);
       } else {
         const t = elapsed / DURATION; // 0〜1
         const easedRise = Math.pow(t, 1.5); // 加速上昇
@@ -257,13 +301,12 @@ export class Lyric3D {
           const dir = new Vector3(w.mesh.position.x, 0, w.mesh.position.z).normalize();
           w.mesh.position.addInPlace(dir.scale(0.012)); // 徐々に広がる
           
-          // フェードアウト
-          w.textBlock.alpha = Math.max(0, (w.textBlock.alpha ?? 0.45) * (1 - t * 0.08));
-          w.mesh.visibility = 1 - t;
+          // フィナーレ終盤で完全に消すのではなく、ホバリング用の明るさへ徐々に変化
+          w.textBlock.alpha = Math.max(0.35, (w.textBlock.alpha ?? 0.45) * (1 - t * 0.5));
+          w.mesh.visibility = 1.0;
           
-          // 舞い上がり中もビートパルスは一応反応するように
           w.beatScale *= 0.85;
-          w.mesh.scaling.setAll(Math.max(0, (0.55 + w.beatScale) * (1 - t * 0.4)));
+          w.mesh.scaling.setAll(Math.max(0.35, (0.55 + w.beatScale) * (1 - t * 0.2)));
         }
       }
       return; // フィナーレ中は通常の activeWords 等の更新はスキップ
@@ -338,6 +381,12 @@ export class Lyric3D {
         w.beatScale = 0.07;
       }
     }
+    // ホバリング中の歌詞もビートで脈打つ
+    if (this.hoveringActive) {
+      for (const w of this.hoveringWords) {
+        w.beatScale = 0.15;
+      }
+    }
   }
 
   /** フリーズモード（時を止める）のトグル */
@@ -362,12 +411,14 @@ export class Lyric3D {
     console.log(`[Lyric3D] Finale triggered. Total words rising: ${this.finaleWords.length}`);
   }
 
-  /** 全単語（active + settled + finale + sparks）を破棄してリセット */
+  /** 全単語（active + settled + finale + hovering + sparks）を破棄してリセット */
   clear(): void {
-    [...this.activeWords, ...this.settledWords, ...this.finaleWords].forEach(w => this._dispose(w));
+    [...this.activeWords, ...this.settledWords, ...this.finaleWords, ...this.hoveringWords].forEach(w => this._dispose(w));
     this.activeWords = [];
     this.settledWords = [];
     this.finaleWords = [];
+    this.hoveringWords = [];
+    this.hoveringActive = false;
     
     this.sparks.forEach(s => {
       s.mesh.dispose();
@@ -518,31 +569,53 @@ export class Lyric3D {
     w.material.emissiveColor = new Color3(1.5, 0.4, 1.5);
     w.textBlock.color = "#ffffff";
 
-    // 周囲に光の粒（Spark）を散らす
+    // 周囲に記号（Spark）を散らす
     const pos = w.mesh.position;
-    for (let i = 0; i < 5; i++) {
-      const spark = MeshBuilder.CreateBox("spark", { size: 0.04 }, this.scene);
+    const symbols = ["♫", "♡", "✨", "🎵", "♥", "🎶", "⭐"];
+    
+    for (let i = 0; i < 7; i++) {
+      // 3D Plane で記号を描画
+      const spark = MeshBuilder.CreatePlane("spark", { width: 0.16, height: 0.16 }, this.scene);
+      spark.billboardMode = Mesh.BILLBOARDMODE_ALL;
+      spark.parent = this.container;
+      spark.position.copyFrom(pos);
+
+      // マテリアル設定（非ライティング・両面）
       const mat = new StandardMaterial("spark-mat", this.scene);
       mat.disableLighting = true;
-      // サビかどうかに応じて逆のネオン色に
+      mat.useAlphaFromDiffuseTexture = true;
+      mat.backFaceCulling = false;
+      // サビかどうかに応じてネオン色に
       mat.emissiveColor = w.isChorus ? new Color3(0.0, 0.9, 1.0) : new Color3(1.0, 0.4, 0.9);
       spark.material = mat;
-      spark.position.copyFrom(pos);
+
+      // GUIで記号のテクスチャを作成
+      const tex = AdvancedDynamicTexture.CreateForMesh(spark, 64, 64, false);
+      const tb = new TextBlock();
+      tb.text = symbols[Math.floor(Math.random() * symbols.length)];
+      tb.fontFamily = "'Orbitron', 'Noto Sans JP', sans-serif";
+      tb.fontSize = "46px";
+      tb.fontWeight = "bold";
+      tb.color = "#ffffff";
+      tb.shadowColor = w.isChorus ? "rgba(0,220,255,0.9)" : "rgba(255,100,220,0.9)";
+      tb.shadowBlur = 10;
+      tex.addControl(tb);
 
       // 3Dランダムな方向に速度を決定
       const angle = Math.random() * Math.PI * 2;
-      const speed = 0.5 + Math.random() * 0.8;
+      const speed = 0.5 + Math.random() * 0.9;
       const velocity = new Vector3(
         Math.cos(angle) * speed,
-        0.4 + Math.random() * 0.9, // 上方向
+        0.5 + Math.random() * 1.0, // 上方向
         Math.sin(angle) * speed
       );
 
       this.sparks.push({
         mesh: spark,
+        texture: tex,
         velocity,
         spawnTime: Date.now(),
-        duration: 400 + Math.random() * 300
+        duration: 500 + Math.random() * 300
       });
     }
   }

@@ -118,21 +118,39 @@ export class TextAliveSync {
 
   /** 現在サビ区間内かどうかを返す */
   isInChorus(position: number): boolean {
-    if (!this.player?.video) return false;
-    const seg = this.player.video.findChorus(position);
-    return seg !== null;
+    if (!this.player) return false;
+    const choruses = this.player.getChoruses() || [];
+    for (const seg of choruses) {
+      if (position >= seg.startTime && position <= seg.endTime) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 現在のサビの開始時間(ms)を返す。サビ区間外なら -1 */
+  getCurrentChorusStart(position: number): number {
+    if (!this.player) return -1;
+    const choruses = this.player.getChoruses() || [];
+    for (const seg of choruses) {
+      if (position >= seg.startTime && position <= seg.endTime) {
+        return seg.startTime;
+      }
+    }
+    return -1;
   }
 
   /** 次のサビ開始時刻(ms)を返す。なければ Infinity */
   getNextChorusStart(position: number): number {
-    if (!this.player?.video) return Infinity;
-    // repetitiveSegments を順に検索して position より後のものを返す
-    const video = this.player.video as any;
-    const segments = video.segments ?? [];
-    for (const seg of segments) {
-      if (seg.startTime > position) return seg.startTime;
+    if (!this.player) return Infinity;
+    const choruses = this.player.getChoruses() || [];
+    let nextStart = Infinity;
+    for (const seg of choruses) {
+      if (seg.startTime > position && seg.startTime < nextStart) {
+        nextStart = seg.startTime;
+      }
     }
-    return Infinity;
+    return nextStart;
   }
 
   /** 楽曲の総再生時間(ms)を返す */

@@ -11,10 +11,9 @@
  *   6. TextAlive position をマスタークロックとしてレンダーループに注入
  *   7. サビ演出・歌詞オーバーレイ制御
  */
-import { Scene, SceneLoader } from "@babylonjs/core";
-import { MmdRuntime, VmdLoader } from "babylon-mmd";
-import "babylon-mmd/esm/Loader/pmxLoader";
-import "babylon-mmd/esm/Loader/vmdLoader";
+import { Scene } from "@babylonjs/core";
+import { MmdRuntime, StreamAudioPlayer } from "babylon-mmd";
+import { loadMmdModel } from "../../src/app/loadMmdModel";
 
 import { createStudioScene, createARScene } from "./sceneSetup";
 import { TextAliveSync } from "./textAliveSync";
@@ -25,9 +24,9 @@ import { checkARSupport, setupFallbackBanner, showARCapableMessage } from "./arF
 // ──────────────────────────────────────────────
 // 定数
 // ──────────────────────────────────────────────
-const MIKU_PMX = "../assets/model/miku.pmx"; // 既存アセットを流用
+const MIKU_PMX = "/assets/model/miku.pmx"; // 既存アセットを流用（絶対パス指定）
 // 要確認: 「シャッターチャンス」専用VMDがあればここを変更
-const DANCE_VMD = "../assets/motion/dindondan.vmd";
+const DANCE_VMD = "/assets/motion/dindondan.vmd";
 const AR_URL = "https://webar-coral.vercel.app/shutter-chance/";
 
 // ──────────────────────────────────────────────
@@ -37,6 +36,7 @@ let taSync: TextAliveSync | null = null;
 let lyricDisplay: LyricDisplay | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
+let audioPlayer: StreamAudioPlayer | null = null;
 let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 
@@ -116,34 +116,29 @@ async function startApp(mode: "ar" | "studio") {
   // ④ MMDランタイム + ミクモデル + VMDロード
   mmdRuntime = new MmdRuntime(scene);
   mmdRuntime.register(scene);
+  audioPlayer = new StreamAudioPlayer(scene);
+  await mmdRuntime.setAudioPlayer(audioPlayer);
 
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
   try {
-    const lastSlash = MIKU_PMX.lastIndexOf("/");
-    const rootUrl = MIKU_PMX.substring(0, lastSlash + 1);
-    const filename = MIKU_PMX.substring(lastSlash + 1);
-
-    const mmdMesh = await SceneLoader.ImportMeshAsync(undefined, rootUrl, filename, scene, (ev) => {
-      if (ev.lengthComputable && ev.total > 0) {
-        updateLoadingProgress(Math.floor((ev.loaded / ev.total) * 100));
+    const result = await loadMmdModel(
+      scene,
+      mmdRuntime,
+      MIKU_PMX,
+      DANCE_VMD,
+      shadowGenerator,
+      undefined,
+      (ev) => {
+        if (ev.lengthComputable && ev.total > 0) {
+          updateLoadingProgress(Math.floor((ev.loaded / ev.total) * 100));
+        }
       }
-    }, ".pmx");
+    );
 
-    const mesh = mmdMesh.meshes[0];
-    mesh.scaling.setAll(0.07);
-    mesh.position.y = 0.5;
-    shadowGenerator?.addShadowCaster(mesh, true);
-    mesh.receiveShadows = true;
-
-    mmdModel = mmdRuntime.createMmdModel(mesh as any);
-
-    // VMDモーションロード
-    const vmdLoader = new VmdLoader(scene);
-    const motion = await vmdLoader.loadAsync("motion", DANCE_VMD);
-    const handle = mmdModel.createRuntimeAnimation(motion);
-    mmdModel.setRuntimeAnimation(handle);
-    mmdRuntime.setManualAnimationDuration(motion.endFrame);
+    mmdModel = result.model;
+    mmdModel.mesh.scaling.setAll(0.07);
+    mmdModel.mesh.position.y = 0.5;
   } catch (e) {
     console.error("Model load failed:", e);
     setStatusMessage("⚠ モデルの読み込みに失敗しました");
@@ -151,7 +146,8 @@ async function startApp(mode: "ar" | "studio") {
 
   // ⑤ TextAlive 初期化
   setStatusMessage("楽曲を読み込み中...");
-  const mediaEl = document.getElementById("textalive-media")!;
+  // StreamAudioPlayerの内部HTMLAudioElementをTextAliveのmediaElementとして使用する
+  const audio = (audioPlayer as any)._audio || (audioPlayer as any).audio;
 
   taSync = new TextAliveSync({
     onReady: () => {
@@ -189,18 +185,20 @@ async function startApp(mode: "ar" | "studio") {
     },
   });
 
-  await taSync.init(mediaEl);
+  if (audio) {
+    await taSync.init(audio as any);
+  } else {
+    // フォールバックとしてDOM上の要素を使用
+    const mediaEl = document.getElementById("textalive-media")!;
+    await taSync.init(mediaEl);
+  }
 
-  // ⑥ TextAlive positionをマスタークロックとしてMMD同期
+  // ⑥ 毎フレーム、オーディオプレイヤーのcurrentTimeに基づいて演出と歌詞を同期
   scene.onBeforeRenderObservable.add(() => {
-    if (!isPlaying || !mmdRuntime) return;
-    // TextAliveの再生位置(ms) → MMDフレーム変換 (30fps)
-    const targetFrame = (currentPosition / 1000) * 30;
-    // 大きなズレがある場合のみシーク（連続seekは重い）
-    const diff = Math.abs(mmdRuntime.currentFrameTime - targetFrame);
-    if (diff > 5) {
-      mmdRuntime.seekAnimation(targetFrame, false);
-    }
+    if (!isPlaying || !audioPlayer) return;
+    const pos = audioPlayer.currentTime * 1000;
+    currentPosition = pos;
+    onTick(pos);
   });
 
   // ⑦ サブシステム初期化

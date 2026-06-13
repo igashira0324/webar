@@ -56,15 +56,22 @@ export class ShutterSystem {
    * TextAliveのonTimeUpdateから毎フレーム呼ばれる。
    * position: 現在再生位置(ms)
    * isInChorus: 現在サビ区間内か
+   * currentChorusStart: 現在のサビ開始時刻(ms)。サビ外なら -1
    * nextChorusStart: 次のサビ開始時刻(ms)
    * currentLyric: 現在表示中の歌詞テキスト
    */
   update(
     position: number,
     isInChorus: boolean,
+    currentChorusStart: number,
     nextChorusStart: number,
     currentLyric: string
   ): void {
+    // シークやループ等で時間が巻き戻った場合は判定用キーをリセット
+    if (position < this.lastChorusStart) {
+      this.lastChorusStart = -1;
+    }
+
     const timeToChorus = nextChorusStart - position;
 
     // サビ3秒前: ビューファインダー表示
@@ -73,14 +80,13 @@ export class ShutterSystem {
     }
 
     // サビ突入: 自動シャッター（サビごとに1回）
-    if (isInChorus) {
-      // 新しいサビ区間に入ったか判定
-      const chorusKey = Math.floor(position / 1000); // 秒単位でデバウンス
-      if (chorusKey !== this.lastChorusStart && !this.shutterCooldown) {
-        this.lastChorusStart = chorusKey;
+    if (isInChorus && currentChorusStart !== -1) {
+      // 現在のサビ開始時刻をキーとして1度だけシャッターを切る
+      if (currentChorusStart !== this.lastChorusStart && !this.shutterCooldown) {
+        this.lastChorusStart = currentChorusStart;
         this.shoot(currentLyric);
       }
-    } else {
+    } else if (!isInChorus) {
       // サビ外でビューファインダーを非表示
       if (this.viewfinderVisible) {
         this.hideViewfinder();

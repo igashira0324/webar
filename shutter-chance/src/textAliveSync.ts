@@ -89,15 +89,15 @@ export class TextAliveSync {
 
   /** 現在の発声中の単語テキストを返す（なければ null）*/
   getCurrentWord(position: number): string | null {
-    if (!this.player) return null;
-    const word = this.player.findWord(position);  // player.video ではなく player 直接
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);  // findWord は player.video 経由が正しい
     return word?.text ?? null;
   }
 
   /** 現在の発声中のフレーズテキストを返す（なければ null）*/
   getCurrentPhrase(position: number): string | null {
-    if (!this.player) return null;
-    const phrase = this.player.findPhrase(position);  // player.video ではなく player 直接
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);  // findPhrase は player.video 経由が正しい
     return phrase?.text ?? null;
   }
 

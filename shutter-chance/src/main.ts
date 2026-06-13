@@ -183,8 +183,10 @@ async function startApp(mode: "ar" | "studio") {
       setTimeout(() => openGallery(), 1500);
     },
     onTimeUpdate: (pos) => {
-      // currentPosition はフォールバック用。精度の高い位置は onBeforeRenderObservable で取得する
+      // onTimeUpdate は TextAlive が再生の進行に合わせて確実に発火するコールバック
+      // timer.position より信頼性が高いので、ここで currentPosition を更新する
       currentPosition = pos;
+      console.log("[onTimeUpdate]", Math.round(pos), "ms"); // DEBUG: 発火確認用
     },
     onError: (e) => {
       console.error("[TextAlive]", e);
@@ -196,16 +198,16 @@ async function startApp(mode: "ar" | "studio") {
 
   await taSync.init(mediaEl);
 
-  // ⑥ TextAlive timer.position をマスタークロックとして毎フレームMMD同期
+  // ⑥ currentPosition （onTimeUpdate から更新）をマスタークロックとしてMMD同期
+  // timer.position が込まない環境でも onTimeUpdate は確実に発火するため、こちらを使う
   scene.onBeforeRenderObservable.add(() => {
     if (!taSync?.isReady) return;
 
-    const pos = isPlaying ? taSync.getPosition() : currentPosition;
+    // currentPosition を常に使う（isPlaying 時は onTimeUpdate が更新する）
+    const pos = currentPosition;
     onTick(pos);
 
     if (!isPlaying || !mmdRuntime) return;
-    currentPosition = pos;
-    // register(scene) が自動で毎フレームのボーン更新を実行する。seekAnimation でフレームを指定するだけでよい
     mmdRuntime.seekAnimation((pos / 1000) * 30, true);
   });
 

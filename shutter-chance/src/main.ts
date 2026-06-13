@@ -134,7 +134,7 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
   try {
-    mmdModel = await loadMmdModel(scene, MIKU_PMX, DANCE_VMD, mmdRuntime);
+    mmdModel = await loadMmdModel(scene, mmdRuntime, MIKU_PMX, DANCE_VMD);
     setStatusMessage("ミク読み込み完了");
     updateLoadingProgress(60);
   } catch (e) {

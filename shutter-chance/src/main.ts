@@ -19,6 +19,7 @@ import { createStudioScene, createARScene } from "./sceneSetup";
 import { TextAliveSync } from "./textAliveSync";
 import { LyricDisplay } from "./lyricDisplay";
 import { ShutterSystem } from "./shutterSystem";
+import { Lyric3D } from "./lyric3d";
 import { checkARSupport, setupFallbackBanner, showARCapableMessage } from "./arFallback";
 
 // ──────────────────────────────────────────────
@@ -33,11 +34,13 @@ const AR_URL = "https://webar-coral.vercel.app/shutter-chance/";
 // ──────────────────────────────────────────────
 let taSync: TextAliveSync | null = null;
 let lyricDisplay: LyricDisplay | null = null;
+let lyric3d: Lyric3D | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
 let currentPosition = 0; // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
+let lastWordObjText = ""; // 3D歌詞の重複ポップアップを防ぐためのトラッキング
 
 // 撮影枚数（コレクション型の記念記録）
 let photoCount = 0;
@@ -163,6 +166,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     },
     onStop: () => {
       isPlaying = false;
+      // 3D歌詞をクリア
+      lyric3d?.clear();
       // 曲終了 → ギャラリー表示
       setTimeout(() => openGallery(), 1500);
     },
@@ -193,6 +198,7 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
 
   // ⑥ サブシステム初期化
   lyricDisplay = new LyricDisplay("lyric-word", "lyric-phrase");
+  lyric3d = new Lyric3D(scene);
   shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
 
   // 撮影コールバック（記念コレクション型 — 判定なし）
@@ -243,12 +249,29 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
 }
 
 // ──────────────────────────────────────────────
-// レンダーループ毎のサブシステム更新
+// レンダーループ毎 of サブシステム更新
 // ──────────────────────────────────────────────
 function onTick(position: number): void {
   if (!taSync?.isReady) return;
 
-  // 歌詞表示
+  const isInChorus = taSync.isInChorus(position);
+
+  // 1. 3D空間の歌詞ポップアップ制御
+  const wordObj = taSync.getCurrentWordObj(position);
+  if (wordObj) {
+    if (wordObj.text !== lastWordObjText) {
+      lastWordObjText = wordObj.text;
+      // 3D空間に単語をポップアップ（サビなら演出強化）
+      lyric3d?.spawnWord(wordObj.text, wordObj.duration, isInChorus);
+    }
+  } else {
+    lastWordObjText = "";
+  }
+
+  // 毎フレーム 3D歌詞のアニメーション（フェードアウト、上昇等）を更新
+  lyric3d?.update();
+
+  // 2. 既存の平面DOM歌詞表示（補助）
   const word = taSync.getCurrentWord(position);
   const phrase = taSync.getCurrentPhrase(position);
   lyricDisplay?.update(word, phrase);
@@ -261,7 +284,6 @@ function onTick(position: number): void {
   }
 
   // シャッターシステム（ビューファインダー表示制御）
-  const isInChorus = taSync.isInChorus(position);
   const currentChorusStart = taSync.getCurrentChorusStart(position);
   const nextChorus = taSync.getNextChorusStart(position);
   shutterSystem?.update(position, isInChorus, currentChorusStart, nextChorus, word ?? "");

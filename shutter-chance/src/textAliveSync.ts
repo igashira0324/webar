@@ -94,6 +94,17 @@ export class TextAliveSync {
     return word?.text ?? null;
   }
 
+  /** 現在の発声中の単語のテキストと持続時間をオブジェクトで返す */
+  getCurrentWordObj(position: number): { text: string; duration: number } | null {
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);
+    if (!word) return null;
+    return {
+      text: word.text,
+      duration: word.duration
+    };
+  }
+
   /** 現在の発声中のフレーズテキストを返す（なければ null）*/
   getCurrentPhrase(position: number): string | null {
     if (!this.player?.video) return null;

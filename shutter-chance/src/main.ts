@@ -247,7 +247,8 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     }
   }
 
-  // ⑪ サビ中の長押し（ホールド）演出イベントリスナー
+  // ⑪ サビ中の長押し（ホールド）演出イベントリスナー (視認性検証のため一時無効化)
+  /*
   const startHold = () => {
     if (taSync?.isReady && taSync.isInChorus(currentPosition)) {
       isHolding = true;
@@ -260,6 +261,7 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   canvas.addEventListener("pointerup", stopHold);
   canvas.addEventListener("pointercancel", stopHold);
   canvas.addEventListener("pointerout", stopHold);
+  */
 }
 
 // ──────────────────────────────────────────────
@@ -270,28 +272,25 @@ function onTick(position: number): void {
 
   const isInChorus = taSync.isInChorus(position);
 
-  // サビホールドガイドの表示・非表示制御
+  // サビホールドガイドの表示・非表示制御 (一時無効化のため常に none)
   const holdGuide = document.getElementById("chorus-hold-guide");
   if (holdGuide) {
-    holdGuide.style.display = isInChorus ? "block" : "none";
+    holdGuide.style.display = "none";
   }
 
-  // サビ長押し極限発光演出
-  if (isInChorus && isHolding) {
-    if (glowLayer) glowLayer.intensity = 2.4; // ネオン極限発光
-    lyric3d?.spawnHoldSparks(); // 3D空間にネオン火花を四散
-  } else {
-    if (glowLayer) glowLayer.intensity = isInChorus ? 1.2 : 0.8;
-    if (!isInChorus) isHolding = false; // サビ外ではホールド無効
+  // サビ長押し極限発光演出 (一時無効化し、標準輝度に固定)
+  if (glowLayer) {
+    glowLayer.intensity = isInChorus ? 1.2 : 0.8;
   }
+  isHolding = false;
 
   // 1. 3D空間の歌詞ポップアップ制御
   const wordObj = taSync.getCurrentWordObj(position);
   if (wordObj) {
     if (wordObj.text !== lastWordObjText) {
       lastWordObjText = wordObj.text;
-      // 3D空間に単語をポップアップ（サビなら演出強化）
-      lyric3d?.spawnWord(wordObj.text, wordObj.duration, isInChorus);
+      // 3D空間に単語をポップアップ（3000ms 固定寿命で、確実に見せる）
+      lyric3d?.spawnWord(wordObj.text, 3000, isInChorus);
     }
   } else {
     lastWordObjText = "";

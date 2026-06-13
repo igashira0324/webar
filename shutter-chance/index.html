@@ -247,6 +247,35 @@
       color: #000; border: none; font-weight: 700;
     }
 
+    /* ── 時止め・撮影ボタン ── */
+    #freeze-shoot-btn {
+      /* 通常時: シアンネオンで「時を止める」 */
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0,229,255,0.35);
+      font-size: 0.8rem;
+      transition: all 0.25s;
+    }
+    #freeze-shoot-btn:hover {
+      background: rgba(0,229,255,0.12);
+      box-shadow: 0 0 22px rgba(0,229,255,0.6);
+    }
+    /* フリーズ中: マゼンタネオンで「撮影」 */
+    #freeze-shoot-btn.shooting {
+      border-color: var(--pink);
+      color: var(--pink);
+      box-shadow: 0 0 16px rgba(232,121,249,0.5);
+      animation: shootBtnPulse 0.9s ease-in-out infinite;
+    }
+    #freeze-shoot-btn.shooting:hover {
+      background: rgba(232,121,249,0.12);
+      box-shadow: 0 0 28px rgba(232,121,249,0.7);
+    }
+    @keyframes shootBtnPulse {
+      0%,100% { box-shadow: 0 0 14px rgba(232,121,249,0.4); }
+      50%      { box-shadow: 0 0 28px rgba(232,121,249,0.8), 0 0 6px rgba(255,255,255,0.3); }
+    }
+
     /* ── Viewfinder ── */
     #viewfinder {
       position: absolute; inset: 52px 0 0 0; pointer-events: none; z-index: 60;
@@ -536,6 +565,8 @@
     <!-- Controls -->
     <div id="controls">
       <button id="play-btn" class="ctrl-btn">▶ 再生</button>
+      <!-- 時止め・撮影ボタン（状態によりラベル・イコンが切り替わる） -->
+      <button id="freeze-shoot-btn" class="ctrl-btn hidden">⏳ 時を止める</button>
       <button id="ar-start-btn" class="ctrl-btn hidden">🥽 AR起動</button>
       <button id="gallery-btn" class="ctrl-btn">🖼 ギャラリー</button>
       <button id="credits-btn" class="ctrl-btn">ℹ</button>

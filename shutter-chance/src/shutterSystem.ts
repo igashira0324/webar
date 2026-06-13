@@ -36,24 +36,8 @@ export class ShutterSystem {
     this.flashEl = document.getElementById(flashId)!;
     this.photoStackEl = document.getElementById(photoStackId)!;
     this.babylonCanvas = canvas;
-
-    // キーボード（スペース）とタップで手動撮影
-    document.addEventListener("keydown", (e) => {
-      if (e.code === "Space" && !e.repeat) this.triggerManualShutter();
-    });
-    document.addEventListener("pointerup", (e) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.closest("#controls") ||
-        target.closest(".ctrl-btn") ||
-        target.closest("#mode-select") ||
-        target.closest("#gallery-modal") ||
-        target.closest("#credits-modal")
-      ) {
-        return;
-      }
-      this.triggerManualShutter();
-    });
+    // ※ 旧: キーボード/タップで時止め発動していたが、専用ボタンに移行したため削除
+    //    → main.ts の #freeze-shoot-btn ハンドラで時止め・撮影を制御する
   }
 
   setManualShutterCallback(cb: () => void): void {

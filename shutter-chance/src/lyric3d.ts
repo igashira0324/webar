@@ -101,16 +101,13 @@ export class Lyric3D {
     if (!text || text.trim() === "") return;
     this._syncContainerParent();
 
-    // active が上限を超えたら最も古いものを降下フェーズへ移行
-    while (this.activeWords.length >= this.MAX_ACTIVE) {
-      const oldest = this.activeWords.shift()!;
-      oldest.phase = "falling";
-      oldest.spawnTime = Date.now(); // 降下タイマーをリセット
-      this.activeWords.push(oldest); // 末尾に再追加せず falling 扱いは activeWords で管理する
-      // ↑ 実際は activeWords 内で phase 変更だけで OK（上の shift は不要だが念のため残す）
-      // 修正: 先頭を取り出してフェーズだけ変えて降下リストに戻す
-      this.activeWords.unshift(oldest);
-      break; // 1個だけ変更
+    // active が上限を超えたら最も古い単語を降下フェーズへ移行
+    if (this.activeWords.length >= this.MAX_ACTIVE) {
+      const oldest = this.activeWords[0];
+      if (oldest.phase === "rising") {
+        oldest.phase = "falling";
+        oldest.spawnTime = Date.now(); // 降下タイマーをリセット
+      }
     }
 
     // ── 出現座標（ミクの足元〜腰: y=0.6〜1.2）
@@ -155,7 +152,19 @@ export class Lyric3D {
     const word: LyricWord = {
       mesh: plane, texture: tex, textBlock: tb, material: mat,
       spawnPos: pos.clone(),
-      settledPos: new Vector3(pos.x, 0.02 + Math.random() * 0.08, pos.z), // 床に積もる座標
+      // 堆積座標は360度ランダムに分散させる（ミクを囲む歌詞の海）
+      //  - angle: 0〜2π でランダム方向
+      //  - radius: 0.8〜2.5m でランダム距離
+      //  - y: 床すれすれ（0.02〜0.10m）
+      settledPos: (() => {
+        const angle  = Math.random() * Math.PI * 2;
+        const radius = 0.8 + Math.random() * 1.7;
+        return new Vector3(
+          Math.cos(angle) * radius,
+          0.02 + Math.random() * 0.08,
+          Math.sin(angle) * radius,
+        );
+      })(),
       spawnTime: Date.now(),
       phase: "rising",
       isChorus,

@@ -48,6 +48,9 @@ let lastWordObjText = "";     // 3D歌詞の重複ポップアップ防止トラ
 let isFrozen = false;          // フリーズ中フラグ
 let frozenPosition = 0;        // フリーズ時に保存した再生位置
 
+// 時止め・撮影ボタンの DOM参照（startApp内で取得後に代入）
+let freezeShootBtnEl: HTMLButtonElement | null = null;
+
 // 撮影枚数（コレクション型の記念記録）
 let photoCount = 0;
 
@@ -180,16 +183,23 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       isPlaying = true;
       const btn = document.getElementById("play-btn");
       if (btn) btn.textContent = "⏸ 一時停止";
+      // 時止めボタンを表示
+      freezeShootBtnEl?.classList.remove("hidden");
+      updateFreezeShootBtn();
     },
     onPause: () => {
       isPlaying = false;
       const btn = document.getElementById("play-btn");
       if (btn) btn.textContent = "▶ 再生";
+      // 停止中は時止めボタンを非表示（フリーズ中はのぞいてたまま）
+      if (!isFrozen) freezeShootBtnEl?.classList.add("hidden");
     },
     onStop: () => {
       isPlaying = false;
       // フリーズモード中だった場合も解除
       if (isFrozen) exitFreezeMode();
+      // 時止めボタンを非表示
+      freezeShootBtnEl?.classList.add("hidden");
       // 3D歌詞をクリア
       lyric3d?.clear();
       // 曲終了 → ギャラリー表示
@@ -226,21 +236,10 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   lyric3d = new Lyric3D(scene);
   shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
 
-  // 撮影コールバック：
-  //   再生中 → フリーズモード（時を止める）に入る
-  //   フリーズ中 → 撮影して再開
+  // 撮影コールバック（shutterSystem.shoot（）のラッパー— 直接撮影のみ）
   shutterSystem.setManualShutterCallback(() => {
-    if (!isPlaying) return; // 停止中は無視
-
-    if (!isFrozen) {
-      // 初回タップ → 時を止める
-      enterFreezeMode();
-    } else {
-      // 2回目タップ → 決定的瞬間を撮影 → 再開
-      const lyric = document.getElementById("lyric-word")?.textContent ?? "";
-      shutterSystem?.shoot(lyric);
-      exitFreezeMode();
-    }
+    const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+    shutterSystem?.shoot(lyric);
   });
 
   // 写真追加時に枚数カウントを更新
@@ -248,6 +247,23 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     photoCount++;
     updatePhotoCount();
   });
+
+  // ── #freeze-shoot-btn: 時止め・撮影の切り替わりボタン ──
+  const freezeShootBtn = document.getElementById("freeze-shoot-btn") as HTMLButtonElement | null;
+  freezeShootBtn?.addEventListener("click", () => {
+    if (!isFrozen) {
+      // 「時を止める」→ フリーズモードへ
+      enterFreezeMode();
+    } else {
+      // 「撮影」→ 決定的瞬間を撮影して自動再開
+      const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+      shutterSystem?.shoot(lyric);
+      exitFreezeMode();
+    }
+  });
+  // freezeShootBtnElにDOM参照を保持（enterFreezeMode/exitFreezeModeから参照可能にする）
+  freezeShootBtnEl = freezeShootBtn;
+
 
   // ⑦ 再生ボタン
   const playBtn = document.getElementById("play-btn");
@@ -390,7 +406,7 @@ function triggerBeatPulse(): void {
   const lyricWord = document.getElementById("lyric-word");
   if (lyricWord) {
     lyricWord.classList.remove("beat-pulse");
-    void lyricWord.offsetWidth; // reflow でアニメーション再開
+    void lyricWord.offsetWidth;
     lyricWord.classList.add("beat-pulse");
   }
 
@@ -399,6 +415,22 @@ function triggerBeatPulse(): void {
     vfFrame.classList.remove("beat-pulse-glow");
     void vfFrame.offsetWidth;
     vfFrame.classList.add("beat-pulse-glow");
+  }
+}
+
+/**
+ * #freeze-shoot-btnのラベル・アイコン・クラスを isFrozen の状態に合わせて更新
+ * フリーズ中: マゼンタで「📷 撮影」
+ * 通常時: シアンで「⏳ 時を止める」
+ */
+function updateFreezeShootBtn(): void {
+  if (!freezeShootBtnEl) return;
+  if (isFrozen) {
+    freezeShootBtnEl.textContent = "📷 撮影";
+    freezeShootBtnEl.classList.add("shooting");
+  } else {
+    freezeShootBtnEl.textContent = "⏳ 時を止める";
+    freezeShootBtnEl.classList.remove("shooting");
   }
 }
 
@@ -440,6 +472,9 @@ function enterFreezeMode(): void {
   const playBtn = document.getElementById("play-btn");
   if (playBtn) playBtn.textContent = "▶ 再生";
 
+  // 時止めボタンを「📷 撮影」表示に切り替え
+  updateFreezeShootBtn();
+
   // GlowLayer を強めて「止まった世界」感を演出
   if (glowLayer) glowLayer.intensity = 2.0;
 }
@@ -457,6 +492,9 @@ function exitFreezeMode(): void {
   // フリーズUI を隠す
   const freezeUi = document.getElementById("freeze-ui");
   if (freezeUi) freezeUi.classList.add("hidden");
+
+  // 時止めボタンを「⏳ 時を止める」表示に戻す
+  updateFreezeShootBtn();
 
   // TextAlive 再生を再開
   taSync?.play();

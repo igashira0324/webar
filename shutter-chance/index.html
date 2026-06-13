@@ -124,6 +124,15 @@
       position: absolute; inset: 52px 0 0 0; pointer-events: none;
       display: flex; flex-direction: column; justify-content: space-between; padding: 12px;
       z-index: 50;
+      transition: bottom 0.3s ease;
+    }
+
+    /* If fallback banner is visible, lift the main UI controls up so they don't get covered */
+    body.has-fallback-banner #main-ui {
+      bottom: 96px;
+    }
+    body.has-fallback-banner #photo-stack {
+      bottom: 176px;
     }
 
     /* ── Lyrics ── */

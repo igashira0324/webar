@@ -116,6 +116,7 @@ async function startApp(mode: "ar" | "studio") {
   // AR非対応環境 → フォールバックバナー表示
   if (mode === "studio") {
     setupFallbackBanner("ar-fallback-banner", AR_URL);
+    document.body.classList.add("has-fallback-banner");
   }
 
   // ④ MMDランタイム + ミクモデル + VMDロード

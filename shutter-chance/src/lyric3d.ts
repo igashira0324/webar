@@ -145,13 +145,11 @@ export class Lyric3D {
     const pos = this._findFreeSpawnPos();
 
     // ── Plane メッシュ
-    const hasNewLine = text.includes("\n");
-    const lines = text.split("\n");
-    const maxLineCharCount = Math.max(...lines.map(line => [...line].length));
+    const charCount = [...text].length;
 
-    // 長いフレーズが来ても巨大になりすぎないよう制限。改行時は高さを1.6倍にする。
-    const pw = Math.max(0.8, Math.min(2.5, maxLineCharCount * (isChorus ? 0.22 : 0.18)));
-    const ph = (isChorus ? 0.7 : 0.55) * (hasNewLine ? 1.6 : 1.0);
+    // 単語ベースでのサイズ計算。
+    const pw = Math.max(0.6, Math.min(2.0, charCount * (isChorus ? 0.22 : 0.18)));
+    const ph = isChorus ? 0.45 : 0.35;
     const plane = MeshBuilder.CreatePlane("lyric", { width: pw, height: ph }, this.scene);
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
     plane.parent = this.container;
@@ -169,17 +167,17 @@ export class Lyric3D {
     plane.material = mat;
 
     // ── テクスチャ / テキスト
-    // 解像度も大きくなりすぎないように制限。改行時は高さを1.6倍にする。
-    const texW = Math.max(512, Math.min(1024, maxLineCharCount * 60));
-    const texH = (isChorus ? 200 : 160) * (hasNewLine ? 1.6 : 1.0);
+    // 単語表示に適した解像度
+    const texW = Math.max(256, Math.min(512, charCount * 64));
+    const texH = isChorus ? 100 : 80;
     const tex = AdvancedDynamicTexture.CreateForMesh(plane, texW, texH, false);
     const tb = new TextBlock();
     tb.text = text;
-    tb.textWrapping = true; // 折り返し・改行を有効化
+    tb.textWrapping = false; // 改行・折り返しを無効化
     tb.fontFamily = "'Orbitron', 'Noto Sans JP', sans-serif";
-    // 最長行の文字数に応じてフォントサイズを動的に縮小する
-    const baseFontSize = isChorus ? 90 : 70;
-    const calculatedFontSize = Math.max(32, Math.min(baseFontSize, Math.floor((texW / maxLineCharCount) * 1.2)));
+    // 文字数に応じてフォントサイズを動的に縮小する
+    const baseFontSize = isChorus ? 56 : 46;
+    const calculatedFontSize = Math.max(24, Math.min(baseFontSize, Math.floor((texW / charCount) * 1.15)));
     tb.fontSize = `${calculatedFontSize}px`;
     tb.fontWeight = "bold";
     tb.color = isChorus ? "#f0abfc" : "#67e8f9";

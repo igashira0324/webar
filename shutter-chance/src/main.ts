@@ -42,7 +42,7 @@ let isHolding = false;
 let currentPosition = 0;      // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
-let lastPhraseStartTime = -1; // 3D歌詞の重複ポップアップ防止用フレーズ開始時刻トラッキング
+let lastWordStartTime = -1; // 3D歌詞の重複ポップアップ防止用単語開始時刻トラッキング
 let finaleTriggered = false;   // 曲終わりのフィナーレ演出が発火したかどうかのフラグ
 
 // ── フリーズモード（光のシャッターで時を止める）
@@ -333,26 +333,6 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   */
 }
 
-/** 3D表示用に長い歌詞フレーズを適切に改行するヘルパー関数 */
-function splitTextForLyric(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.length <= 8) return trimmed;
-
-  // 読点（、，）や空白があればそこを優先的に改行位置とする
-  const splitChars = [" ", "　", "、", "，"];
-  for (const char of splitChars) {
-    const idx = trimmed.indexOf(char);
-    if (idx > 2 && idx < trimmed.length - 2) {
-      // 適切な範囲にある区切り文字で分割
-      return trimmed.substring(0, idx + 1).trim() + "\n" + trimmed.substring(idx + 1).trim();
-    }
-  }
-
-  // なければほぼ中央で分割
-  const half = Math.floor(trimmed.length / 2);
-  return trimmed.substring(0, half) + "\n" + trimmed.substring(half);
-}
-
 // ──────────────────────────────────────────────
 // レンダーループ毎 of サブシステム更新
 // ──────────────────────────────────────────────
@@ -373,21 +353,23 @@ function onTick(position: number): void {
   }
   isHolding = false;
 
-  // 1. 3D空間の歌詞ポップアップ制御
-  const phraseInfo = taSync.getCurrentPhraseInfo(position);
-  if (phraseInfo) {
-    if (phraseInfo.startTime !== lastPhraseStartTime) {
-      lastPhraseStartTime = phraseInfo.startTime;
-      const text = phraseInfo.text.trim();
-      // 助詞単独（1文字の「の」「を」「て」「に」「は」「が」「と」「も」「で」「や」「た」「し」など）はスキップするフィルタ
-      const particleFilter = /^[のをてにはがともでやたし]$/;
-      if (text.length > 0 && !particleFilter.test(text)) {
-        // 3D空間にフレーズをポップアップ（表示時間は lyric3d 内部で管理、長いものは改行）
-        lyric3d?.spawnWord(splitTextForLyric(text), 0, isInChorus);
+  // 1. 3D空間の歌詞ポップアップ制御（自立語＋助詞結合した単語ベースでのポップ）
+  const wordInfo = taSync.getMergedWordInfo(position);
+  if (wordInfo) {
+    if (wordInfo.startTime !== lastWordStartTime) {
+      lastWordStartTime = wordInfo.startTime;
+      const text = wordInfo.text.trim();
+      if (text.length > 0) {
+        // 3D空間に単語を表示（表示時間は lyric3d 内部で管理）
+        lyric3d?.spawnWord(text, 0, isInChorus);
       }
     }
   } else {
-    lastPhraseStartTime = -1;
+    // 現在再生位置で単語が得られない場合はトラッキングをリセット
+    // ※ 助詞でスキップされている間は lastWordStartTime をリセットせず維持する
+    if (!taSync.getCurrentWord(position)) {
+      lastWordStartTime = -1;
+    }
   }
 
   // 毎フレーム 3D歌詞のアニメーション（フェードアウト、上昇等）を更新

@@ -124,6 +124,61 @@ export class TextAliveSync {
     };
   }
 
+  /** 
+   * 現在発声中の単語情報（自立語に後ろの助詞・助動詞を結合した状態）を取得する。
+   * 自立語が発声されたタイミングでのみ返し、付属語単独が発声されたタイミングでは null を返すことで、
+   * 単語単位の pop と助詞の結合を両立させる。
+   */
+  getMergedWordInfo(position: number): { text: string; startTime: number; isChorus: boolean } | null {
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);
+    if (!word) return null;
+
+    // 現在の単語が「付属語」である場合は null を返す（自立語のタイミングで結合されて spawn 済みのためスキップ）
+    if (this._isAuxiliaryWord(word)) {
+      return null;
+    }
+
+    // 自立語の場合、後ろに続く「付属語」をすべて連結する
+    let mergedText = word.text;
+    let nextWord = word.next;
+    while (nextWord && this._isAuxiliaryWord(nextWord)) {
+      mergedText += nextWord.text;
+      nextWord = nextWord.next;
+    }
+
+    const phrase = this.player.video.findPhrase(position);
+    const isChorus = phrase?.isChorus ?? false;
+
+    return {
+      text: mergedText,
+      startTime: word.startTime,
+      isChorus,
+    };
+  }
+
+  /** 単語が付属語（助詞・助動詞）であるか判定する */
+  private _isAuxiliaryWord(word: any): boolean {
+    if (!word) return false;
+    const text = word.text.trim();
+    if (text.length === 0) return false;
+
+    // 1. 品詞による判定 (TextAliveの日本語解析では pos が "助詞" または "助動詞" など)
+    const pos = word.pos || "";
+    if (pos === "助詞" || pos === "助動詞" || pos === "P" || pos === "M" || pos === "particle" || pos === "auxiliary-verb") {
+      return true;
+    }
+
+    // 2. 文字列パターンによる判定 (品詞が取得できない、または別の文字で返ってきた場合のためのセーフティネット)
+    // ひらがな1〜2文字の典型的な助詞・助動詞
+    const particleFilter = /^[のをてにはがともでやたしだなどにもかへより]$/;
+    if (particleFilter.test(text)) {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * 現在フレーズの「決めの瞬間」時刻(ms)を返す。
    * フレーズの最後の単語の startTime を「シャッターチャンス」と定義。

@@ -71,8 +71,8 @@ export class TextAliveSync {
     this.player = new Player({
       app: { token: APP_TOKEN },
       mediaElement,
-      listener,
     });
+    this.player.addListener(listener);
   }
 
   get isReady(): boolean {

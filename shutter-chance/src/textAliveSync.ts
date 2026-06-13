@@ -275,6 +275,36 @@ export class TextAliveSync {
     return this.player;
   }
 
+  /**
+   * 撮影タイミング評価を返す（シャッターチャンス判定）
+   * - PERFECT: フレーズclimaxタイミング ±400ms 以内
+   * - SPARK:   サビ区間内での撮影
+   * - BEAT:    ビート強拍（position=0の拍）±200ms 以内
+   * - CAPTURED: それ以外
+   */
+  getShotRating(position: number): "PERFECT" | "SPARK" | "BEAT" | "CAPTURED" {
+    if (!this.player) return "CAPTURED";
+
+    // PERFECT: フレーズ最後の単語タイミング ±400ms
+    const climaxTime = this.getPhraseClimaxTime(position);
+    if (climaxTime !== null && Math.abs(position - climaxTime) <= 400) {
+      return "PERFECT";
+    }
+
+    // SPARK: サビ区間内
+    if (this.isInChorus(position)) {
+      return "SPARK";
+    }
+
+    // BEAT: ビート強拍（小節の1拍目）±200ms
+    const beat = this.getCurrentBeat(position);
+    if (beat && beat.index === 0 && Math.abs(position - beat.startTime) <= 200) {
+      return "BEAT";
+    }
+
+    return "CAPTURED";
+  }
+
   dispose(): void {
     this.player?.dispose();
     this.player = null;

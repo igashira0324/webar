@@ -7,7 +7,7 @@ export type ShutterPhoto = {
   dataUrl: string;
   timestamp: number;
   lyric: string;
-  // rating は廃止 — コレクション型のため判定なし
+  rating?: string; // タイミング評価 (PERFECT, SPARK, BEAT, CAPTURED)
 };
 
 export class ShutterSystem {
@@ -79,7 +79,7 @@ export class ShutterSystem {
 
 
   /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成（記念コレクション用） */
-  async shoot(currentLyric: string): Promise<void> {
+  async shoot(currentLyric: string, rating?: string): Promise<void> {
     if (this.shutterCooldown) return;
     this.shutterCooldown = true;
 
@@ -97,7 +97,7 @@ export class ShutterSystem {
         dataUrl,
         timestamp: Date.now(),
         lyric: currentLyric,
-        // rating なし — 思い出コレクションとして保存
+        rating,
       };
       this.photos.push(photo);
       this.addPolaroidToStack(photo);
@@ -108,10 +108,7 @@ export class ShutterSystem {
       }
     }
 
-    // ④ ビューファインダーを閉じる
-    this.hideViewfinder();
-
-    // ⑤ クールダウン（2秒）
+    // ④ クールダウン（2秒）
     setTimeout(() => {
       this.shutterCooldown = false;
     }, 2000);
@@ -167,7 +164,14 @@ export class ShutterSystem {
 
     const caption = document.createElement("div");
     caption.className = "polaroid-caption";
-    caption.textContent = photo.lyric || "♪";
+    
+    // 評価テキストの成形
+    let ratingStr = "";
+    if (photo.rating === "PERFECT") ratingStr = "✨ PERFECT SHOT! ✨\n";
+    else if (photo.rating === "SPARK") ratingStr = "⚡ SPARK BONUS ⚡\n";
+    else if (photo.rating === "BEAT") ratingStr = "🎵 BEAT BONUS 🎵\n";
+    
+    caption.innerText = `${ratingStr}${photo.lyric || "♪"}\n\n© 夜未アガリ / Piapro`;
 
     polaroid.appendChild(img);
     polaroid.appendChild(caption);
@@ -208,7 +212,13 @@ export class ShutterSystem {
 
       const cap = document.createElement("div");
       cap.className = "gallery-caption";
-      cap.textContent = photo.lyric || "♪";
+      
+      let ratingStr = "";
+      if (photo.rating === "PERFECT") ratingStr = "[PERFECT] ";
+      else if (photo.rating === "SPARK") ratingStr = "[SPARK] ";
+      else if (photo.rating === "BEAT") ratingStr = "[BEAT] ";
+      
+      cap.innerText = `${ratingStr}${photo.lyric || "♪"}\n© 夜未アガリ / Piapro`;
 
       item.appendChild(img);
       item.appendChild(cap);

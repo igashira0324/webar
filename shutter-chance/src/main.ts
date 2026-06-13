@@ -48,6 +48,10 @@ let finaleTriggered = false;   // 曲終わりのフィナーレ演出が発火�
 let isFrozen = false;          // フリーズ中フラグ
 let frozenPosition = 0;        // フリーズ時に保存した再生位置
 
+// ── デモモード（審査員向け自動再生）
+let isDemoMode = false;        // デモモード動作中か
+let lastDemoActionTime = 0;    // デモアクションの最終時刻トラッキング
+
 // 時止め・撮影ボタンの DOM参照（startApp内で取得後に代入）
 let freezeShootBtnEl: HTMLButtonElement | null = null;
 
@@ -79,6 +83,7 @@ function showModeSelect(arSupported: boolean): void {
   const modeSelect = document.getElementById("mode-select")!;
   const arBtn = document.getElementById("btn-ar")!;
   const studioBtn = document.getElementById("btn-studio")!;
+  const demoBtn = document.getElementById("btn-demo")!;
 
   if (!arSupported) {
     arBtn.setAttribute("disabled", "true");
@@ -99,7 +104,14 @@ function showModeSelect(arSupported: boolean): void {
     document.getElementById("loading")?.classList.remove("hidden");
     startApp("studio");
   });
+  demoBtn.addEventListener("click", () => {
+    modeSelect.classList.add("hidden");
+    document.getElementById("loading")?.classList.remove("hidden");
+    isDemoMode = true;
+    startApp("studio"); // デモはスタジオモードベースで起動
+  });
 }
+
 
 // ──────────────────────────────────────────────
 // アプリ本体起動
@@ -118,12 +130,12 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     scene = result.scene;
     shadowGenerator = result.shadowGenerator;
     enterAR = result.enterAR ?? null;
-    setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
+    setupFallbackBanner("ar-fallback-banner", AR_URL);
   } else {
     const result = await createStudioScene(canvas);
     scene = result.scene;
     shadowGenerator = result.shadowGenerator;
-    setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
+    setupFallbackBanner("ar-fallback-banner", AR_URL);
   }
 
   // ② GlowLayer（歌詞の発光演出用）
@@ -178,6 +190,15 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       lyricDisplay?.show();
       // ウェルカムオーバーレイを表示（3秒後に自動消える）
       showWelcomeOverlay();
+
+      // デモモードなら自動再生開始 & ナビタイトル変更
+      if (isDemoMode) {
+        const titleEl = document.querySelector(".nav-title");
+        if (titleEl) titleEl.innerHTML = "🎬 デモモード (自動再生)";
+        setTimeout(() => {
+          taSync?.play();
+        }, 1000);
+      }
     },
     onPlay: () => {
       isPlaying = true;
@@ -206,8 +227,10 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       if (!finaleTriggered) {
         lyric3d?.clear();
       }
-      // 曲終了 → ギャラリー表示
-      setTimeout(() => openGallery(), 1500);
+      // 曲終了 → ギャラリー表示（デモモード時は自動リロードされるためスキップ）
+      if (!isDemoMode) {
+        setTimeout(() => openGallery(), 1500);
+      }
     },
     onTimeUpdate: (pos) => {
       // onTimeUpdate は TextAlive が再生進行に合わせて確実に発火するコールバック
@@ -230,6 +253,15 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     const pos = currentPosition;
     onTick(pos);
 
+    // デモモード中はカメラを自動で旋回させ、オートシーケンスを実行
+    if (isDemoMode && isPlaying && !isFrozen) {
+      const camera = scene.activeCamera as any;
+      if (camera && typeof camera.alpha === "number") {
+        camera.alpha += 0.003;
+      }
+      updateDemoSequence(pos);
+    }
+
     // フリーズ中はMMDアニメーションを進めない（その瞬間のポーズで静止）
     if (!isPlaying || !mmdRuntime || isFrozen) return;
     mmdRuntime.seekAnimation((pos / 1000) * 30, true);
@@ -243,7 +275,9 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   // 撮影コールバック（shutterSystem.shoot（）のラッパー— 直接撮影のみ）
   shutterSystem.setManualShutterCallback(() => {
     const lyric = document.getElementById("lyric-word")?.textContent ?? "";
-    shutterSystem?.shoot(lyric);
+    const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
+    shutterSystem?.shoot(lyric, rating);
+    showRatingPopup(rating);
   });
 
   // 写真追加時に枚数カウントを更新
@@ -261,7 +295,9 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     } else {
       // 「撮影」→ 決定的瞬間を撮影して自動再開
       const lyric = document.getElementById("lyric-word")?.textContent ?? "";
-      shutterSystem?.shoot(lyric);
+      const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
+      shutterSystem?.shoot(lyric, rating);
+      showRatingPopup(rating);
       exitFreezeMode();
     }
   });
@@ -552,6 +588,115 @@ function showMainUI(): void {
   document.getElementById("main-ui")?.classList.remove("hidden");
   document.getElementById("loading")?.classList.add("hidden");
 }
+
+/** 撮影タイミングの判定結果を画面中央にポップアップ表示する */
+function showRatingPopup(rating: string): void {
+  const pop = document.getElementById("shot-rating-pop");
+  if (!pop) return;
+
+  const labelEl = pop.querySelector(".rating-label") as HTMLElement;
+  const subEl = pop.querySelector(".rating-sub") as HTMLElement;
+  if (!labelEl || !subEl) return;
+
+  pop.classList.remove("hidden", "show", "hide", "perfect", "spark", "beat", "captured");
+
+  let label = "";
+  let sub = "";
+  let className = "";
+
+  if (rating === "PERFECT") {
+    label = "PERFECT SHOT! ✨";
+    sub = "CLIMAX TIMING BONUS";
+    className = "perfect";
+  } else if (rating === "SPARK") {
+    label = "SPARK BONUS ⚡";
+    sub = "CHORUS SYNC BONUS";
+    className = "spark";
+  } else if (rating === "BEAT") {
+    label = "BEAT BONUS 🎵";
+    sub = "DOWNBEAT HIT";
+    className = "beat";
+  } else {
+    label = "CAPTURED 📷";
+    sub = "SHUTTER CHANCE";
+    className = "captured";
+  }
+
+  labelEl.textContent = label;
+  subEl.textContent = sub;
+  pop.classList.add(className, "show");
+
+  // アニメーション用に遅延してhideにする
+  setTimeout(() => {
+    pop.classList.remove("show");
+    pop.classList.add("hide");
+    setTimeout(() => {
+      pop.classList.add("hidden");
+      pop.classList.remove("hide", className);
+    }, 500);
+  }, 900);
+}
+
+/** デモモード中の自動操作シーケンス (時止め・撮影) */
+function updateDemoSequence(pos: number): void {
+  if (!isDemoMode || !isPlaying) return;
+
+  const currentChorusStart = taSync?.getCurrentChorusStart(pos) ?? -1;
+  const inChorus = taSync?.isInChorus(pos) ?? false;
+
+  // 1. サビ中: 時止めがまだ発動していない & 最終デモアクションから15秒以上経っている場合
+  if (inChorus && currentChorusStart !== -1 && !isFrozen && (pos - lastDemoActionTime > 15000)) {
+    const timeInChorus = pos - currentChorusStart;
+    // サビ開始から2秒〜6秒の間で自動で時止め
+    if (timeInChorus > 2000 && timeInChorus < 6000) {
+      console.log("[Demo] Auto-freezing in chorus at pos:", pos);
+      lastDemoActionTime = pos;
+      enterFreezeMode();
+
+      // 1.5秒後に自動撮影 & 再開
+      setTimeout(() => {
+        if (isDemoMode && isFrozen) {
+          console.log("[Demo] Auto-shooting in chorus...");
+          const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+          const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
+          shutterSystem?.shoot(lyric, rating);
+          showRatingPopup(rating);
+          exitFreezeMode();
+        }
+      }, 1500);
+    }
+  }
+
+  // 2. A/Bメロ中: 最終デモアクションから20秒以上経過し、フレーズの最後の単語タイミング（シャッターチャンス）に近い場合
+  if (!inChorus && !isFrozen && (pos - lastDemoActionTime > 20000)) {
+    const climaxTime = taSync?.getPhraseClimaxTime(pos);
+    if (climaxTime && Math.abs(pos - climaxTime) < 500) {
+      console.log("[Demo] Auto-freezing at phrase climax at pos:", pos);
+      lastDemoActionTime = pos;
+      enterFreezeMode();
+
+      // 1.5秒後に自動撮影 & 再開
+      setTimeout(() => {
+        if (isDemoMode && isFrozen) {
+          console.log("[Demo] Auto-shooting at phrase climax...");
+          const lyric = document.getElementById("lyric-word")?.textContent ?? "";
+          const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
+          shutterSystem?.shoot(lyric, rating);
+          showRatingPopup(rating);
+          exitFreezeMode();
+        }
+      }, 1500);
+    }
+  }
+
+  // 3. デモ終了制御: 曲が終わってフィナーレが始まり、さらに12秒経過したら元の画面に戻す
+  if (finaleTriggered && (pos - lastDemoActionTime > 12000)) {
+    console.log("[Demo] Auto-reloading back to mode select...");
+    window.location.reload();
+  }
+}
+
+
 
 // ──────────────────────────────────────────────
 // エントリ

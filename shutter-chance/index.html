@@ -435,12 +435,53 @@
     }
     #freeze-resume-btn:hover { background: rgba(100,200,255,0.3); }
 
+
+    /* ── シャッターチャンス判定ポップアップ ── */
+    #shot-rating-pop {
+      position: absolute; top: 35%; left: 50%; transform: translateX(-50%) translateY(-50%) scale(0.6);
+      z-index: 500; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; font-weight: 900; letter-spacing: 4px;
+      text-align: center; white-space: nowrap;
+      opacity: 0; transition: opacity 0.1s, transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    #shot-rating-pop.show {
+      opacity: 1; transform: translateX(-50%) translateY(-50%) scale(1);
+    }
+    #shot-rating-pop.hide {
+      opacity: 0; transform: translateX(-50%) translateY(-50%) scale(1.2);
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+    #shot-rating-pop .rating-label {
+      display: block; font-size: 1.6rem;
+    }
+    #shot-rating-pop .rating-sub {
+      display: block; font-size: 0.7rem; letter-spacing: 5px; opacity: 0.8; margin-top: 4px;
+    }
+    #shot-rating-pop.perfect .rating-label { color: var(--cyan); text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,229,255,0.5); }
+    #shot-rating-pop.spark   .rating-label { color: var(--pink); text-shadow: 0 0 20px var(--pink), 0 0 40px rgba(255,43,214,0.5); }
+    #shot-rating-pop.beat    .rating-label { color: var(--amber); text-shadow: 0 0 20px var(--amber); }
+    #shot-rating-pop.captured .rating-label { color: var(--dim); }
+
     /* ── AR overlay ── */
     #ar-overlay {
       position: absolute; inset: 52px 0 0 0; z-index: 55;
       display: none; pointer-events: none;
     }
     #ar-overlay.active { display: block; pointer-events: auto; }
+    /* AR配置ガイド (未配置時のみ表示) */
+    #ar-place-guide {
+      position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+      background: rgba(4,8,20,0.82); backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,229,255,0.4); border-radius: 20px;
+      padding: 10px 22px; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; font-size: 0.78rem; color: var(--cyan);
+      letter-spacing: 1px; text-align: center; z-index: 56;
+      animation: guidePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes guidePulse {
+      0%,100% { opacity: 0.9; } 50% { opacity: 0.5; }
+    }
+    #ar-place-guide.placed { display: none; }
 
     /* ── Hidden audio element for TextAlive ── */
     #textalive-media { display: none; }
@@ -473,6 +514,7 @@
     <div id="ar-status-area"></div>
     <button id="btn-ar" class="mode-btn">🥽 ARモードで体験する</button>
     <button id="btn-studio" class="mode-btn">🎬 スタジオモードで見る</button>
+    <button id="btn-demo" class="mode-btn" style="background:var(--glass);color:var(--dim);border:1px solid var(--border);font-size:0.8rem;">🎥 デモを見る（自動再生）</button>
   </div>
 
   <!-- Main UI (visible after load) -->
@@ -530,8 +572,16 @@
   <!-- AR fallback banner -->
   <div id="ar-fallback-banner"></div>
 
-  <!-- AR DOM overlay -->
-  <div id="ar-overlay"></div>
+  <!-- AR DOM overlay (タップ配置ガイド含む) -->
+  <div id="ar-overlay">
+    <div id="ar-place-guide">📱 床を映してタップすると<br>ミクと歌詞が配置されます</div>
+  </div>
+
+  <!-- シャッターチャンス判定ポップアップ -->
+  <div id="shot-rating-pop" class="hidden">
+    <span class="rating-label"></span>
+    <span class="rating-sub"></span>
+  </div>
 
   <!-- Gallery modal -->
   <div id="gallery-modal" class="hidden">
@@ -551,19 +601,34 @@
     <div class="credits-body">
       <h3>🎵 楽曲</h3>
       <p>シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン<br>
-      © 夜未アガリ / Piapro</p>
+      © 夜未アガリ / Piapro<br>
+      (ピアプロ楽曲利用規約に基づき非営利目的で利用)</p>
 
       <h3>🎤 歌詞同期</h3>
       <p>TextAlive App API<br>© Textalive, Inc.</p>
 
-      <h3>🧊 3Dエンジン</h3>
-      <p>Babylon.js / babylon-mmd</p>
+      <h3>🧊 3Dエンジン / ライブラリ</h3>
+      <p>Babylon.js (Apache License 2.0)<br>
+      babylon-mmd (MIT License)<br>
+      Havok Physics WASM (Copyright Microsoft / Autodesk / Unity)</p>
 
       <h3>💃 3Dモデル・モーション</h3>
-      <ul>
-        <li>モデル作者: （ここに作者名を記載）</li>
-        <li>モーション作者: （ここに作者名を記載）</li>
-        <li>※ 使用モデル・モーションは各作者の規約に従って利用しています</li>
+      <div style="font-size:0.75rem; line-height:1.4; color:var(--text); background:rgba(255,255,255,0.05); padding:8px; border-radius:8px; border:1px dashed var(--border); margin-bottom:12px;">
+        <strong>【重要: 応募提出時のライセンス表示】</strong><br>
+        コンテスト規定に基づき、実機アセット（MMDモデル・モーション）の著作者情報および配布元URLを以下に追記して提出してください。
+      </div>
+      <ul style="padding-left:15px; font-size:0.78rem;">
+        <li><strong>MMD 3Dモデル</strong>:
+          <br>モデル名: 初音ミクモデル
+          <br>作者: （ここに作者名をご記入ください）
+          <br>配布元URL / 規約: （ここにURLを記入）
+        </li>
+        <li style="margin-top:8px;"><strong>MMD ダンスモーション</strong>:
+          <br>モーション名: ディンドンダンダンスモーション (dindondan.vmd)
+          <br>作者: （ここに作者名をご記入ください）
+          <br>配布元URL / 規約: （ここにURLを記入）
+        </li>
+        <li style="margin-top:8px; color:var(--dim);">※ 本作品は各制作者様の二次創作利用規約およびコンテスト応募規約（非営利目的）に従って作成・構成されています。</li>
       </ul>
 
       <h3>📱 AR体験</h3>

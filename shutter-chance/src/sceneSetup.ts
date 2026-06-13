@@ -88,11 +88,15 @@ export async function createARScene(canvas: HTMLCanvasElement): Promise<SceneBun
       (scene as any)._xrData = { xr, hitTest, arRoot };
 
       xr.baseExperience.onStateChangedObservable.add((state) => {
+        const arOverlay = document.getElementById("ar-overlay");
         if (state === WebXRState.IN_XR) {
           scene.clearColor = new Color4(0, 0, 0, 0);
           arRoot.setEnabled(true);
+          // ar-overlay を有効化してタップ配置を受け付ける
+          arOverlay?.classList.add("active");
         } else if (state === WebXRState.NOT_IN_XR) {
           scene.clearColor = new Color4(0.03, 0.03, 0.12, 1.0);
+          arOverlay?.classList.remove("active");
         }
       });
 

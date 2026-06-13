@@ -11,14 +11,12 @@ export type ShutterPhoto = {
 };
 
 export class ShutterSystem {
-  private viewfinderEl: HTMLElement;
   private flashEl: HTMLElement;
   private photoStackEl: HTMLElement;
   private photos: ShutterPhoto[] = [];
   private babylonCanvas: HTMLCanvasElement;
 
   // サビ演出の状態管理
-  private viewfinderVisible = false;
   private lastChorusStart = -1;
   private shutterCooldown = false; // 連続撮影防止
 
@@ -27,17 +25,14 @@ export class ShutterSystem {
   private onPhotoCaptured: ((photo: ShutterPhoto) => void) | null = null;
 
   constructor(
-    viewfinderId: string,
     flashId: string,
     photoStackId: string,
     canvas: HTMLCanvasElement
   ) {
-    this.viewfinderEl = document.getElementById(viewfinderId)!;
     this.flashEl = document.getElementById(flashId)!;
     this.photoStackEl = document.getElementById(photoStackId)!;
     this.babylonCanvas = canvas;
-    // ※ 旧: キーボード/タップで時止め発動していたが、専用ボタンに移行したため削除
-    //    → main.ts の #freeze-shoot-btn ハンドラで時止め・撮影を制御する
+    // 撮影は専用ボタン（#freeze-shoot-btn）経由でのみ発動するため、トリガーリスナーは main.ts 側で管理する
   }
 
   setManualShutterCallback(cb: () => void): void {
@@ -59,57 +54,29 @@ export class ShutterSystem {
    * position: 現在再生位置(ms)
    * isInChorus: 現在サビ区間内か
    * currentChorusStart: 現在のサビ開始時刻(ms)。サビ外なら -1
-   * nextChorusStart: 次のサビ開始時刻(ms)
+   * nextChorusStart: 次のサビ開始時刻(ms)（未使用：将来の拡張用に残す）
    * currentLyric: 現在表示中の歌詞テキスト
    */
   update(
     position: number,
     isInChorus: boolean,
     currentChorusStart: number,
-    nextChorusStart: number,
-    currentLyric: string
+    _nextChorusStart: number,
+    _currentLyric: string
   ): void {
     // シークやループ等で時間が巻き戻った場合は判定用キーをリセット
     if (position < this.lastChorusStart) {
       this.lastChorusStart = -1;
     }
 
-    const timeToChorus = nextChorusStart - position;
-
-    // サビ3秒前: ビューファインダー表示
-    if (timeToChorus > 0 && timeToChorus <= 3000 && !this.viewfinderVisible) {
-      this.showViewfinder();
-    }
-
-    // サビ中: 自動撮影は廃止。ビューファインダー枠の表示のみ行う。
-    // 撮影はプレイヤーのタップ/スペースキーのみで発生する（スコアを操作と直結させるため）
+    // サビ中: lastChorusStart を更新して状態を管理（撮影はボタン経由のみ）
     if (isInChorus && currentChorusStart !== -1) {
-      // 新しいサビに入ったときにだけ lastChorusStart を更新（状態管理のため残す）
       if (currentChorusStart !== this.lastChorusStart) {
         this.lastChorusStart = currentChorusStart;
       }
-      // ビューファインダー枠はサビ中も表示し続ける（「チャンス区間」の視覚的提示）
-    } else if (!isInChorus) {
-      // サビ外でビューファインダーを非表示
-      if (this.viewfinderVisible) {
-        this.hideViewfinder();
-      }
     }
   }
 
-  /** ビューファインダーフレームをフェードイン表示 */
-  private showViewfinder(): void {
-    this.viewfinderVisible = true;
-    this.viewfinderEl.classList.add("visible");
-    // AFロック演出（段階的に色が変わる）
-    setTimeout(() => this.viewfinderEl.classList.add("locked"), 1500);
-  }
-
-  /** ビューファインダーを非表示 */
-  private hideViewfinder(): void {
-    this.viewfinderVisible = false;
-    this.viewfinderEl.classList.remove("visible", "locked");
-  }
 
   /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成（記念コレクション用） */
   async shoot(currentLyric: string): Promise<void> {

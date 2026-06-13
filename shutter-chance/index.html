@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Shutter Chance AR ― ミクと撮る一瞬 | マジカルミライ2026</title>
-  <meta name="description" content="マジカルミライ2026プログラミングコンテスト応募作品。TextAlive + WebAR + MMDで「シャッターチャンス」を体験。" />
+  <title>Lyric Spark AR ― 歌詞の海に入る体験 | マジカルミライ2026</title>
+  <meta name="description" content="マジカルミライ2026プログラミングコンテスト応募作品。TextAlive + WebAR + MMDで歌詞が降り積もる世界を体験。光のシャッターで歌詞の一瞬を永遠に。" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
@@ -276,37 +276,6 @@
       50%      { box-shadow: 0 0 28px rgba(232,121,249,0.8), 0 0 6px rgba(255,255,255,0.3); }
     }
 
-    /* ── Viewfinder ── */
-    #viewfinder {
-      position: absolute; inset: 52px 0 0 0; pointer-events: none; z-index: 60;
-      display: none !important;
-      align-items: center; justify-content: center;
-      opacity: 0; transition: opacity 0.5s;
-    }
-    #viewfinder.visible { opacity: 1; }
-    .vf-frame {
-      width: min(70vw, 400px); aspect-ratio: 1;
-      border: 3px solid var(--cyan); border-radius: 8px;
-      box-shadow: 0 0 30px rgba(0,229,255,0.6), inset 0 0 30px rgba(0,229,255,0.08);
-      position: relative;
-    }
-    .vf-corner {
-      position: absolute; width: 20px; height: 20px;
-      border-color: var(--cyan); border-style: solid; border-width: 3px;
-    }
-    .vf-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
-    .vf-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
-    .vf-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
-    .vf-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
-    .vf-label {
-      position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
-      font-family: 'Orbitron', sans-serif; font-size: 0.65rem; letter-spacing: 3px; color: var(--cyan);
-      animation: blink 0.8s ease-in-out infinite;
-    }
-    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-    #viewfinder.locked .vf-frame { border-color: #00ff88; box-shadow: 0 0 30px rgba(0,255,136,0.7); }
-    #viewfinder.locked .vf-label { color: #00ff88; content: "AF ■"; }
-    #viewfinder.locked .vf-corner { border-color: #00ff88; }
     /* ── Game HUD ── */
     #game-hud {
       position: absolute; top: 12px; right: 12px; z-index: 55; pointer-events: none;
@@ -318,24 +287,6 @@
     #game-hud.hidden { display: none; }
     .hud-item { font-size: 1.1rem; font-weight: 900; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
     .hud-stats { font-size: 0.65rem; display: flex; gap: 8px; color: var(--text); }
-    .hud-perf { color: var(--cyan); }
-    .hud-good { color: var(--pink); }
-    .hud-miss { color: var(--amber); }
-
-    /* ── Pop rating ── */
-    .rating-pop {
-      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
-      font-family: 'Orbitron', sans-serif; font-size: 1.8rem; font-weight: 900;
-      opacity: 0; pointer-events: none; z-index: 90;
-      text-shadow: 0 0 15px currentColor;
-      transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .rating-pop.animate {
-      opacity: 1; transform: translate(-50%, -50%) scale(1);
-    }
-    .rating-pop.perfect { color: var(--cyan); }
-    .rating-pop.good { color: var(--pink); }
-    .rating-pop.miss { color: var(--amber); }
     /* ── Flash ── */
     #flash {
       position: absolute; inset: 0; z-index: 200; pointer-events: none;
@@ -367,32 +318,6 @@
       font-size: 0.45rem; text-align: center; color: #333; margin-top: 2px;
       font-family: 'Orbitron', sans-serif; overflow: hidden; white-space: nowrap;
       text-overflow: ellipsis;
-    }
-
-    /* ── サビ用ホールドガイド ── */
-    #chorus-hold-guide {
-      position: absolute;
-      bottom: 20%; left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 900;
-      color: #ffd700;
-      text-shadow: 0 0 10px #ffd700, 0 0 20px #e879f9;
-      pointer-events: none;
-      animation: pulseNeon 0.8s ease-in-out infinite alternate;
-      z-index: 410;
-      letter-spacing: 2px;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 8px 18px;
-      border-radius: 20px;
-      border: 1px solid rgba(232, 121, 249, 0.5);
-      box-shadow: 0 0 15px rgba(232, 121, 249, 0.3);
-      display: none; /* JSでサビ時に表示 */
-    }
-    @keyframes pulseNeon {
-      from { transform: translateX(-50%) scale(0.95); opacity: 0.7; }
-      to { transform: translateX(-50%) scale(1.05); opacity: 1; }
     }
 
     /* ── Fallback banner ── */
@@ -524,7 +449,7 @@
 <body>
 <nav>
   <a href="/" class="nav-back">← もどる</a>
-  <span class="nav-title">📷 SHUTTER CHANCE AR</span>
+  <span class="nav-title">✨ LYRIC SPARK AR</span>
   <span style="font-size:0.65rem;color:var(--dim);">マジカルミライ2026</span>
 </nav>
 
@@ -536,17 +461,17 @@
 
   <!-- Loading -->
   <div id="loading">
-    <div class="loading-logo">SHUTTER CHANCE AR</div>
+    <div class="loading-logo">LYRIC SPARK AR</div>
     <div id="status-message">初期化中...</div>
     <div id="loading-bar"><div id="loading-progress"></div></div>
   </div>
 
   <!-- Mode select -->
   <div id="mode-select" class="hidden">
-    <h2>📷 SHUTTER CHANCE AR</h2>
-    <p>「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」<br>サビの瞬間に、ミクと写真を撮ろう。</p>
+    <h2>✨ LYRIC SPARK AR</h2>
+    <p>「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」<br>歌詞が降り積もる世界に立ち、光のシャッターで<br>歌詞の一瞬を永遠に焼き付けよう。</p>
     <div id="ar-status-area"></div>
-    <button id="btn-ar" class="mode-btn">📷 ARモードで撮影する</button>
+    <button id="btn-ar" class="mode-btn">🥽 ARモードで体験する</button>
     <button id="btn-studio" class="mode-btn">🎬 スタジオモードで見る</button>
   </div>
 
@@ -566,25 +491,12 @@
     <!-- Controls -->
     <div id="controls">
       <button id="play-btn" class="ctrl-btn">▶ 再生</button>
-      <!-- 時止め・撮影ボタン（状態によりラベル・イコンが切り替わる） -->
+      <!-- 時止め・撮影ボタン（状態によりラベル・アイコンが切り替わる） -->
       <button id="freeze-shoot-btn" class="ctrl-btn hidden">⏳ 時を止める</button>
       <button id="ar-start-btn" class="ctrl-btn hidden">🥽 AR起動</button>
       <button id="gallery-btn" class="ctrl-btn">🖼 ギャラリー</button>
       <button id="credits-btn" class="ctrl-btn">ℹ</button>
     </div>
-  </div>
-
-  <!-- Viewfinder overlay -->
-  <div id="viewfinder">
-    <div class="vf-frame">
-      <div class="vf-corner tl"></div>
-      <div class="vf-corner tr"></div>
-      <div class="vf-corner bl"></div>
-      <div class="vf-corner br"></div>
-      <div class="vf-label">AF ○ SHUTTER CHANCE</div>
-    </div>
-    <!-- サビ用の長押しガイド -->
-    <div id="chorus-hold-guide">🔥 TOUCH & HOLD FOR GLOW 🔥</div>
   </div>
 
   <!-- Flash overlay -->

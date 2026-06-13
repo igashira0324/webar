@@ -38,7 +38,6 @@ let lyric3d: Lyric3D | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
 let glowLayer: any = null;
-let isHolding = false;
 let currentPosition = 0;      // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
@@ -239,7 +238,7 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   // ⑥ サブシステム初期化
   lyricDisplay = new LyricDisplay("lyric-word", "lyric-phrase");
   lyric3d = new Lyric3D(scene);
-  shutterSystem = new ShutterSystem("viewfinder", "flash", "photo-stack", canvas);
+  shutterSystem = new ShutterSystem("flash", "photo-stack", canvas);
 
   // 撮影コールバック（shutterSystem.shoot（）のラッパー— 直接撮影のみ）
   shutterSystem.setManualShutterCallback(() => {
@@ -315,22 +314,6 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
       arStartBtn.addEventListener("click", () => enterAR!());
     }
   }
-
-  // ⑪ サビ中の長押し（ホールド）演出イベントリスナー (視認性検証のため一時無効化)
-  /*
-  const startHold = () => {
-    if (taSync?.isReady && taSync.isInChorus(currentPosition)) {
-      isHolding = true;
-    }
-  };
-  const stopHold = () => {
-    isHolding = false;
-  };
-  canvas.addEventListener("pointerdown", startHold);
-  canvas.addEventListener("pointerup", stopHold);
-  canvas.addEventListener("pointercancel", stopHold);
-  canvas.addEventListener("pointerout", stopHold);
-  */
 }
 
 // ──────────────────────────────────────────────
@@ -341,17 +324,10 @@ function onTick(position: number): void {
 
   const isInChorus = taSync.isInChorus(position);
 
-  // サビホールドガイドの表示・非表示制御 (一時無効化のため常に none)
-  const holdGuide = document.getElementById("chorus-hold-guide");
-  if (holdGuide) {
-    holdGuide.style.display = "none";
-  }
-
-  // サビ長押し極限発光演出 (一時無効化し、標準輝度に固定)
+  // サビ区間の発光強度制御
   if (glowLayer) {
     glowLayer.intensity = isInChorus ? 1.2 : 0.8;
   }
-  isHolding = false;
 
   // 1. 3D空間の歌詞ポップアップ制御（自立語＋助詞結合した単語ベースでのポップ）
   const wordInfo = taSync.getMergedWordInfo(position);

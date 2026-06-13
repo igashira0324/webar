@@ -1,103 +1,155 @@
-# Shutter Chance AR ― ミクと撮る一瞬
+# ✨ Lyric Spark AR
 
 **マジカルミライ2026 プログラミング・コンテスト 応募作品**
 
+> TextAlive + WebXR + MMD で「歌詞の海の中に立つ」AR体験。  
+> 降り積もる歌詞の世界で、光のシャッターで歌詞の一瞬を永遠に焼き付けよう。
+
 ---
 
-## 🎵 概要
+## 🎯 コンセプト
 
-課題曲「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」の歌詞・ビート・サビに同期して、
-WebAR空間で初音ミクが踊り、サビの決め瞬間に"シャッターを切って写真が溜まる"体験アプリです。
+「Lyric Spark AR」は、TextAlive App API と WebXR を組み合わせた **歌詞演出主役のリリックARアプリ**です。
 
-### コンセプト
+- **歌詞が降り積もる** — 楽曲「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」に合わせて、初音ミクが踊る現実空間に3Dの歌詞プレーンが次々と湧き上がり、足元に降り積もっていきます。
+- **歌詞の海の中に入り込む** — ARモードではスマートフォンのカメラを通して、現実の部屋にミクと歌詞が実際に立ち上がります。過去のコンテスト作にない「AR×リリック体験」です。
+- **光のシャッターで時を止める** — 「⏳ 時を止める」ボタンで演奏を一時停止し、空間の好きな角度からミクと歌詞を構図に収めて「📷 撮影」できます。撮影した写真はギャラリーに蓄積されます。
+- **積もった歌詞に触れる** — 床に落ちた歌詞をタップすると、♫ や ♡ など音楽・感情を象徴する記号がポップに飛び散ります。
+- **歌詞の星座エンディング** — 曲の終わりに歌詞が舞い上がり、そのままミクの周囲を漂い続ける「歌詞の星座」状態へと移行します。
 
-曲名「シャッターチャンス」を文字通り体験に。
-- サビ前にビューファインダーが現れ、AF合焦演出
-- サビ頭のビートでフラッシュ＋シャッター音→ポラロイド写真が生成
-- 曲が進むほど「ミクとの思い出の写真」が積み重なるギャラリー
+---
+
+## なぜWebARなのか
+
+WebXR ARCore を活用することで、スマートフォンのカメラ越しに初音ミクと歌詞が実際の現実空間に立ち上がります。  
+ユーザーは「歌詞の海の中に入り込む」感覚を得られ、従来の画面上の映像体験とは次元の異なるライブ感を味わえます。  
+インストール不要でブラウザから即アクセスできるため、展示・コンテストでの実演にも適しています。
 
 ---
 
 ## 🛠 技術スタック
 
 | 技術 | 用途 |
-|------|------|
-| [TextAlive App API](https://developer.textalive.jp) | 歌詞・ビート・サビ同期 |
-| [Babylon.js](https://www.babylonjs.com) | 3D/AR レンダリング |
-| [babylon-mmd](https://github.com/noname0310/babylon-mmd) | MMD(PMX/VMD)再生 |
-| WebXR Device API | AR体験（Android/ARCore） |
-| Vite + TypeScript | ビルドツール |
+|---|---|
+| **TypeScript** | メインロジック |
+| **Babylon.js** | 3Dレンダリング・シーン管理 |
+| **babylon-mmd** | PMX/VMDモデル・モーション再生 |
+| **TextAlive App API** | 楽曲・歌詞・ビートのリアルタイム同期 |
+| **WebXR Device API** | ARモード（ARCore対応Android） |
+| **Vite + Vite basic-ssl** | ビルド・HTTPS開発サーバー |
 
 ---
 
-## 📱 動作環境
+## 動作環境
 
-| 環境 | 体験内容 |
-|------|---------|
-| **Android Chrome (ARCore対応)** | フル AR 体験 ★推奨★ |
-| PC Chrome / Safari | スタジオモード（仮想背景で全機能動作） |
-| iOS Safari | スタジオモード（WebXR非対応のためAR不可） |
-
-> **AR体験は Android (ARCore 対応端末) + Chrome が最もリッチに動作します。**
+| 環境 | 対応状況 |
+|---|---|
+| **ARフル体験** | ARCore対応 Android端末 + Chrome (HTTPS必須) |
+| **スタジオモード** | PC / Mac / Android / iOS — 最新Chrome / Safari |
+| **iOS Safari** | AR非対応・スタジオモードのみ |
 
 ---
 
-## 🏗 ビルド・実行手順
+## 🚀 セットアップ
 
 ```bash
-# 依存関係インストール（初回のみ）
+# 依存関係のインストール（Havok物理演算WASMも自動配備）
+make setup
+
+# または
 npm install
+```
 
-# 開発サーバー起動
-npm run dev
-# → http://localhost:5173/shutter-chance/ でアクセス
+### アセットの配置
 
-# 本番ビルド
-npm run build
-# → dist/shutter-chance/index.html が出力される
+```
+public/assets/
+  model/miku.pmx       # MMDモデル
+  motion/dance.vmd     # VMDモーションファイル
+  motion/facial.vmd    # 表情モーション（任意）
 ```
 
 ---
 
-## 🔑 TextAlive App Token 設定
+## 起動方法
 
-`shutter-chance/src/textAliveSync.ts` の以下の箇所に取得したトークンを設定してください：
+### 開発用（PC ブラウザ）
 
-```typescript
-const APP_TOKEN = "1NQ6doQkcHMm1MpI";
+```bash
+make dev
+# → http://localhost:5173/shutter-chance/
 ```
 
-App Token は [developer.textalive.jp](https://developer.textalive.jp) で取得できます。
+### ARモード / 展示用（HTTPS / LAN）
+
+スマートフォンのWebARにはHTTPS接続が必要です。
+
+```bash
+make dev-https
+# → https://[LAN-IP]:5173/shutter-chance/
+```
+
+表示されるLAN IPアドレスにスマートフォンからアクセスしてください。
 
 ---
 
-## 🎵 楽曲情報（バージョン固定）
+## 🎮 使い方
 
-```typescript
-Song URL: "https://piapro.jp/t/PNpQ/20251209170719"
-beatId: 4827295
-chordId: 2963756
-repetitiveSegmentId: 3086263
-lyricId: 126542
-lyricDiffId: 28628
+1. **モード選択** — 「🥽 ARモードで体験する」または「🎬 スタジオモードで見る」を選択
+2. **▶ 再生** — ボタンを押すと楽曲がスタートし、歌詞が3D空間に湧き上がり始めます
+3. **歌詞が降り積もる** — TextAliveから取得した歌詞が、ミクを中心に360度に広がりながら床に積もっていきます
+4. **⏳ 時を止める** — ボタンで時を止めて、好きなアングルでミクと歌詞を構図に収めます
+5. **📷 撮影** — 時止め中にボタンを押すと、現在の画面がポラロイド風にギャラリーへ保存されます
+6. **積もった歌詞をタップ** — 床に落ちた歌詞をタップすると ♫ ♡ ⭐ などの記号が飛び散ります
+7. **フィナーレ** — 曲が終わると積もった歌詞が一斉に舞い上がり、ミクの周囲で星座のように漂い続けます
+8. **🖼 ギャラリー** — 撮影した写真を一覧表示・保存できます
+
+---
+
+## 🎵 楽曲情報
+
+**シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン**
+
+- アーティスト: 夜未アガリ
+- TextAlive 楽曲ID: `https://piapro.jp/t/PNpQ/20251209170719`
+- beatId: 4827295 / lyricId: 126542
+
+---
+
+## 📁 コード構成
+
+```
+shutter-chance/src/
+  main.ts          # アプリ起動・TextAlive連携・レンダーループ
+  textAliveSync.ts # TextAlive App API ラッパー（歌詞・ビート・コーラス取得）
+  lyric3d.ts       # 3D歌詞プレーン管理（生成・アニメーション・タップ・フィナーレ）
+  lyricDisplay.ts  # 2D歌詞オーバーレイ（画面上部のテキスト表示）
+  shutterSystem.ts # シャッター撮影・フラッシュ・ポラロイドスタック管理
+  sceneSetup.ts    # Babylon.jsシーン・カメラ・照明・AR初期化
+  arFallback.ts    # AR非対応時のフォールバックバナー表示
 ```
 
 ---
 
-## 📝 クレジット・ライセンス
+## 🎨 クレジット
 
-- **楽曲**: シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン © 夜未アガリ
-- **TextAlive App API**: © Textalive, Inc.
-- **3Dモデル**: 使用モデルの作者規約に従って使用
-- **キャラクター**: 初音ミク、鏡音リン — © Crypton Future Media, INC. (ピアプロキャラクターズ)
+### 楽曲
+- シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン  
+  © 夜未アガリ / Piapro
 
----
+### 歌詞同期
+- TextAlive App API © Textalive, Inc.
 
-## 📋 使い方
+### 3Dエンジン
+- Babylon.js / babylon-mmd
 
-1. ページを開くとモード選択画面が表示されます
-2. **ARモード**（Android/ARCoreのみ）または **スタジオモード** を選択
-3. ▶ ボタンで楽曲再生開始
-4. サビでビューファインダーが現れ、自動でシャッターが切れます
-5. サビ中は画面タップ（PC: スペースキー）で追加撮影も可能
-6. 🖼 ギャラリーボタンで撮れた写真を確認・保存
+### 3Dモデル・モーション
+<!--
+  ⚠️ 提出前に必ず実名を記入してください（利用規約上の必須事項です）
+-->
+- モデル作者: （ここに作者名を記載）
+- モーション作者: （ここに作者名を記載）
+- ※ 使用モデル・モーションは各作者の規約に従って利用しています
+
+### AR技術
+- WebXR Device API + ARCore (Android Chrome)

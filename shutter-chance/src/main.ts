@@ -103,16 +103,19 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   // ① シーン作成
   const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
   let scene: Scene;
+  let shadowGenerator: any = null;
   let enterAR: (() => void) | null = null;
 
   if (mode === "ar") {
     const result = await createARScene(canvas);
     scene = result.scene;
+    shadowGenerator = result.shadowGenerator;
     enterAR = result.enterAR ?? null;
     setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   } else {
     const result = await createStudioScene(canvas);
     scene = result.scene;
+    shadowGenerator = result.shadowGenerator;
     setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   }
 
@@ -132,9 +135,24 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
   try {
-    mmdModel = await loadMmdModel(scene, mmdRuntime, MIKU_PMX, DANCE_VMD);
+    const result = await loadMmdModel(
+      scene,
+      mmdRuntime,
+      MIKU_PMX,
+      DANCE_VMD,
+      shadowGenerator,
+      undefined,
+      (ev) => {
+        if (ev.lengthComputable && ev.total > 0) {
+          updateLoadingProgress(Math.floor((ev.loaded / ev.total) * 100));
+        }
+      }
+    );
+    mmdModel = result.model;
+    // ミクのスケール・位置をデフォルト値に確実に設定（カメラとの比率を正常に保つ）
+    mmdModel.mesh.scaling.setAll(0.07);
+    mmdModel.mesh.position.y = 0.5;
     setStatusMessage("ミク読み込み完了");
-    updateLoadingProgress(60);
   } catch (e) {
     console.error("MMD load failed:", e);
     setStatusMessage("⚠ モデルの読み込みに失敗しました");

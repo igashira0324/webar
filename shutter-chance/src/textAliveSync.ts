@@ -12,7 +12,7 @@ import { Player, PlayerEventListener } from "textalive-app-api";
 // ローカル・Vercel 単体動作では空文字列でも onAppReady(!managed) 経由で楽曲ロード可能。
 // 取得先: https://developer.textalive.jp/profile
 // ──────────────────────────────────────────────
-const APP_TOKEN = "";
+const APP_TOKEN = "1NQ6doQkcHMm1MpI";
 
 // 楽曲バージョン固定値（変更しないこと）
 const SONG_URL = "https://piapro.jp/t/PNpQ/20251209170719";

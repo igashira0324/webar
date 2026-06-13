@@ -164,8 +164,10 @@ async function startApp(mode: "ar" | "studio") {
       setStatusMessage("準備完了");
       showLoadingBar(false);
       showMainUI();
-      // 歌詞表示を有効化（これを呼ばないと歌詞 DOM が出ない）
+      // 歌詞表示を有効化
       lyricDisplay?.show();
+      // ルール説明オーバーレイを3秒表示→フェードアウト（初回起動時のみ）
+      showRuleOverlay();
     },
     onPlay: () => {
       isPlaying = true;
@@ -184,9 +186,7 @@ async function startApp(mode: "ar" | "studio") {
     },
     onTimeUpdate: (pos) => {
       // onTimeUpdate は TextAlive が再生の進行に合わせて確実に発火するコールバック
-      // timer.position より信頼性が高いので、ここで currentPosition を更新する
       currentPosition = pos;
-      console.log("[onTimeUpdate]", Math.round(pos), "ms"); // DEBUG: 発火確認用
     },
     onError: (e) => {
       console.error("[TextAlive]", e);
@@ -300,11 +300,6 @@ async function startApp(mode: "ar" | "studio") {
 function onTick(position: number): void {
   if (!taSync?.isReady) return;
 
-  // DEBUG: 再生位置の確認用ログ（position が 0 のまま動かない場合は同期方式を変える必要あり）
-  if (isPlaying && Math.floor(position / 500) !== Math.floor((position - 16) / 500)) {
-    console.log("[onTick] pos:", Math.round(position), "ms");
-  }
-
   // 歌詞表示
   const word = taSync.getCurrentWord(position);
   const phrase = taSync.getCurrentPhrase(position);
@@ -317,8 +312,17 @@ function onTick(position: number): void {
     triggerBeatPulse();
   }
 
-  // シャッターシステム
+  // サビ中: シャッターターゲット（予告リング）制御
   const isInChorus = taSync.isInChorus(position);
+  if (isInChorus) {
+    const climaxTime = taSync.getPhraseClimaxTime(position);
+    updateShutterTarget(position, climaxTime);
+  } else {
+    // サビ外は予告リングを非表示
+    hideShutterTarget();
+  }
+
+  // シャッターシステム
   const currentChorusStart = taSync.getCurrentChorusStart(position);
   const nextChorus = taSync.getNextChorusStart(position);
   shutterSystem?.update(position, isInChorus, currentChorusStart, nextChorus, word ?? "");
@@ -384,6 +388,86 @@ function triggerBeatPulse(): void {
     void vfFrame.offsetWidth; // Force reflow
     vfFrame.classList.add("beat-pulse-glow");
   }
+}
+
+/**
+ * シャッターターゲットリングの表示を更新する。
+ * climaxTime に向かってリングが収束し、「今だ！」の前後に発光する。
+ */
+function updateShutterTarget(position: number, climaxTime: number | null): void {
+  const ring = document.getElementById("shutter-ring");
+  const center = document.getElementById("shutter-center");
+  if (!ring || !center) return;
+
+  if (climaxTime === null) {
+    hideShutterTarget();
+    return;
+  }
+
+  const remaining = climaxTime - position; // ms
+
+  // 待機時間の上限: 2500ms 先からリングを出す
+  const MAX_AHEAD = 2500;
+  // 「今だ！」判定範囲: クライマックスの ±120ms 以内
+  const HIT_WINDOW = 120;
+
+  if (remaining > MAX_AHEAD || remaining < -HIT_WINDOW * 2) {
+    // 遠すぎる / 過ぎた → 非表示
+    hideShutterTarget();
+    return;
+  }
+
+  // 表示する
+  ring.style.display = "block";
+  center.style.display = "block";
+
+  if (Math.abs(remaining) <= HIT_WINDOW) {
+    // 「今だ！」 — リングが中心枚と重なり、強いグロー
+    ring.style.transform = "translate(-50%, -50%) scale(1.0)";
+    ring.style.opacity = "1";
+    ring.style.borderColor = "#e879f9";
+    ring.style.boxShadow = "0 0 24px 8px #e879f9, 0 0 60px 20px rgba(232,121,249,0.5)";
+    center.style.borderColor = "#e879f9";
+    center.style.boxShadow = "0 0 16px 4px #e879f9";
+  } else {
+    // 収束中: remaining が大きいほどリングが大きく薄い
+    const t = Math.max(0, Math.min(1, 1 - remaining / MAX_AHEAD)); // 0（1遠）→1（くっつく）
+    const scale = 2.0 - t * 1.0; // 2.0 → 1.0
+    const opacity = 0.3 + t * 0.7; // 0.3 → 1.0
+    ring.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+    ring.style.opacity = opacity.toFixed(3);
+    ring.style.borderColor = "#22d3ee";
+    ring.style.boxShadow = `0 0 ${8 + t * 16}px ${2 + t * 6}px #22d3ee`;
+    center.style.borderColor = "#22d3ee";
+    center.style.boxShadow = "0 0 8px 2px #22d3ee";
+  }
+}
+
+/** シャッターターゲットリングを非表示にする */
+function hideShutterTarget(): void {
+  const ring = document.getElementById("shutter-ring");
+  const center = document.getElementById("shutter-center");
+  if (ring) ring.style.display = "none";
+  if (center) center.style.display = "none";
+}
+
+/**
+ * ゲームルール説明オーバーレイを表示し、3秒後に自動フェードアウト。
+ * startApp 後に onReady のタイミングで一度だけ呼ぶ。
+ */
+function showRuleOverlay(): void {
+  const el = document.getElementById("rule-overlay");
+  if (!el) return;
+  el.classList.remove("hidden");
+  el.classList.add("fade-in");
+  // 3秒後にフェードアウト
+  setTimeout(() => {
+    el.classList.add("fade-out");
+    setTimeout(() => {
+      el.classList.add("hidden");
+      el.classList.remove("fade-in", "fade-out");
+    }, 600); // フェードアウトアニメーション時間
+  }, 3000);
 }
 
 function setStatusMessage(msg: string): void {

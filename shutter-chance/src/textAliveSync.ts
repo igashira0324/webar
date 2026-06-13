@@ -101,6 +101,27 @@ export class TextAliveSync {
     return phrase?.text ?? null;
   }
 
+  /**
+   * 現在フレーズの「決めの瞬間」時刻(ms)を返す。
+   * フレーズの最後の単語の startTime を「シャッターチャンス」と定義。
+   * フレーズが取れない・単語が無い場合は null を返す。
+   */
+  getPhraseClimaxTime(position: number): number | null {
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);
+    if (!phrase) return null;
+
+    // IPhrase の単語リストを firstWord から next で辿り、最後の word を探す
+    let lastWord: any = null;
+    let word: any = phrase.firstWord;
+    while (word) {
+      lastWord = word;
+      word = word.next;
+    }
+    if (!lastWord) return null;
+    return lastWord.startTime as number;
+  }
+
   /** 現在のビート情報を返す */
   getCurrentBeat(position: number): { startTime: number; duration: number; index: number } | null {
     if (!this.player) return null;

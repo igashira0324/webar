@@ -175,6 +175,93 @@
       animation: beat-pulse-glow 0.3s ease-out forwards;
     }
 
+    /* ── シャッターターゲットリング（予告） ── */
+    /* 中心に固定された判定枠と、収束するリングの2要素構成 */
+    #shutter-ring {
+      display: none; /* JS で制御 */
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(2.0);
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      border: 3px solid #22d3ee;
+      box-shadow: 0 0 12px 3px #22d3ee;
+      pointer-events: none;
+      z-index: 450; /* viewfinder(z=400)の上、flash(z=500)の下 */
+      transition: border-color 0.1s, box-shadow 0.1s;
+    }
+    #shutter-center {
+      display: none; /* JS で制御 */
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 2px solid #22d3ee;
+      box-shadow: 0 0 8px 2px #22d3ee;
+      pointer-events: none;
+      z-index: 450;
+    }
+
+    /* ── ルール説明オーバーレイ ── */
+    #rule-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(8px);
+      z-index: 900;
+      pointer-events: none;
+    }
+    #rule-overlay.hidden { display: none; }
+    #rule-overlay .rule-box {
+      max-width: 520px;
+      padding: 36px 40px;
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      border-radius: 20px;
+      background: rgba(10, 15, 30, 0.9);
+      box-shadow: 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(232, 121, 249, 0.1);
+      text-align: center;
+    }
+    #rule-overlay .rule-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      color: #22d3ee;
+      text-shadow: 0 0 12px #22d3ee;
+      margin-bottom: 16px;
+    }
+    #rule-overlay .rule-body {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: #e0f0ff;
+    }
+    #rule-overlay .rule-ratings {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 20px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+    }
+    #rule-overlay .rule-ratings .r-perfect { color: #e879f9; text-shadow: 0 0 8px #e879f9; }
+    #rule-overlay .rule-ratings .r-good    { color: #22d3ee; text-shadow: 0 0 8px #22d3ee; }
+    #rule-overlay .rule-ratings .r-miss    { color: #888; }
+    /* フェードアニメーション */
+    @keyframes ruleOverlayFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1.0); }
+    }
+    @keyframes ruleOverlayFadeOut {
+      from { opacity: 1; transform: scale(1.0); }
+      to   { opacity: 0; transform: scale(0.96); }
+    }
+    #rule-overlay.fade-in  { animation: ruleOverlayFadeIn  0.4s ease-out forwards; }
+    #rule-overlay.fade-out { animation: ruleOverlayFadeOut 0.6s ease-in  forwards; }
+
     /* ── Controls ── */
     #controls {
       pointer-events: auto; display: flex; gap: 10px; align-items: center; justify-content: center;
@@ -439,6 +526,27 @@
 
   <!-- Flash overlay -->
   <div id="flash"></div>
+
+  <!-- シャッターターゲット（予告リング）: JSのupdateShutterTarget()で制御される -->
+  <div id="shutter-ring"></div>
+  <div id="shutter-center"></div>
+
+  <!-- ルール説明オーバーレイ: onReady後に3秒表示して自動消える -->
+  <div id="rule-overlay" class="hidden">
+    <div class="rule-box">
+      <div class="rule-title">📷 SHUTTER CHANCE ルール</div>
+      <div class="rule-body">
+        サビでミクが「決め歌詞」を歌う瞬間を狙ってタップ！<br>
+        リングが中心に重なった瞬間が「今だ！」📸<br>
+        ベストショットを集めよう！
+      </div>
+      <div class="rule-ratings">
+        <span class="r-perfect">⚡ PERFECT ≤ 80ms</span>
+        <span class="r-good">✓ GOOD ≤ 180ms</span>
+        <span class="r-miss">✕ MISS</span>
+      </div>
+    </div>
+  </div>
 
   <!-- Photo stack -->
   <div id="photo-stack"></div>

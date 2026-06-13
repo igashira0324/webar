@@ -89,22 +89,22 @@ export class TextAliveSync {
 
   /** 現在の発声中の単語テキストを返す（なければ null）*/
   getCurrentWord(position: number): string | null {
-    if (!this.player?.video) return null;
-    const word = this.player.video.findWord(position);
+    if (!this.player) return null;
+    const word = this.player.findWord(position);  // player.video ではなく player 直接
     return word?.text ?? null;
   }
 
   /** 現在の発声中のフレーズテキストを返す（なければ null）*/
   getCurrentPhrase(position: number): string | null {
-    if (!this.player?.video) return null;
-    const phrase = this.player.video.findPhrase(position);
+    if (!this.player) return null;
+    const phrase = this.player.findPhrase(position);  // player.video ではなく player 直接
     return phrase?.text ?? null;
   }
 
   /** 現在のビート情報を返す */
   getCurrentBeat(position: number): { startTime: number; duration: number; index: number } | null {
-    if (!this.player?.video) return null;
-    const beat = this.player.video.findBeat(position);
+    if (!this.player) return null;
+    const beat = this.player.findBeat(position);  // player.video ではなく player 直接
     if (!beat) return null;
     return {
       startTime: beat.startTime,

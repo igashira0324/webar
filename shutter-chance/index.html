@@ -370,34 +370,6 @@
   </style>
 </head>
 <body>
-  <div id="debug-log-console" style="position:fixed; bottom:0; left:0; width:100%; max-height:200px; overflow-y:auto; background:rgba(0,0,0,0.85); color:#ff5555; font-family:monospace; font-size:11px; z-index:99999; pointer-events:none; padding:8px;"></div>
-  <script>
-    window.onerror = function(msg, url, line, col, error) {
-      const el = document.getElementById("debug-log-console");
-      if (el) {
-        el.innerHTML += '<div style="color:#ff3333;">[ERROR] ' + msg + ' (' + url + ':' + line + ':' + col + ')</div>';
-      }
-      return false;
-    };
-    console.error = (function(oldError) {
-      return function() {
-        const el = document.getElementById("debug-log-console");
-        if (el) {
-          el.innerHTML += '<div style="color:#ffaa00;">[CONSOLE.ERROR] ' + Array.from(arguments).join(' ') + '</div>';
-        }
-        oldError.apply(console, arguments);
-      };
-    })(console.error);
-    console.log = (function(oldLog) {
-      return function() {
-        const el = document.getElementById("debug-log-console");
-        if (el) {
-          el.innerHTML += '<div style="color:#ffffff;">[CONSOLE.LOG] ' + Array.from(arguments).join(' ') + '</div>';
-        }
-        oldLog.apply(console, arguments);
-      };
-    })(console.log);
-  </script>
 <nav>
   <a href="/" class="nav-back">← もどる</a>
   <span class="nav-title">📷 SHUTTER CHANCE AR</span>

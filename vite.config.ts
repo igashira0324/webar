@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
@@ -18,6 +19,12 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        exhibition: resolve(__dirname, 'exhibition-vol5/index.html'),
+        'exhibition-vol5/tech-book-acestep': resolve(__dirname, 'exhibition-vol5/tech-book-acestep.html'),
+        'exhibition-vol5/tech-book-mmd': resolve(__dirname, 'exhibition-vol5/tech-book-mmd.html')
+      },
       output: {
         manualChunks: undefined
       }

@@ -7,10 +7,12 @@
 import { Player, PlayerEventListener } from "textalive-app-api";
 
 // ──────────────────────────────────────────────
-// TODO: ここにTextAlive App tokenを設定
-// developer.textalive.jp でアカウント作成後に取得してください
+// TextAlive App Token
+// コンテスト審査サイト経由で動作する場合はここにトークンを設定。
+// ローカル・Vercel 単体動作では空文字列でも onAppReady(!managed) 経由で楽曲ロード可能。
+// 取得先: https://developer.textalive.jp/profile
 // ──────────────────────────────────────────────
-const APP_TOKEN = "1NQ6doQkcHMm1MpI";
+const APP_TOKEN = "";
 
 // 楽曲バージョン固定値（変更しないこと）
 const SONG_URL = "https://piapro.jp/t/PNpQ/20251209170719";
@@ -44,9 +46,14 @@ export class TextAliveSync {
   async init(mediaElement: HTMLElement): Promise<void> {
     const listener: PlayerEventListener = {
       onAppReady: (app) => {
+        // app.managed = true はコンテスト審査プレイヤー上での動作。
+        // ローカル・Vercel・通常ブラウザ実行では常に false なので、
+        // managed かどうかに関わらず楽曲を自分でロードする。
         if (!app.managed) {
-          // スタンドアロン動作時に楽曲をロード
+          console.log("[TextAlive] onAppReady (standalone): loading song...");
           this.player!.createFromSongUrl(SONG_URL, { video: VIDEO_CONFIG });
+        } else {
+          console.log("[TextAlive] onAppReady (managed): waiting for host player.");
         }
       },
       onVideoReady: () => {
@@ -66,16 +73,6 @@ export class TextAliveSync {
       mediaElement,
       listener,
     });
-
-    // App tokenが空の場合もローカルで楽曲URLを直接ロードする
-    if (!APP_TOKEN) {
-      console.warn("[TextAlive] APP_TOKEN is empty. Loading song directly (limited features).");
-      try {
-        this.player.createFromSongUrl(SONG_URL, { video: VIDEO_CONFIG });
-      } catch (e) {
-        console.error("[TextAlive] Failed to load song:", e);
-      }
-    }
   }
 
   get isReady(): boolean {

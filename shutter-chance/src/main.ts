@@ -128,8 +128,7 @@ async function startApp(mode: "ar" | "studio") {
 
   // ④ MMDランタイム + ミクモデル + VMDロード
   mmdRuntime = new MmdRuntime(scene);
-  // NOTE: 手動で毎フレームのアニメーション・物理・IKの更新サイクルを制御するため、
-  // mmdRuntime.register(scene) による自動登録は意図的に行いません。
+  mmdRuntime.register(scene); // 必須: これでランタイムがシーンの毎フレーム更新サイクルに組み込まれる
 
   setStatusMessage("ミクを読み込み中...");
   let mmdModel: any = null;
@@ -165,6 +164,8 @@ async function startApp(mode: "ar" | "studio") {
       setStatusMessage("準備完了");
       showLoadingBar(false);
       showMainUI();
+      // 歌詞表示を有効化（これを呼ばないと歌詞 DOM が出ない）
+      lyricDisplay?.show();
     },
     onPlay: () => {
       isPlaying = true;
@@ -196,25 +197,16 @@ async function startApp(mode: "ar" | "studio") {
   await taSync.init(mediaEl);
 
   // ⑥ TextAlive timer.position をマスタークロックとして毎フレームMMD同期
-  // onTimeUpdate より高精度な timer.position を使い、歌詞・シャッター・MMD骨格を一括更新する
   scene.onBeforeRenderObservable.add(() => {
     if (!taSync?.isReady) return;
 
-    // isPlaying でなくても位置更新はする（シーク後の静止フレーム表示のため）
     const pos = isPlaying ? taSync.getPosition() : currentPosition;
     onTick(pos);
 
     if (!isPlaying || !mmdRuntime) return;
     currentPosition = pos;
-    const targetFrame = (pos / 1000) * 30;
-
-    // seekAnimation(forceEvaluate=true) でモーション評価 → beforePhysics/afterPhysics で IK・物理解決
-    mmdRuntime.seekAnimation(targetFrame, true);
-    const models = mmdRuntime.models;
-    for (let i = 0; i < models.length; ++i) {
-      models[i].beforePhysics(targetFrame);
-      models[i].afterPhysics();
-    }
+    // register(scene) が自動で毎フレームのボーン更新を実行する。seekAnimation でフレームを指定するだけでよい
+    mmdRuntime.seekAnimation((pos / 1000) * 30, true);
   });
 
   // ⑦ サブシステム初期化
@@ -305,6 +297,11 @@ async function startApp(mode: "ar" | "studio") {
 // ──────────────────────────────────────────────
 function onTick(position: number): void {
   if (!taSync?.isReady) return;
+
+  // DEBUG: 再生位置の確認用ログ（position が 0 のまま動かない場合は同期方式を変える必要あり）
+  if (isPlaying && Math.floor(position / 500) !== Math.floor((position - 16) / 500)) {
+    console.log("[onTick] pos:", Math.round(position), "ms");
+  }
 
   // 歌詞表示
   const word = taSync.getCurrentWord(position);

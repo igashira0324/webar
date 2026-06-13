@@ -101,20 +101,18 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   setStatusMessage("シーンを初期化中...");
 
   // ① シーン作成
+  const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
   let scene: Scene;
-  let canvas: HTMLCanvasElement;
   let enterAR: (() => void) | null = null;
 
   if (mode === "ar") {
-    const result = await createARScene();
+    const result = await createARScene(canvas);
     scene = result.scene;
-    canvas = result.canvas;
     enterAR = result.enterAR ?? null;
     setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   } else {
-    const result = await createStudioScene();
+    const result = await createStudioScene(canvas);
     scene = result.scene;
-    canvas = result.canvas;
     setupFallbackBanner(AR_URL, "fallback-banner", "qr-code", "qr-url-text");
   }
 

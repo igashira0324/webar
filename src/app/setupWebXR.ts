@@ -12,7 +12,8 @@ import {
     enableAnchors, createPlacementReticle, createOcclusionToggleButton,
     type PlacementReticle, type LightEstimationHandle, type OcclusionToggle,
 } from "./arFeatures";
-import { tryConsumeTap, setGameActive, setChanceReady } from "./gameMode";
+import { tryConsumeTap, setGameActive, setChanceReady, cancelActiveChance } from "./gameMode";
+import { togglePlayback } from "./audioController";
 
 // ===== AR ルート管理 =====
 // モデルを arRoot 配下へ付け替え、セッション終了時に元の親子関係と変形へ戻す
@@ -273,6 +274,28 @@ const createArExitButton = (overlay: HTMLElement) => {
     overlay.appendChild(exitBtn);
 };
 
+// AR中でも確実にダンスを一時停止/再開できる専用ボタン（画面下部中央、タップ判定とは完全分離）
+const createArPauseButton = (overlay: HTMLElement) => {
+    const btn = document.createElement("button");
+    btn.id = "ar-pause-btn";
+    btn.textContent = "⏸ 停止";
+    btn.style.cssText =
+        "position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:20;" +
+        "padding:12px 28px;border:1px solid rgba(0,229,255,0.5);border-radius:26px;" +
+        "background:rgba(0,0,0,0.55);color:#fff;font-size:1rem;font-weight:600;" +
+        "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:auto;";
+    btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        cancelActiveChance(); // 停止/再開の瞬間に開いていたチャンスは無効化する
+        await togglePlayback();
+        const paused = !!appState.internalAudio?.paused;
+        btn.textContent = paused ? "▶ 再生" : "⏸ 停止";
+    });
+    btn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+    btn.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
+    overlay.appendChild(btn);
+};
+
 // ===== 2026 WebXR 拡張機能の有効化と結線 =====
 // 全て optional feature として要求するため、未対応端末では自動フォールバックする
 
@@ -324,6 +347,9 @@ const onEnterXR = (ctx: ArSessionContext) => {
     try {
         appState.mmdRuntime?.playAnimation();
     } catch (e) { console.warn(e); }
+    // 入室時は自動再生されるので停止ボタンのラベルを初期状態に戻す
+    const pauseBtn = document.getElementById("ar-pause-btn");
+    if (pauseBtn) pauseBtn.textContent = "⏸ 停止";
     ctx.modelPlaced = false;
     // セッション毎に arRoot の変形を初期状態へ戻す（前回のピンチ拡大/回転が持ち越されないように）
     const arRoot = ctx.root.arRoot;
@@ -387,6 +413,7 @@ export const setupWebXR = async (
 
     if (ctx.overlay) {
         createArExitButton(ctx.overlay);
+        createArPauseButton(ctx.overlay);
         setupArGestures(ctx.overlay, {
             isInXR: () => ctx.inXR,
             isPlaced: () => ctx.modelPlaced,

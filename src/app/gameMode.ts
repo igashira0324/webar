@@ -1,6 +1,8 @@
 // 「表情チャンス」ゲーム — AR中にミクの表情が変わった瞬間（ウィンク/びっくり）を狙ってタップするミニゲーム。
 // setupExpressions.ts の表情発火をチャンスとして受け取り、setupWebXR.ts のタップ経路から判定を横取りする。
-// スコア/コンボはモジュール内で完結させ、共有 AppState (state.ts) は汚さない。
+// スコア/コンボはモジュール内で完結させ、共有 AppState (state.ts) は読み取りのみ（書き換えない）。
+
+import { appState } from "./state";
 
 const HIGH_SCORE_KEY = "webar-expression-chance-highscore";
 
@@ -42,12 +44,10 @@ const FEVER_COMBO = 5;            // フィーバー突入コンボ数
 const FEVER_DURATION_MS = 10000;
 const FEVER_CHANCE_INTERVAL_MS = 2200;
 
-let canvasRef: HTMLCanvasElement | null = null;
 let chanceTimer: number | null = null;
 let feverEndTimer: number | null = null;
 let feverTickTimer: number | null = null;
 let chanceTrigger: (() => void) | null = null; // setupExpressionsが登録する「チャンス表情を即発火」フック
-let photoCooldown = false;
 
 const els = {
     hud: null as HTMLElement | null,
@@ -57,11 +57,9 @@ const els = {
     ring: null as HTMLElement | null,
     flash: null as HTMLElement | null,
     ratingPopup: null as HTMLElement | null,
-    photoStack: null as HTMLElement | null,
 };
 
-export const initGameMode = (canvas: HTMLCanvasElement): void => {
-    canvasRef = canvas;
+export const initGameMode = (): void => {
     els.hud = document.getElementById("game-hud");
     els.hudScore = document.getElementById("hud-score");
     els.hudCombo = document.getElementById("hud-combo");
@@ -69,7 +67,6 @@ export const initGameMode = (canvas: HTMLCanvasElement): void => {
     els.ring = document.getElementById("chance-ring");
     els.flash = document.getElementById("game-flash");
     els.ratingPopup = document.getElementById("rating-popup");
-    els.photoStack = document.getElementById("game-photo-stack");
 
     state.highScore = Number(localStorage.getItem(HIGH_SCORE_KEY)) || 0;
     updateHud();
@@ -87,7 +84,6 @@ export const setGameActive = (active: boolean): void => {
     if (active) {
         state.score = 0;
         state.combo = 0;
-        if (els.photoStack) els.photoStack.innerHTML = "";
     }
     els.hud?.classList.toggle("hidden", !active);
     updateHud();
@@ -120,9 +116,16 @@ export const cancelActiveChance = (): void => {
     closeChanceWindow(false);
 };
 
+// ダンスが実際に再生中か（一時停止中はチャンスを開かず、リングだけ出続けるのを防ぐ）
+const isDancePlaying = (): boolean => {
+    const rt = appState.mmdRuntime as unknown as { isAnimationPlaying?: boolean } | null;
+    if (rt && typeof rt.isAnimationPlaying === "boolean") return rt.isAnimationPlaying;
+    return !!appState.internalAudio && !appState.internalAudio.paused;
+};
+
 // setupExpressions.ts の onChanceExpression から呼ばれる：チャンスウィンドウを開く
 export const openChanceWindow = (_name: string, windowMs: number): void => {
-    if (!state.active || !state.ready) return;
+    if (!state.active || !state.ready || !isDancePlaying()) return;
     state.chanceGolden = Math.random() < GOLDEN_RATE;
     const win = state.chanceGolden ? windowMs * GOLDEN_WINDOW_SCALE : windowMs;
     state.chanceOpen = true;
@@ -213,7 +216,6 @@ const registerHit = (rating: Rating): void => {
     triggerFlash();
     playShutterSound();
     showRatingPopup(rating, golden);
-    void capturePolaroid(rating);
     if (state.combo >= FEVER_COMBO && !isFever()) startFever();
 };
 
@@ -305,77 +307,6 @@ const playShutterSound = (): void => {
     }
 };
 
-const capturePolaroid = async (rating: Rating): Promise<void> => {
-    if (photoCooldown || !canvasRef) return;
-    photoCooldown = true;
-    window.setTimeout(() => { photoCooldown = false; }, 1500);
-
-    // フラッシュの白さと重なるよう少し遅延してからキャプチャ（shutterSystem.tsのタイミングを踏襲）
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 80));
-    const dataUrl = await captureCanvas();
-    if (dataUrl) addPolaroidToStack(dataUrl, rating);
-};
-
-// Babylon.js の canvas を PNG としてキャプチャし、軽い透かしを合成する（shutterSystem.tsのcaptureCanvasを移植・簡略化）
-const captureCanvas = (): Promise<string | null> => {
-    return new Promise((resolve) => {
-        if (!canvasRef) { resolve(null); return; }
-        try {
-            const rawDataUrl = canvasRef.toDataURL("image/png");
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext("2d");
-                if (!ctx) { resolve(rawDataUrl); return; }
-                ctx.drawImage(img, 0, 0);
-
-                const padding = Math.max(10, Math.floor(img.width * 0.02));
-                const fontSize = Math.max(9, Math.floor(img.height * 0.02));
-                ctx.font = `${fontSize}px 'Orbitron', 'Noto Sans JP', sans-serif`;
-                ctx.fillStyle = "rgba(103, 232, 249, 0.9)";
-                ctx.textAlign = "right";
-                ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-                ctx.shadowBlur = 6;
-                ctx.shadowOffsetX = 1;
-                ctx.shadowOffsetY = 1;
-                ctx.fillText("MMD WebAR ✨ 表情チャンス", img.width - padding, img.height - padding);
-
-                resolve(canvas.toDataURL("image/png"));
-            };
-            img.onerror = () => resolve(rawDataUrl);
-            img.src = rawDataUrl;
-        } catch (e) {
-            console.warn("Canvas capture failed:", e);
-            resolve(null);
-        }
-    });
-};
-
-// ポラロイド風画像をスタックに追加（shutterSystem.tsのaddPolaroidToStackを移植・簡略化）
-const addPolaroidToStack = (dataUrl: string, rating: Rating): void => {
-    const stack = els.photoStack;
-    if (!stack) return;
-
-    const polaroid = document.createElement("div");
-    polaroid.className = "polaroid";
-    polaroid.style.transform = `rotate(${(Math.random() - 0.5) * 12}deg)`;
-
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    img.alt = "Chance shot";
-
-    const caption = document.createElement("div");
-    caption.className = "polaroid-caption";
-    caption.textContent = RATING_LABEL[rating];
-
-    polaroid.appendChild(img);
-    polaroid.appendChild(caption);
-    stack.insertBefore(polaroid, stack.firstChild);
-
-    // 表示上意味のある枚数だけ残し、それ以外はDOMごと破棄する（長時間セッションでのメモリ肥大化を防ぐ）
-    while (stack.children.length > 5) {
-        stack.lastChild?.remove();
-    }
-};
+// 注: 以前はヒット時にキャンバスをキャプチャしてポラロイド風に表示していたが、
+// WebXRではカメラ映像がキャンバスに含まれず意味の薄い画像になる上、
+// toDataURLの負荷がモバイルでのカクつき要因になるため撤去した（フラッシュ＋シャッター音は維持）。

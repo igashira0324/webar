@@ -22,7 +22,7 @@ async function init() {
     const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
     if (!canvas) return;
 
-    initGameMode(canvas);
+    initGameMode();
 
     const { scene, shadowGenerator } = await createScene(canvas);
     const mmdRuntime = createMmdRuntime(scene);

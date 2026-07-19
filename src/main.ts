@@ -7,7 +7,10 @@ import { setupPerformanceControls } from './app/performance';
 import { StreamAudioPlayer } from 'babylon-mmd';
 import type { MmdModel } from 'babylon-mmd';
 import { setupExpressions } from './app/setupExpressions';
-import { initGameMode, openChanceWindow, isGameActive, cancelActiveChance } from './app/gameMode';
+import {
+    initGameMode, openChanceWindow, isGameActive, cancelActiveChance,
+    getExpressionTuning, registerChanceTrigger,
+} from './app/gameMode';
 import { appState } from './app/state';
 import { initAudioController, togglePlayback, setupAudio, setLipSyncEnabled, DANCE_PRESETS } from './app/audioController';
 import { showLoading, hideLoading, updateLoadingProgress, showError, showFatalError } from './app/loadingController';
@@ -87,7 +90,7 @@ async function init() {
 
             appState.currentModel = result.model;
             applyModelTransform(result.model);
-            expressionCleanup = setupExpressions(scene, result.model, openChanceWindow, isGameActive);
+            expressionCleanup = setupExpressions(scene, result.model, openChanceWindow, getExpressionTuning, registerChanceTrigger);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
             if ((window as any).__updateXRTargetMeshes) (window as any).__updateXRTargetMeshes([result.model.mesh]);
 
@@ -122,7 +125,7 @@ async function init() {
         appState.currentModel = result.model;
         if (appState.currentModel) {
             applyModelTransform(appState.currentModel);
-            expressionCleanup = setupExpressions(scene, appState.currentModel, openChanceWindow, isGameActive);
+            expressionCleanup = setupExpressions(scene, appState.currentModel, openChanceWindow, getExpressionTuning, registerChanceTrigger);
             (window as any).__updateXRTargetMeshes?.([appState.currentModel.mesh]);
             if (result.motion) mmdRuntime.setManualAnimationDuration(result.motion.endFrame);
             showLoading("Loading Audio...");
@@ -220,6 +223,9 @@ async function init() {
     });
 
     scene.onPointerObservable.add((pointerInfo) => {
+        // AR中のタップは配置/ゲーム判定専用。WebXRのタップもシーンのポインタイベントに
+        // 変換されてここに届くため、AR中にミクへタップが当たると再生停止してしまうのを防ぐ
+        if (isGameActive()) return;
         if (pointerInfo.type === 32 && pointerInfo.pickInfo?.hit) {
             const pickedMesh = pointerInfo.pickInfo.pickedMesh;
             if (pickedMesh && appState.currentModel && (pickedMesh === appState.currentModel.mesh || pickedMesh.isDescendantOf(appState.currentModel.mesh))) {

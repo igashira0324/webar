@@ -28,16 +28,23 @@ const EXPRESSIONS: Expression[] = [
 
 const CHANCE_EXPRESSIONS = EXPRESSIONS.filter((e) => e.chanceEligible);
 
+export interface ExpressionTuning {
+  chanceRatio: number;   // チャンス対象表情を優先抽選する確率 (0-1)
+  intervalScale: number; // 表情スケジュール間隔の倍率 (1=通常、小さいほど高頻度)
+}
+
 /**
  * MMDモデルにランダムな表情（まばたき、笑顔、ウィンク等）を設定します。
  * onChanceExpression: ウィンク等の「表情チャンス」対象表情が発火した瞬間に呼ばれる（表情チャンスゲーム用フック）
- * isArActive: AR中はtrueを返す関数。trueの間はチャンス対象表情の出現率を引き上げる
+ * getTuning: ゲーム側から抽選確率・発火間隔を動的に調整するためのフック（AR中の高頻度化・フィーバー加速）
+ * registerChanceTrigger: 「チャンス表情を即発火する関数」をゲーム側へ渡す（フィーバー中の連続チャンス用）
  */
 export const setupExpressions = (
   _scene: Scene,
   model: MmdModel,
   onChanceExpression?: (name: string, windowMs: number) => void,
-  isArActive?: () => boolean
+  getTuning?: () => ExpressionTuning,
+  registerChanceTrigger?: (trigger: () => void) => void
 ) => {
   const morph = model.morph;
   if (!morph) {
@@ -167,16 +174,18 @@ export const setupExpressions = (
     }, wait);
   };
 
-  // AR中は表情チャンス対象（ウィンク/びっくり）を50%の確率で優先抽選し、デモの間延びを防ぐ
+  // ゲーム側のチューニングに応じて表情チャンス対象（ウィンク/びっくり）を優先抽選する
   const pickExpression = (): Expression => {
-    if (isArActive?.() && Math.random() < 0.5) {
+    const ratio = getTuning?.().chanceRatio ?? 0;
+    if (ratio > 0 && Math.random() < ratio) {
       return CHANCE_EXPRESSIONS[Math.floor(Math.random() * CHANCE_EXPRESSIONS.length)];
     }
     return EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
   };
 
   const scheduleExpression = () => {
-    const wait = 4000 + Math.random() * 5000; // 4-9秒
+    const scale = getTuning?.().intervalScale ?? 1;
+    const wait = (4000 + Math.random() * 5000) * scale; // 基準4-9秒 × チューニング倍率
     exprTimer = window.setTimeout(() => {
       // 30%の確率で口パク、70%の確率で通常表情
       if (Math.random() < 0.3) {
@@ -190,6 +199,11 @@ export const setupExpressions = (
 
   scheduleBlink();
   scheduleExpression();
+
+  // フィーバー中などにゲーム側がスケジューラを待たずチャンス表情を発火できるようにする
+  registerChanceTrigger?.(() => {
+    playExpression(CHANCE_EXPRESSIONS[Math.floor(Math.random() * CHANCE_EXPRESSIONS.length)]);
+  });
 
   console.log("✨ Enhanced random expressions, blinking and talk-sync enabled");
 

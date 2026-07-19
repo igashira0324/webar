@@ -875,6 +875,11 @@
       }
       #chance-ring.hidden { display: none; }
       #chance-ring.pulsing { animation: chanceRingPulse 0.6s ease-out infinite; }
+      /* ゴールデンチャンス: 金色リング（短いウィンドウ・スコア3倍の合図） */
+      #chance-ring.golden {
+        border-color: var(--accent);
+        box-shadow: 0 0 40px var(--accent), 0 0 12px #fff;
+      }
       @keyframes chanceRingPulse {
         0% { transform: scale(0.8); opacity: 1; }
         100% { transform: scale(1.3); opacity: 0; }
@@ -898,6 +903,20 @@
         color: var(--secondary);
         text-shadow: 0 0 20px var(--secondary), 0 0 40px rgba(255, 0, 170, 0.5);
         font-size: 1.4rem;
+      }
+      #rating-popup.golden {
+        color: var(--accent);
+        text-shadow: 0 0 20px var(--accent), 0 0 40px rgba(255, 170, 0, 0.6);
+      }
+
+      /* フィーバータイム中はHUDが金色に明滅する */
+      #game-hud.fever {
+        border-color: var(--accent);
+        animation: feverGlow 0.8s ease-in-out infinite alternate;
+      }
+      @keyframes feverGlow {
+        from { box-shadow: 0 0 12px rgba(255, 170, 0, 0.35); }
+        to   { box-shadow: 0 0 30px rgba(255, 170, 0, 0.85); }
       }
       @keyframes ratingPop {
         0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }

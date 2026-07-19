@@ -67,6 +67,9 @@ export const setupModals = () => {
             await xr.baseExperience.enterXRAsync("immersive-ar", "local-floor", xr.renderTarget);
         } catch (e: any) {
             console.error("AR起動失敗:", e);
+            // requestSession 成功後の初期化中に失敗すると、ネイティブXRセッションが生き残って
+            // 画面タップを奪い続ける（エラーダイアログの✕も押せなくなる）ため、明示的に終了させる
+            try { await xr.baseExperience.sessionManager.exitXRAsync(); } catch (e2) { /* 未開始なら無視 */ }
             showArError(e);
         }
     });

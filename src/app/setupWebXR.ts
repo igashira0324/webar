@@ -378,6 +378,10 @@ const onExitXR = (ctx: ArSessionContext) => {
     ctx.inXR = false;
     ctx.overlay?.classList.remove("active");
     setGameActive(false);
+    // Babylon 9.14 の不具合対策: セッション中に _lastFrameDetected が WebXR の XRAnchorSet
+    // （読み取り専用で clear() を持たない）へ置き換わったまま残り、次回セッション初期化の
+    // clearAnchorsOnSessionInit 処理が TypeError を投げて再入室が失敗する。素の Set に戻しておく
+    if (ctx.anchorSystem) (ctx.anchorSystem as any)._lastFrameDetected = new Set();
     if (ctx.controlPanel) ctx.controlPanel.style.display = "block";
     if (ctx.showSettingsBtn) ctx.showSettingsBtn.style.display = "block";
     ctx.modelPlaced = false;

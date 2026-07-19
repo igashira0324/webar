@@ -11,8 +11,8 @@ export async function generateCoolQRCode(canvas: HTMLCanvasElement, text: string
 
     const size = canvas.width;
     const qr = QrCode.encodeText(text, Ecc.HIGH); // アイコンを置くため誤差訂正はHIGH
-    
-    const margin = 2; // QRモジュール単位の余白
+
+    const margin = 4; // QR仕様上のクワイエットゾーン推奨値（4モジュール未満はスキャナが検出しにくい）
     const modulesCount = qr.size + margin * 2;
     const moduleSize = size / modulesCount;
 
@@ -27,27 +27,26 @@ export async function generateCoolQRCode(canvas: HTMLCanvasElement, text: string
 
     // モジュールの描画
     ctx.fillStyle = gradient;
+
+    // アイコンが置かれる中央付近は描画をスキップ (excavate)。
+    // アイコンの実寸（キャンバス比22%）に比例させ、モジュール数が変わっても穴のサイズがずれないようにする
+    const centerLimit = Math.round(0.11 * modulesCount);
+    const centerX = Math.floor(qr.size / 2);
+    const centerY = Math.floor(qr.size / 2);
+
     for (let y = 0; y < qr.size; y++) {
         for (let x = 0; x < qr.size; x++) {
             if (qr.getModule(x, y)) {
-                // 角丸ドット風のデザイン
-                const dx = (x + margin) * moduleSize;
-                const dy = (y + margin) * moduleSize;
-                
-                // アイコンが置かれる中央付近は描画をスキップ (excavate)
-                // 読み取り精度を上げるため、スキップ範囲を最小限に抑える
-                const centerLimit = 3; 
-                const centerX = Math.floor(qr.size / 2);
-                const centerY = Math.floor(qr.size / 2);
                 if (x >= centerX - centerLimit && x <= centerX + centerLimit &&
                     y >= centerY - centerLimit && y <= centerY + centerLimit) {
                     continue;
                 }
 
-                // 通常のモジュール描画
-                ctx.beginPath();
-                ctx.roundRect(dx + 0.5, dy + 0.5, moduleSize - 1, moduleSize - 1, moduleSize / 4);
-                ctx.fill();
+                // 隣接モジュールと隙間なく描画する（ドット風の隙間を作ると
+                // ファインダーパターン等の比率が崩れ、実機スキャナが読み取れなくなるため）
+                const dx = (x + margin) * moduleSize;
+                const dy = (y + margin) * moduleSize;
+                ctx.fillRect(dx, dy, moduleSize, moduleSize);
             }
         }
     }

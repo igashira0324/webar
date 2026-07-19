@@ -7,16 +7,17 @@ interface Expression {
   duration: number;   // 表情を維持する時間 (ms)
   fadeIn: number;     // フェードイン時間 (ms)
   fadeOut: number;    // フェードアウト時間 (ms)
+  chanceEligible?: boolean; // 「表情チャンス」ゲームのタップ対象になる表情か
 }
 
 // 表情パターン（MMD標準モーフ名）
 const EXPRESSIONS: Expression[] = [
   { name: "笑い",     intensity: 0.8, duration: 2500, fadeIn: 400, fadeOut: 600 },
-  { name: "ウィンク",  intensity: 1.0, duration: 800,  fadeIn: 150, fadeOut: 300 },
-  { name: "ウィンク2", intensity: 1.0, duration: 800,  fadeIn: 150, fadeOut: 300 },
+  { name: "ウィンク",  intensity: 1.0, duration: 800,  fadeIn: 150, fadeOut: 300, chanceEligible: true },
+  { name: "ウィンク2", intensity: 1.0, duration: 800,  fadeIn: 150, fadeOut: 300, chanceEligible: true },
   { name: "なごみ",   intensity: 0.7, duration: 3000, fadeIn: 500, fadeOut: 700 },
   { name: "じと目",   intensity: 0.6, duration: 2000, fadeIn: 400, fadeOut: 500 },
-  { name: "びっくり", intensity: 0.7, duration: 1200, fadeIn: 200, fadeOut: 400 },
+  { name: "びっくり", intensity: 0.7, duration: 1200, fadeIn: 200, fadeOut: 400, chanceEligible: true },
   { name: "にこり",   intensity: 0.8, duration: 2500, fadeIn: 400, fadeOut: 600 },
   // 新規追加パターン
   { name: "怒り",     intensity: 0.8, duration: 2000, fadeIn: 300, fadeOut: 500 },
@@ -25,10 +26,19 @@ const EXPRESSIONS: Expression[] = [
   { name: "にっこり", intensity: 0.9, duration: 2500, fadeIn: 400, fadeOut: 600 },
 ];
 
+const CHANCE_EXPRESSIONS = EXPRESSIONS.filter((e) => e.chanceEligible);
+
 /**
  * MMDモデルにランダムな表情（まばたき、笑顔、ウィンク等）を設定します。
+ * onChanceExpression: ウィンク等の「表情チャンス」対象表情が発火した瞬間に呼ばれる（表情チャンスゲーム用フック）
+ * isArActive: AR中はtrueを返す関数。trueの間はチャンス対象表情の出現率を引き上げる
  */
-export const setupExpressions = (_scene: Scene, model: MmdModel) => {
+export const setupExpressions = (
+  _scene: Scene,
+  model: MmdModel,
+  onChanceExpression?: (name: string, windowMs: number) => void,
+  isArActive?: () => boolean
+) => {
   const morph = model.morph;
   if (!morph) {
     console.warn("Model has no morph controller");
@@ -73,6 +83,10 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
 
   // フェード付きで表情を実行
   const playExpression = (expr: Expression) => {
+    if (expr.chanceEligible) {
+      // タップ有効ウィンドウ = フェードイン+維持時間（フェードアウト中の緩慢な変化はヒット判定に含めない）
+      onChanceExpression?.(expr.name, expr.fadeIn + expr.duration);
+    }
     const start = performance.now();
     const total = expr.fadeIn + expr.duration + expr.fadeOut;
 
@@ -153,6 +167,14 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
     }, wait);
   };
 
+  // AR中は表情チャンス対象（ウィンク/びっくり）を50%の確率で優先抽選し、デモの間延びを防ぐ
+  const pickExpression = (): Expression => {
+    if (isArActive?.() && Math.random() < 0.5) {
+      return CHANCE_EXPRESSIONS[Math.floor(Math.random() * CHANCE_EXPRESSIONS.length)];
+    }
+    return EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
+  };
+
   const scheduleExpression = () => {
     const wait = 4000 + Math.random() * 5000; // 4-9秒
     exprTimer = window.setTimeout(() => {
@@ -160,8 +182,7 @@ export const setupExpressions = (_scene: Scene, model: MmdModel) => {
       if (Math.random() < 0.3) {
         playTalk();
       } else {
-        const expr = EXPRESSIONS[Math.floor(Math.random() * EXPRESSIONS.length)];
-        playExpression(expr);
+        playExpression(pickExpression());
       }
       scheduleExpression();
     }, wait);

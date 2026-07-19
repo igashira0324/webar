@@ -1,6 +1,10 @@
 import { appState } from "./state";
 import { generateCoolQRCode } from "./qrController";
 
+// 展示・もくもく会等で他の人に読み取ってもらうための固定公開URL
+// （window.location.href だとローカル/LAN IPで開いた場合にそのURLを埋め込んでしまうため固定する）
+const SHARE_URL = "https://webar-git-feature-shutter-chance-igashira0324s-projects.vercel.app/";
+
 export const openModal = (id: string) => {
     const el = document.getElementById(id);
     el?.classList.remove("hidden");
@@ -56,8 +60,7 @@ export const setupModals = () => {
         openModal("qr-modal");
         const canvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
         if (canvas) {
-            // 現在のURLをQRコード化（localhost等の場合は適切なドメインに読み替えることも検討可）
-            generateCoolQRCode(canvas, window.location.href);
+            generateCoolQRCode(canvas, SHARE_URL);
         }
     });
     document.getElementById("closeQrBtn")?.addEventListener("click", () => closeModal("qr-modal"));

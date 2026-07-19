@@ -259,8 +259,9 @@ const makeArButton = (label: string, onClick: () => void): HTMLButtonElement => 
     const btn = document.createElement("button");
     btn.textContent = label;
     btn.style.cssText =
-        "padding:12px 18px;border:1px solid rgba(0,229,255,0.5);border-radius:26px;" +
+        "padding:10px 14px;border:1px solid rgba(0,229,255,0.5);border-radius:26px;" +
         "background:rgba(0,0,0,0.55);color:#fff;font-size:0.95rem;font-weight:600;" +
+        "white-space:nowrap;flex-shrink:0;" + // 画面幅が狭くても文字を縦に折り返させない
         "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:auto;";
     btn.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
     btn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
@@ -275,7 +276,7 @@ const createArBottomBar = (overlay: HTMLElement) => {
     bar.id = "ar-bottom-bar";
     bar.style.cssText =
         "position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;" +
-        "display:flex;gap:10px;pointer-events:auto;";
+        "display:flex;flex-wrap:nowrap;gap:8px;max-width:calc(100vw - 12px);pointer-events:auto;";
 
     const pauseBtn = makeArButton("⏸ 停止", async () => {
         cancelActiveChance(); // 停止/再開の瞬間に開いていたチャンスは無効化する

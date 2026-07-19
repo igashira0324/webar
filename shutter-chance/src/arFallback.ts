@@ -2,7 +2,7 @@
  * arFallback.ts
  * AR非対応環境（PC等）でのフォールバック処理
  * - スタジオモードへ誘導
- * - webar-coral.vercel.app へのQRコード表示
+ * - AR体験URLへのQRコード表示
  * - 「フル体験はAndroidで」バナー
  */
 
@@ -32,6 +32,7 @@ export function setupFallbackBanner(bannerId: string, arUrl: string): void {
     </div>
   `;
   banner.classList.add("visible");
+  document.body.classList.add("has-fallback-banner");
 
   // QRコードを動的生成（qrcode npm パッケージを使用）
   _generateQR("fallback-qr-canvas", arUrl);

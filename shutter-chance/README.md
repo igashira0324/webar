@@ -52,7 +52,7 @@
 ## なぜWebARなのか
 
 WebXR ARCore を活用することで、スマートフォンのカメラ越しに初音ミクと歌詞が実際の現実空間に立ち上がります。  
-ユーザーは「歌詞の海の中入り込む」感覚を得られ、従来の画面上の映像体験とは次元の異なるライブ感を味わえます。  
+ユーザーは「歌詞の海の中に入り込む」感覚を得られ、従来の画面上の映像体験とは次元の異なるライブ感を味わえます。  
 インストール不要でブラウザから即アクセスできるため、展示・コンテストでの実演にも適しています。
 
 ---
@@ -76,7 +76,7 @@ WebXR ARCore を活用することで、スマートフォンのカメラ越し�
 
 - **PC (Windows 11 / macOS)**: Google Chrome 最新版（スタジオモード / デモモード）
 - **Android**: Pixel 7 / Chrome 最新版（WebXR immersive-ar モード対応）
-- **iOS**: iPhone 15 / Safari 最新版（スタジオモードのみ。iOS SafariはWebXR非対応のためAR起動ボタンが無効化され、QRコードによるAndroid案内が表示されます）
+- **iOS**: iPhone 15 / Safari 最新版（スタジオモードのみ。iOS SafariではWebXR immersive-arに対応していないため、ARボタンは無効化されます。スタジオモードではAndroid向けAR体験URLのQRコード案内を表示します。）
 
 ---
 
@@ -175,24 +175,23 @@ shutter-chance/src/
   © 夜未アガリ / Piapro
 
 ### 歌詞同期
-- TextAlive App API © Textalive, Inc.
+- TextAlive App API (産業技術総合研究所 TextAlive Project / © AIST TextAlive Project)
+
+### 効果音
+- シャッター効果音: Web Audio API によるプログラム合成音（外部音源素材不使用）
 
 ### 3Dエンジン
 - Babylon.js / babylon-mmd
 
 ### 3Dモデル・モーション
-<!--
-  ⚠️ 提出前に必ず実際の作者名・配布URLをご記入ください（利用規約上の必須事項です）
--->
 - **MMD 3Dモデル**:
-  - モデル名: 初音ミクモデル
-  - モデル作者: （ここに作者名を記載）
-  - 配布URL / ライセンス: （ここに配布URL / 規約情報を記載）
+  - モデル名: 602e式初音ミク (VRoid Studio二次創作モデル / GENTIANA MAXIMUM)
+  - モデル作者: 602e
+  - 配布URL / ライセンス: [https://note.com/602e3/](https://note.com/602e3/) (キャラクター利用ガイドラインに従い非営利目的で使用)
 - **MMD モーション**:
   - モーション名: ディンドンダン ダンスモーション (dindondan.vmd)
-  - モーション作者: （ここに作者名を記載）
-  - 配布URL / ライセンス: （ここに配布URL / 規約情報を記載）
-- ※ 本作品内のすべてのモデルおよびモーションアセットは、各制作者の配布規約および非営利目的利用規約に従って組み込まれています。
+  - モーション作者: つるぺた (振付参考: 【雛姫】)
+  - 配布URL / ライセンス: [https://www.nicovideo.jp/watch/sm24707661](https://www.nicovideo.jp/watch/sm24707661) (非営利目的での利用規約に従い使用)
 
 ### AR技術
 - WebXR Device API + ARCore (Android Chrome)

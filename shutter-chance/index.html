@@ -185,9 +185,15 @@
       background: rgba(0, 0, 0, 0.72);
       backdrop-filter: blur(8px);
       z-index: 900;
-      pointer-events: none;
+      pointer-events: auto;
     }
     #rule-overlay.hidden { display: none; }
+
+    .gallery-rating { font-weight: bold; margin-right: 4px; }
+    .gallery-rating.perfect { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
+    .gallery-rating.spark { color: var(--pink); text-shadow: 0 0 6px var(--pink); }
+    .gallery-rating.beat { color: var(--amber); text-shadow: 0 0 6px var(--amber); }
+    .gallery-rating.captured { color: var(--dim); }
 
     #rule-overlay .rule-box {
       max-width: 520px;
@@ -512,6 +518,14 @@
     <h2>✨ LYRIC SPARK AR</h2>
     <p>「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」<br>歌詞が降り積もる世界に立ち、光のシャッターで<br>歌詞の一瞬を永遠に焼き付けよう。</p>
     <div id="ar-status-area"></div>
+    <div style="margin: 12px 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.8rem; color: var(--dim);">
+      <span>画質設定:</span>
+      <select id="quality-select" style="background: var(--bg2); color: var(--text); border: 1px solid var(--border); padding: 5px 10px; border-radius: 8px; font-family: inherit; font-size: 0.78rem; outline: none; cursor: pointer;">
+        <option value="high">高画質 (影あり / Glowあり)</option>
+        <option value="medium" selected>標準 (影なし / Glowあり)</option>
+        <option value="low">軽量 (影なし / Glowなし)</option>
+      </select>
+    </div>
     <button id="btn-ar" class="mode-btn">🥽 ARモードで体験する</button>
     <button id="btn-studio" class="mode-btn">🎬 スタジオモードで見る</button>
     <button id="btn-demo" class="mode-btn" style="background:var(--glass);color:var(--dim);border:1px solid var(--border);font-size:0.8rem;">🎥 デモを見る（自動再生）</button>
@@ -554,14 +568,19 @@
     <button id="freeze-resume-btn">▶ 再開</button>
   </div>
 
-  <!-- ルール説明オーバーレイ: onReady後に3秒表示して自動消える -->
+  <!-- ルール説明オーバーレイ: onReady後に表示され、タップで閉じる -->
   <div id="rule-overlay" class="hidden">
     <div class="rule-box">
       <div class="rule-title">🎵 Lyric Spark AR</div>
-      <div class="rule-body">
-        ミクと歌詞の世界へようこそ🎵<br>
-        音楽と同期して飛び交う歌詞演出を楽しもう！<br>
-        お気に入りの瞬間は 📷 で残せます。
+      <div class="rule-body" style="text-align: left; font-size: 0.8rem; line-height: 1.6; margin-top: 10px;">
+        1. <strong>「▶ 再生」</strong>を押すと音楽がスタートし、3Dの歌詞が降り積もります。<br>
+        2. 気に入ったアングルで<strong>「⏳ 時を止める」</strong>を押すと、撮影モード（フリーズ）になります。<br>
+        3. 画面をドラッグしてアングルを調整し、<strong>「📷 撮影」</strong>を押して記録します。<br>
+        4. 撮影した写真はギャラリーに保存され、音楽が自動で再開します。<br>
+        5. 床に積もった歌詞をタップすると、音楽記号がポップに弾けます！
+      </div>
+      <div style="font-size: 0.72rem; color: var(--dim); margin-top: 18px; text-align: center;">
+        (画面をタップして閉じる)
       </div>
     </div>
   </div>
@@ -605,7 +624,10 @@
       (ピアプロ楽曲利用規約に基づき非営利目的で利用)</p>
 
       <h3>🎤 歌詞同期</h3>
-      <p>TextAlive App API<br>© Textalive, Inc.</p>
+      <p>TextAlive App API<br>© AIST TextAlive Project / 産業技術総合研究所</p>
+
+      <h3>🔊 効果音</h3>
+      <p>シャッター効果音: Web Audio API によるプログラム合成音（外部音源素材不使用）</p>
 
       <h3>🧊 3Dエンジン / ライブラリ</h3>
       <p>Babylon.js (Apache License 2.0)<br>
@@ -613,20 +635,16 @@
       Havok Physics WASM (Copyright Microsoft / Autodesk / Unity)</p>
 
       <h3>💃 3Dモデル・モーション</h3>
-      <div style="font-size:0.75rem; line-height:1.4; color:var(--text); background:rgba(255,255,255,0.05); padding:8px; border-radius:8px; border:1px dashed var(--border); margin-bottom:12px;">
-        <strong>【重要: 応募提出時のライセンス表示】</strong><br>
-        コンテスト規定に基づき、実機アセット（MMDモデル・モーション）の著作者情報および配布元URLを以下に追記して提出してください。
-      </div>
       <ul style="padding-left:15px; font-size:0.78rem;">
         <li><strong>MMD 3Dモデル</strong>:
-          <br>モデル名: 初音ミクモデル
-          <br>作者: （ここに作者名をご記入ください）
-          <br>配布元URL / 規約: （ここにURLを記入）
+          <br>モデル名: 602e式初音ミク (GENTIANA MAXIMUM)
+          <br>作者: 602e
+          <br>配布元URL / 規約: <a href="https://note.com/602e3/" target="_blank" style="color:var(--cyan);">https://note.com/602e3/</a>
         </li>
         <li style="margin-top:8px;"><strong>MMD ダンスモーション</strong>:
-          <br>モーション名: ディンドンダンダンスモーション (dindondan.vmd)
-          <br>作者: （ここに作者名をご記入ください）
-          <br>配布元URL / 規約: （ここにURLを記入）
+          <br>モーション名: ディンドンダン ダンスモーション (dindondan.vmd)
+          <br>作者: つるぺた (振付元: 【雛姫】)
+          <br>配布元URL / 規約: <a href="https://www.nicovideo.jp/watch/sm24707661" target="_blank" style="color:var(--cyan);">https://www.nicovideo.jp/watch/sm24707661</a>
         </li>
         <li style="margin-top:8px; color:var(--dim);">※ 本作品は各制作者様の二次創作利用規約およびコンテスト応募規約（非営利目的）に従って作成・構成されています。</li>
       </ul>

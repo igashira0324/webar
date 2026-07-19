@@ -24,6 +24,7 @@ export const setupAudioLipSync = (
   let enabled = true;
   let attached = false;
   let smoothed = 0;
+  let currentEl: HTMLAudioElement | null = null;
 
   // 調整パラメータ（v1 と同じ設定）
   const SMOOTHING = 0.55;       // 平滑化（0=即時, 1=固定）
@@ -38,7 +39,10 @@ export const setupAudioLipSync = (
    *                     （ボーカル分離トラックを裏で再生する用途）
    */
   const attach = (audioElement: HTMLAudioElement, silent: boolean = false): boolean => {
-    if (attached) return true;
+    // 既に同じ要素に繋がっていれば何もしない
+    if (attached && currentEl === audioElement) return true;
+    // 別の要素へ繋ぎ直す場合は、古いグラフ（createMediaElementSource は要素ごとに一度きり）を破棄
+    if (attached) dispose();
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!Ctx) {
@@ -94,6 +98,7 @@ export const setupAudioLipSync = (
         }
       });
 
+      currentEl = audioElement;
       attached = true;
       console.log(`🎵 LipSync attached (silent=${silent})`);
       return true;
@@ -128,6 +133,11 @@ export const setupAudioLipSync = (
     }
     if (sourceNode) { try { sourceNode.disconnect(); } catch {} sourceNode = null; }
     if (analyser) { try { analyser.disconnect(); } catch {} analyser = null; }
+    // AudioContext を閉じてリークを防ぐ（ブラウザは同時に開ける数に上限がある）
+    if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+    dataArray = null;
+    smoothed = 0;
+    currentEl = null;
     attached = false;
   };
 

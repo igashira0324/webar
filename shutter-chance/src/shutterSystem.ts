@@ -6,9 +6,19 @@
 export type ShutterPhoto = {
   dataUrl: string;
   timestamp: number;
+  songPosition: number; // 楽曲内タイムスタンプ(ms)
   lyric: string;
   rating?: string; // タイミング評価 (PERFECT, SPARK, BEAT, CAPTURED)
 };
+
+/** 再生位置(ms)を MM:SS.mmm に整形する */
+function formatTime(ms: number): string {
+  const totalSeconds = ms / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const milliseconds = Math.floor(ms % 1000);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
+}
 
 export class ShutterSystem {
   private flashEl: HTMLElement;
@@ -20,8 +30,6 @@ export class ShutterSystem {
   private lastChorusStart = -1;
   private shutterCooldown = false; // 連続撮影防止
 
-  // ユーザー手動撮影（サビ中タップ/スペース）
-  private onManualShutter: (() => void) | null = null;
   private onPhotoCaptured: ((photo: ShutterPhoto) => void) | null = null;
 
   constructor(
@@ -35,18 +43,8 @@ export class ShutterSystem {
     // 撮影は専用ボタン（#freeze-shoot-btn）経由でのみ発動するため、トリガーリスナーは main.ts 側で管理する
   }
 
-  setManualShutterCallback(cb: () => void): void {
-    this.onManualShutter = cb;
-  }
-
   setOnPhotoCapturedCallback(cb: (photo: ShutterPhoto) => void): void {
     this.onPhotoCaptured = cb;
-  }
-
-  private triggerManualShutter(): void {
-    if (this.onManualShutter && !this.shutterCooldown) {
-      this.onManualShutter();
-    }
   }
 
   /**
@@ -79,7 +77,7 @@ export class ShutterSystem {
 
 
   /** シャッターを切る：フラッシュ → Canvas合成 → ポラロイド生成（記念コレクション用） */
-  async shoot(currentLyric: string, rating?: string): Promise<void> {
+  async shoot(songPosition: number, currentLyric: string, rating?: string): Promise<void> {
     if (this.shutterCooldown) return;
     this.shutterCooldown = true;
 
@@ -91,11 +89,12 @@ export class ShutterSystem {
 
     // ③ Canvasキャプチャ & ポラロイド生成（少し遅延してフラッシュと重ねる）
     await new Promise<void>((resolve) => setTimeout(resolve, 80));
-    const dataUrl = this.captureCanvas();
+    const dataUrl = await this.captureCanvas();
     if (dataUrl) {
       const photo: ShutterPhoto = {
         dataUrl,
         timestamp: Date.now(),
+        songPosition,
         lyric: currentLyric,
         rating,
       };
@@ -133,20 +132,60 @@ export class ShutterSystem {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(ctx.destination);
+      src.onended = () => {
+        ctx.close().catch(() => {});
+      };
       src.start();
     } catch (e) {
       console.warn("Shutter sound failed:", e);
     }
   }
 
-  /** Babylon.js の canvas を PNG としてキャプチャ */
-  private captureCanvas(): string | null {
-    try {
-      return this.babylonCanvas.toDataURL("image/png");
-    } catch (e) {
-      console.warn("Canvas capture failed:", e);
-      return null;
-    }
+  /** Babylon.js の canvas を PNG としてキャプチャし、著作権スタンプを合成する */
+  private async captureCanvas(): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      try {
+        const rawDataUrl = this.babylonCanvas.toDataURL("image/png");
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          // 元画像を描画
+          ctx.drawImage(img, 0, 0);
+          
+          // 右下に小さくクレジットを描画
+          const padding = Math.max(12, Math.floor(img.width * 0.025));
+          const fontSize = Math.max(10, Math.floor(img.height * 0.024));
+          ctx.font = `${fontSize}px 'Orbitron', 'Noto Sans JP', sans-serif`;
+          ctx.fillStyle = "rgba(103, 232, 249, 0.9)"; // シアン
+          ctx.textAlign = "right";
+          
+          // 文字シャドウ
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 1;
+          ctx.shadowOffsetY = 1;
+          
+          const text = "© 夜未アガリ / Piapro | Model: 602e | Motion: つるぺた";
+          ctx.fillText(text, img.width - padding, img.height - padding);
+          
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => {
+          resolve(rawDataUrl);
+        };
+        img.src = rawDataUrl;
+      } catch (e) {
+        console.warn("Canvas watermark drawing failed:", e);
+        resolve(null);
+      }
+    });
   }
 
   /** ポラロイド風画像をスタックに追加 */
@@ -171,7 +210,8 @@ export class ShutterSystem {
     else if (photo.rating === "SPARK") ratingStr = "⚡ SPARK BONUS ⚡\n";
     else if (photo.rating === "BEAT") ratingStr = "🎵 BEAT BONUS 🎵\n";
     
-    caption.innerText = `${ratingStr}${photo.lyric || "♪"}\n\n© 夜未アガリ / Piapro`;
+    const timeStr = formatTime(photo.songPosition);
+    caption.innerText = `${ratingStr}${timeStr}\n“ ${photo.lyric || "♪"} ”\n\n© 夜未アガリ / Piapro`;
 
     polaroid.appendChild(img);
     polaroid.appendChild(caption);
@@ -213,12 +253,26 @@ export class ShutterSystem {
       const cap = document.createElement("div");
       cap.className = "gallery-caption";
       
-      let ratingStr = "";
-      if (photo.rating === "PERFECT") ratingStr = "[PERFECT] ";
-      else if (photo.rating === "SPARK") ratingStr = "[SPARK] ";
-      else if (photo.rating === "BEAT") ratingStr = "[BEAT] ";
+      let ratingClass = (photo.rating || "captured").toLowerCase();
+      let ratingStr = photo.rating || "CAPTURED";
+      const timeStr = formatTime(photo.songPosition);
       
-      cap.innerText = `${ratingStr}${photo.lyric || "♪"}\n© 夜未アガリ / Piapro`;
+      cap.innerHTML = `
+        <div style="font-size: 0.7rem; color: var(--dim); margin-bottom: 2px;">[${timeStr}]</div>
+        <div style="margin-bottom: 4px;">
+          <span class="gallery-rating ${ratingClass}">${ratingStr}</span>
+        </div>
+      `;
+
+      const lyricDiv = document.createElement("div");
+      lyricDiv.style.fontWeight = "bold";
+      lyricDiv.style.fontSize = "0.8rem";
+      lyricDiv.style.color = "#a5f3fc";
+      lyricDiv.style.whiteSpace = "nowrap";
+      lyricDiv.style.overflow = "hidden";
+      lyricDiv.style.textOverflow = "ellipsis";
+      lyricDiv.textContent = `“ ${photo.lyric || "♪"} ”`;
+      cap.appendChild(lyricDiv);
 
       item.appendChild(img);
       item.appendChild(cap);

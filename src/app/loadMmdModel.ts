@@ -36,16 +36,20 @@ export const loadMmdModel = async (
 
     console.log("Loading MMD Model:", { rootUrl, sceneFilename });
 
-    const mmdMesh = await SceneLoader.ImportMeshAsync(
-        undefined,
-        rootUrl,
-        sceneFilename,
-        scene,
-        onProgress,
-        ".pmx"
-    );
-
-    SceneLoader.OnPluginActivatedObservable.remove(onActivated);
+    // 読み込みが例外を投げてもグローバル observer が残らないよう finally で必ず解除する
+    let mmdMesh;
+    try {
+        mmdMesh = await SceneLoader.ImportMeshAsync(
+            undefined,
+            rootUrl,
+            sceneFilename,
+            scene,
+            onProgress,
+            ".pmx"
+        );
+    } finally {
+        SceneLoader.OnPluginActivatedObservable.remove(onActivated);
+    }
 
     const mesh = mmdMesh.meshes[0];
     
@@ -64,6 +68,8 @@ export const loadMmdModel = async (
     // Add motion to model
     const handle = mmdModel.createRuntimeAnimation(motion);
     mmdModel.setRuntimeAnimation(handle);
+    // ダンス切替時に前のハンドルを破棄できるよう保持しておく
+    (mmdModel as any).__vmdHandle = handle;
 
     // Force set duration to allow seeking (use raw frames)
     mmdRuntime.setManualAnimationDuration(motion.endFrame);
@@ -97,10 +103,16 @@ export const loadVmdToModel = async (
     // Load VMD
     const vmdLoader = new VmdLoader(scene);
     const motion = await vmdLoader.loadAsync("motion", vmdPath);
-    
+
     // Add motion to model
+    const oldHandle = (mmdModel as any).__vmdHandle;
     const handle = mmdModel.createRuntimeAnimation(motion);
     mmdModel.setRuntimeAnimation(handle);
+    // 直前のランタイムアニメーションを破棄（切替を繰り返してもハンドルが溜まらないように）
+    if (oldHandle !== undefined && oldHandle !== null) {
+        try { mmdModel.destroyRuntimeAnimation(oldHandle); } catch (e) {}
+    }
+    (mmdModel as any).__vmdHandle = handle;
 
     // Force set duration to allow seeking
     mmdRuntime.setManualAnimationDuration(motion.endFrame);

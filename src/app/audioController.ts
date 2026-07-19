@@ -32,11 +32,25 @@ export const DANCE_PRESETS: Record<string, { vmd: string, music: string, vocal: 
 export const initAudioController = () => {
     if (!appState.scene) return;
     lipSync = setupAudioLipSync(appState.scene, () => appState.currentModel);
-    
+
     appState.scene.onBeforeRenderObservable.add(() => {
         handleLoopDetection();
         handleIdleMouth();
     });
+};
+
+// #lipsyncToggle から呼ばれる（音楽連動リップシンクの ON/OFF）
+export const setLipSyncEnabled = (enabled: boolean) => {
+    lipSync?.setEnabled(enabled);
+};
+
+// 口モーフを 0 に戻す（一時停止・停止時などに使用）
+const resetMouthMorphs = () => {
+    const morph = appState.currentModel?.morph;
+    if (!morph) return;
+    for (const name of ["あ", "a", "A", "Lip_A", "い", "う", "え", "お", "笑い"]) {
+        try { morph.setMorphWeight(name, 0); } catch (e) {}
+    }
 };
 
 export const togglePlayback = async (forceState?: boolean): Promise<boolean> => {
@@ -47,9 +61,6 @@ export const togglePlayback = async (forceState?: boolean): Promise<boolean> => 
 
     try {
         if (shouldPlay) {
-            const ctx = (window as any).BABYLON?.Engine?.audioEngine?.audioContext;
-            if (ctx && ctx.state === "suspended") await ctx.resume();
-
             const promises: Promise<any>[] = [appState.internalAudio.play()];
             if (appState.vocalAudio) {
                 lipSync.attach(appState.vocalAudio, true);
@@ -63,6 +74,8 @@ export const togglePlayback = async (forceState?: boolean): Promise<boolean> => 
             appState.internalAudio.pause();
             if (appState.vocalAudio) appState.vocalAudio.pause();
             appState.mmdRuntime.pauseAnimation();
+            // 一時停止時は口モーフを閉じる（アイドル/リップシンクの開きっぱなしを防ぐ）
+            resetMouthMorphs();
             if (btn) btn.textContent = "▶";
         }
         return true;
@@ -116,17 +129,19 @@ const handleLoopDetection = () => {
 
 const handleIdleMouth = () => {
     if (!appState.bgmStarted || !appState.currentModel || !appState.scene || DANCE_PRESETS[appState.currentDanceId].vocal) return;
-    
+    // 再生中のみ動かす（一時停止中に口が開いたまま固まるのを防ぐ）
+    if (appState.internalAudio && appState.internalAudio.paused) return;
+
     const deltaTime = appState.scene.getEngine().getDeltaTime();
     idleMouthTimer += deltaTime;
-    
+
     if (idleMouthTimer > 2000) {
         if (Math.random() > 0.7) {
             const weight = Math.random() * 0.2;
             try {
+                // 口モーフのみ操作（"笑い" は setupExpressions が管理するので触らない）
                 appState.currentModel.morph.setMorphWeight("あ", weight);
                 appState.currentModel.morph.setMorphWeight("a", weight);
-                if (Math.random() > 0.5) appState.currentModel.morph.setMorphWeight("笑い", weight * 1.5);
             } catch(e) {}
         }
         idleMouthTimer = 0;
@@ -154,6 +169,11 @@ export const setupAudio = async (danceId: string) => {
             audio.preload = "auto";
             audio.load?.();
             
+            // 前のボーカル要素と解析グラフを破棄してから差し替える
+            // （createMediaElementSource は要素ごとに一度きり／AudioContext のリーク防止）
+            if (appState.vocalAudio) { try { appState.vocalAudio.pause(); appState.vocalAudio.src = ""; } catch (e) {} }
+            lipSync?.dispose();
+
             appState.vocalAudio = preset.vocal ? new Audio(preset.vocal) : null;
             if (appState.vocalAudio) {
                 appState.vocalAudio.loop = false;

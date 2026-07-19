@@ -11,7 +11,7 @@
  */
 import {
   Scene, MeshBuilder, Mesh, Vector3, TransformNode,
-  StandardMaterial, Color3, PointerEventTypes
+  StandardMaterial, Color3, PointerEventTypes, Texture, Color4
 } from "@babylonjs/core";
 import { AdvancedDynamicTexture, TextBlock } from "@babylonjs/gui";
 
@@ -37,6 +37,8 @@ interface LyricWord {
   beatScale: number;   // ビートパルスによる一時的なスケール加算
   /** フリーズモード中は update() を止めるために参照 */
   frozenAt: number | null;
+  phraseId: number;    // 関連するフレーズの開始時間(ms)
+  isCapturedPhoto?: boolean; // 撮影写真フラグ
 }
 
 interface SparkParticle {
@@ -86,10 +88,14 @@ export class Lyric3D {
   /** フリーズモードが有効かどうか（外部から操作される） */
   isFrozen = false;
 
-  constructor(scene: Scene) {
+  private linesMesh: any = null;
+
+  constructor(scene: Scene, parentNode?: TransformNode) {
     this.scene = scene;
     this.container = new TransformNode("lyric3DContainer", this.scene);
-    this._syncContainerParent();
+    if (parentNode) {
+      this.container.parent = parentNode;
+    }
 
     // タップ弾け・堆積歌詞タップ演出: PointerObservable でピックされたメッシュを判定
     this.scene.onPointerObservable.add((pi) => {
@@ -112,10 +118,18 @@ export class Lyric3D {
     });
   }
 
-  /** ARモード切り替え時にコンテナ親を同期 */
-  private _syncContainerParent(): void {
-    const xrData = (this.scene as any)._xrData;
-    if (xrData?.arRoot) this.container.parent = xrData.arRoot;
+  /** 画質設定による堆積上限の動的設定 */
+  setMaxSettled(max: number): void {
+    (this as any).MAX_SETTLED_DYNAMIC = max;
+    const limit = this._getMaxSettled();
+    while (this.settledWords.length > limit) {
+      const oldest = this.settledWords.shift()!;
+      this._fadeAndDispose(oldest);
+    }
+  }
+
+  private _getMaxSettled(): number {
+    return (this as any).MAX_SETTLED_DYNAMIC !== undefined ? (this as any).MAX_SETTLED_DYNAMIC : this.MAX_SETTLED;
   }
 
   // ────────────────────────────────────────
@@ -127,10 +141,16 @@ export class Lyric3D {
    * @param text 歌詞テキスト
    * @param _duration 未使用（内部固定値を使用）
    * @param isChorus サビ区間かどうか
+   * @param phraseId 関連するフレーズID
    */
-  spawnWord(text: string, _duration: number, isChorus: boolean): void {
+  spawnWord(text: string, _duration: number, isChorus: boolean, phraseId: number = 0): void {
     if (!text || text.trim() === "") return;
-    this._syncContainerParent();
+
+    // ── ミク・リンのデュエット振り分け（サビ以外）
+    let isRin = false;
+    if (!isChorus) {
+      isRin = Math.random() > 0.5;
+    }
 
     // active が上限を超えたら最も古い単語を降下フェーズへ移行
     if (this.activeWords.length >= this.MAX_ACTIVE) {
@@ -141,8 +161,8 @@ export class Lyric3D {
       }
     }
 
-    // ── 出現座標（ミクの足元〜腰: y=0.6〜1.2）
-    const pos = this._findFreeSpawnPos();
+    // ── 出現座標（Miku=左, Rin=右）
+    const pos = this._findFreeSpawnPos(isChorus ? undefined : isRin);
 
     // ── Plane メッシュ
     const charCount = [...text].length;
@@ -161,28 +181,42 @@ export class Lyric3D {
     mat.disableLighting = true;
     mat.useAlphaFromDiffuseTexture = true;
     mat.backFaceCulling = false;
-    mat.emissiveColor = isChorus
-      ? new Color3(0.95, 0.3, 1.0)   // マゼンタ（サビ）
-      : new Color3(0.0, 0.85, 1.0);  // シアン（通常）
+    
+    if (isChorus) {
+      mat.emissiveColor = new Color3(0.95, 0.3, 1.0);  // サビ: マゼンタ
+    } else if (isRin) {
+      mat.emissiveColor = new Color3(1.0, 0.55, 0.0);  // リン: オレンジ
+    } else {
+      mat.emissiveColor = new Color3(0.0, 0.85, 1.0);  // ミク: シアン
+    }
     plane.material = mat;
 
     // ── テクスチャ / テキスト
-    // 単語表示に適した解像度
     const texW = Math.max(256, Math.min(512, charCount * 64));
     const texH = isChorus ? 100 : 80;
     const tex = AdvancedDynamicTexture.CreateForMesh(plane, texW, texH, false);
     const tb = new TextBlock();
     tb.text = text;
-    tb.textWrapping = false; // 改行・折り返しを無効化
+    tb.textWrapping = false;
     tb.fontFamily = "'Orbitron', 'Noto Sans JP', sans-serif";
-    // 文字数に応じてフォントサイズを動的に縮小する
     const baseFontSize = isChorus ? 56 : 46;
     const calculatedFontSize = Math.max(24, Math.min(baseFontSize, Math.floor((texW / charCount) * 1.15)));
     tb.fontSize = `${calculatedFontSize}px`;
     tb.fontWeight = "bold";
-    tb.color = isChorus ? "#f0abfc" : "#67e8f9";
-    tb.shadowColor = isChorus ? "rgba(240,171,252,0.9)" : "rgba(103,232,249,0.9)";
-    tb.shadowBlur = isChorus ? 22 : 16;
+
+    if (isChorus) {
+      tb.color = "#f0abfc";
+      tb.shadowColor = "rgba(240,171,252,0.9)";
+      tb.shadowBlur = 22;
+    } else if (isRin) {
+      tb.color = "#fed7aa"; // リン (薄いオレンジ)
+      tb.shadowColor = "rgba(255,152,0,0.9)";
+      tb.shadowBlur = 18;
+    } else {
+      tb.color = "#67e8f9"; // ミク (シアン)
+      tb.shadowColor = "rgba(103,232,249,0.9)";
+      tb.shadowBlur = 16;
+    }
     tb.shadowOffsetX = 0;
     tb.shadowOffsetY = 0;
     tex.addControl(tb);
@@ -190,10 +224,6 @@ export class Lyric3D {
     const word: LyricWord = {
       mesh: plane, texture: tex, textBlock: tb, material: mat,
       spawnPos: pos.clone(),
-      // 堆積座標は360度ランダムに分散させる（ミクを囲む歌詞の海）
-      //  - angle: 0〜2π でランダム方向
-      //  - radius: 0.8〜2.5m でランダム距離
-      //  - y: 床すれすれ（0.02〜0.10m）
       settledPos: (() => {
         const angle  = Math.random() * Math.PI * 2;
         const radius = 0.8 + Math.random() * 1.7;
@@ -209,6 +239,7 @@ export class Lyric3D {
       exploded: false,
       beatScale: 0,
       frozenAt: null,
+      phraseId
     };
 
     this.activeWords.push(word);
@@ -252,7 +283,7 @@ export class Lyric3D {
           (w as any)._hoverRotSpeed = (Math.random() > 0.5 ? 1 : -1) * (0.01 + Math.random() * 0.03);
         }
 
-        // 極めてゆっくりとミク（0, 0）の周りを旋回
+        // 極めてゆっくりと旋回
         (w as any)._hoverAngle += (w as any)._hoverRotSpeed * 0.005;
         const radius = (w as any)._hoverRadius;
         const angle = (w as any)._hoverAngle;
@@ -263,12 +294,17 @@ export class Lyric3D {
         const phase = (w as any)._hoverPhaseOffset + now * 0.001 * (w as any)._hoverSpeed;
         w.mesh.position.y = (w as any)._hoverBaseY + Math.sin(phase) * 0.12;
 
-        // 淡い表示を維持（アルファ 0.35 付近、スケール 0.45 付近）
         w.beatScale *= 0.85;
-        w.textBlock.alpha = 0.35 + w.beatScale * 0.5; // ビートで少し輝く
-        w.mesh.visibility = 1.0;
-        w.mesh.scaling.setAll(0.45 + w.beatScale * 0.25);
+        if (w.isCapturedPhoto) {
+          w.mesh.scaling.setAll(0.8 + w.beatScale * 0.25);
+        } else {
+          w.textBlock.alpha = 0.35 + w.beatScale * 0.5; // ビートで少し輝く
+          w.mesh.visibility = 1.0;
+          w.mesh.scaling.setAll(0.45 + w.beatScale * 0.25);
+        }
       }
+      this._updateConstellationLines();
+      return; // ホバリング中も通常の更新はスキップ
     }
 
     // ── フィナーレ演出（舞い上がり）の更新
@@ -299,14 +335,18 @@ export class Lyric3D {
           const dir = new Vector3(w.mesh.position.x, 0, w.mesh.position.z).normalize();
           w.mesh.position.addInPlace(dir.scale(0.012)); // 徐々に広がる
           
-          // フィナーレ終盤で完全に消すのではなく、ホバリング用の明るさへ徐々に変化
-          w.textBlock.alpha = Math.max(0.35, (w.textBlock.alpha ?? 0.45) * (1 - t * 0.5));
-          w.mesh.visibility = 1.0;
-          
-          w.beatScale *= 0.85;
-          w.mesh.scaling.setAll(Math.max(0.35, (0.55 + w.beatScale) * (1 - t * 0.2)));
+          if (w.isCapturedPhoto) {
+            // スケールイン
+            w.mesh.scaling.setAll(t * 0.8);
+          } else {
+            w.textBlock.alpha = Math.max(0.35, (w.textBlock.alpha ?? 0.45) * (1 - t * 0.5));
+            w.mesh.visibility = 1.0;
+            w.beatScale *= 0.85;
+            w.mesh.scaling.setAll(Math.max(0.35, (0.55 + w.beatScale) * (1 - t * 0.2)));
+          }
         }
       }
+      this._updateConstellationLines();
       return; // フィナーレ中は通常の activeWords 等の更新はスキップ
     }
 
@@ -396,7 +436,7 @@ export class Lyric3D {
   spawnHoldSparks(): void { /* Phase 2 で実装 */ }
 
   /** 曲終わりの舞い上がり演出をトリガーする */
-  triggerFinale(): void {
+  triggerFinale(photos: any[] = []): void {
     if (this.finaleActive) return;
     this.finaleActive = true;
     this.finaleStartTime = Date.now();
@@ -406,11 +446,153 @@ export class Lyric3D {
     this.activeWords = [];
     this.settledWords = [];
     
-    console.log(`[Lyric3D] Finale triggered. Total words rising: ${this.finaleWords.length}`);
+    // ポラロイド写真の3D生成と追加
+    photos.forEach((photo, idx) => {
+      try {
+        const parentMesh = this._create3DPolaroid(photo);
+        parentMesh.parent = this.container;
+        
+        // ミクを囲む円環状に配置、少し高さをずらす
+        const angle = (idx / Math.max(1, photos.length)) * Math.PI * 2 + Math.random() * 0.5;
+        const radius = 1.2 + Math.random() * 0.8;
+        parentMesh.position.set(
+          Math.cos(angle) * radius,
+          0.1 + Math.random() * 0.2, // 下部から舞い上がる
+          Math.sin(angle) * radius
+        );
+        
+        (parentMesh as any)._finaleStartY = parentMesh.position.y;
+        
+        const word: LyricWord = {
+          mesh: parentMesh as any,
+          texture: null as any,
+          textBlock: null as any,
+          material: null as any,
+          spawnPos: parentMesh.position.clone(),
+          settledPos: parentMesh.position.clone(),
+          spawnTime: Date.now(),
+          phase: "settled",
+          isChorus: false,
+          exploded: false,
+          beatScale: 0,
+          frozenAt: null,
+          phraseId: -999, // 写真オブジェクト特別ID
+          isCapturedPhoto: true
+        };
+        
+        parentMesh.scaling.setAll(0); // 縮小状態からスタート
+        this.finaleWords.push(word);
+      } catch (e) {
+        console.warn("Failed to create 3D polaroid for finale:", e);
+      }
+    });
+    
+    console.log(`[Lyric3D] Finale triggered. Total items rising: ${this.finaleWords.length}`);
+  }
+
+  private _create3DPolaroid(photo: any): Mesh {
+    const parent = new Mesh("polaroidParent", this.scene);
+    
+    // 1. 白背景プレート
+    const back = MeshBuilder.CreatePlane("polaroidBack", { width: 0.6, height: 0.75 }, this.scene);
+    const backMat = new StandardMaterial("polaroidBackMat", this.scene);
+    backMat.disableLighting = true;
+    backMat.emissiveColor = new Color3(1.0, 1.0, 1.0);
+    back.material = backMat;
+    back.parent = parent;
+    
+    // 2. 写真画像プレート
+    const imgPlane = MeshBuilder.CreatePlane("polaroidImg", { width: 0.52, height: 0.52 }, this.scene);
+    const imgMat = new StandardMaterial("polaroidImgMat", this.scene);
+    imgMat.disableLighting = true;
+    const tex = new Texture(photo.dataUrl, this.scene);
+    imgMat.emissiveTexture = tex;
+    imgPlane.material = imgMat;
+    imgPlane.parent = parent;
+    imgPlane.position.y = 0.08;
+    imgPlane.position.z = -0.005; // z-fighting 防止
+    
+    parent.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    return parent;
+  }
+
+  /** フレーズ単位で歌詞同士を線で繋ぎ、また写真をその中心（ハブ）に繋ぐ */
+  private _updateConstellationLines(): void {
+    const words = this.finaleActive ? this.finaleWords : this.hoveringWords;
+    const groups: Record<number, LyricWord[]> = {};
+    
+    for (const w of words) {
+      if (w.isCapturedPhoto || w.exploded || w.phraseId === -999 || w.phraseId === 0) continue;
+      if (!groups[w.phraseId]) {
+        groups[w.phraseId] = [];
+      }
+      groups[w.phraseId].push(w);
+    }
+    
+    const lines: Vector3[][] = [];
+    
+    // 1. 同じフレーズの単語同士を時系列順に接続
+    for (const phraseId in groups) {
+      const group = groups[phraseId];
+      if (group.length < 2) continue;
+      group.sort((a, b) => a.spawnTime - b.spawnTime);
+      const points = group.map(w => w.mesh.position);
+      lines.push(points);
+    }
+    
+    // 2. 撮影写真を最寄りの歌詞ワードと接続して星座のハブ化する
+    const photos = words.filter(w => w.isCapturedPhoto);
+    const lyrics = words.filter(w => !w.isCapturedPhoto && !w.exploded);
+    if (photos.length > 0 && lyrics.length > 0) {
+      for (const p of photos) {
+        let nearest: LyricWord | null = null;
+        let minDist = Infinity;
+        for (const l of lyrics) {
+          const dist = Vector3.Distance(p.mesh.position, l.mesh.position);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = l;
+          }
+        }
+        if (nearest) {
+          lines.push([p.mesh.position, nearest.mesh.position]);
+        }
+      }
+    }
+    
+    // 既存の星座線をクリア
+    if (this.linesMesh) {
+      this.linesMesh.dispose();
+      this.linesMesh = null;
+    }
+    
+    if (lines.length === 0) return;
+    
+    try {
+      const colors: Color4[][] = [];
+      for (const line of lines) {
+        const lineColor = new Color4(0.0, 0.9, 1.0, 0.35); // シアン半透明
+        colors.push(line.map(() => lineColor));
+      }
+      
+      this.linesMesh = MeshBuilder.CreateLineSystem("constellationLines", {
+        lines,
+        colors,
+        useVertexAlpha: true
+      }, this.scene);
+      this.linesMesh.parent = this.container;
+    } catch (e) {
+      console.warn("Failed to create constellation lines:", e);
+    }
   }
 
   /** 全単語（active + settled + finale + hovering + sparks）を破棄してリセット */
   clear(): void {
+    if (this.linesMesh) {
+      this.linesMesh.dispose();
+      this.linesMesh = null;
+    }
+    
     [...this.activeWords, ...this.settledWords, ...this.finaleWords, ...this.hoveringWords].forEach(w => this._dispose(w));
     this.activeWords = [];
     this.settledWords = [];
@@ -494,8 +676,9 @@ export class Lyric3D {
   private _addSettled(w: LyricWord): void {
     this.settledWords.push(w);
 
+    const limit = this._getMaxSettled();
     // FIFO: 古いものを消す
-    while (this.settledWords.length > this.MAX_SETTLED) {
+    while (this.settledWords.length > limit) {
       const oldest = this.settledWords.shift()!;
       this._fadeAndDispose(oldest);
     }
@@ -503,7 +686,6 @@ export class Lyric3D {
 
   /** フェードアウトしてから dispose（GC 負担を分散） */
   private _fadeAndDispose(w: LyricWord): void {
-    // 即時 dispose（シンプルに）
     this._dispose(w);
   }
 
@@ -529,11 +711,12 @@ export class Lyric3D {
   }
 
   /** 既存の単語と重なりにくい出現座標を探す */
-  private _findFreeSpawnPos(): Vector3 {
+  private _findFreeSpawnPos(isRin?: boolean): Vector3 {
     const all = [...this.activeWords, ...this.settledWords];
+    const sideSign = isRin === undefined ? (Math.random() > 0.5 ? 1 : -1) : (isRin ? 1 : -1);
     for (let i = 0; i < 20; i++) {
       const c = new Vector3(
-        (Math.random() - 0.5) * 2.2,         // x: -1.1 〜 +1.1
+        (Math.random() * 1.1) * sideSign,         // x: Rin = right, Miku = left
         0.6 + Math.random() * 0.6,            // y: 0.6 〜 1.2（足元〜腰）
         (Math.random() - 0.5) * 1.2,          // z: -0.6 〜 +0.6
       );
@@ -544,7 +727,7 @@ export class Lyric3D {
     }
     // フォールバック
     return new Vector3(
-      (Math.random() - 0.5) * 2.2,
+      (Math.random() * 1.1) * sideSign,
       0.6 + Math.random() * 0.6,
       (Math.random() - 0.5) * 1.2,
     );
@@ -552,6 +735,14 @@ export class Lyric3D {
 
   /** メッシュ・テクスチャ・マテリアルを確実に解放 */
   private _dispose(w: LyricWord): void {
+    if (w.isCapturedPhoto) {
+      w.mesh.getChildMeshes().forEach(m => {
+        m.material?.dispose();
+        m.dispose();
+      });
+      w.mesh.dispose();
+      return;
+    }
     w.texture.dispose();
     w.material.dispose();
     w.mesh.dispose();
@@ -572,22 +763,18 @@ export class Lyric3D {
     const symbols = ["♫", "♡", "✨", "🎵", "♥", "🎶", "⭐"];
     
     for (let i = 0; i < 7; i++) {
-      // 3D Plane で記号を描画
       const spark = MeshBuilder.CreatePlane("spark", { width: 0.16, height: 0.16 }, this.scene);
       spark.billboardMode = Mesh.BILLBOARDMODE_ALL;
       spark.parent = this.container;
       spark.position.copyFrom(pos);
 
-      // マテリアル設定（非ライティング・両面）
       const mat = new StandardMaterial("spark-mat", this.scene);
       mat.disableLighting = true;
       mat.useAlphaFromDiffuseTexture = true;
       mat.backFaceCulling = false;
-      // サビかどうかに応じてネオン色に
       mat.emissiveColor = w.isChorus ? new Color3(0.0, 0.9, 1.0) : new Color3(1.0, 0.4, 0.9);
       spark.material = mat;
 
-      // GUIで記号のテクスチャを作成
       const tex = AdvancedDynamicTexture.CreateForMesh(spark, 64, 64, false);
       const tb = new TextBlock();
       tb.text = symbols[Math.floor(Math.random() * symbols.length)];
@@ -599,7 +786,6 @@ export class Lyric3D {
       tb.shadowBlur = 10;
       tex.addControl(tb);
 
-      // 3Dランダムな方向に速度を決定
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.5 + Math.random() * 0.9;
       const velocity = new Vector3(

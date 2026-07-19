@@ -38,6 +38,7 @@ let lyric3d: Lyric3D | null = null;
 let shutterSystem: ShutterSystem | null = null;
 let mmdRuntime: MmdRuntime | null = null;
 let glowLayer: any = null;
+let scene: Scene | null = null;
 let currentPosition = 0;      // TextAlive再生位置(ms) — マスタークロック
 let isPlaying = false;
 let lastBeatIndex = -1;
@@ -121,20 +122,21 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
 
   // ① シーン作成
   const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-  let scene: Scene;
   let shadowGenerator: any = null;
   let enterAR: (() => void) | null = null;
+  let contentRoot: any = null;
 
   if (mode === "ar") {
     const result = await createARScene(canvas);
     scene = result.scene;
     shadowGenerator = result.shadowGenerator;
+    contentRoot = result.contentRoot;
     enterAR = result.enterAR ?? null;
-    setupFallbackBanner("ar-fallback-banner", AR_URL);
   } else {
     const result = await createStudioScene(canvas);
     scene = result.scene;
     shadowGenerator = result.shadowGenerator;
+    contentRoot = result.contentRoot;
     setupFallbackBanner("ar-fallback-banner", AR_URL);
   }
 
@@ -169,6 +171,7 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
     );
     mmdModel = result.model;
     // ミクのスケール・位置をデフォルト値に確実に設定（カメラとの比率を正常に保つ）
+    mmdModel.mesh.parent = contentRoot;
     mmdModel.mesh.scaling.setAll(0.07);
     mmdModel.mesh.position.y = 0.5;
     setStatusMessage("ミク読み込み完了");
@@ -269,16 +272,20 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
 
   // ⑥ サブシステム初期化
   lyricDisplay = new LyricDisplay("lyric-word", "lyric-phrase");
-  lyric3d = new Lyric3D(scene);
+  lyric3d = new Lyric3D(scene!, contentRoot);
   shutterSystem = new ShutterSystem("flash", "photo-stack", canvas);
 
-  // 撮影コールバック（shutterSystem.shoot（）のラッパー— 直接撮影のみ）
-  shutterSystem.setManualShutterCallback(() => {
-    const lyric = document.getElementById("lyric-word")?.textContent ?? "";
-    const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
-    shutterSystem?.shoot(lyric, rating);
-    showRatingPopup(rating);
-  });
+  // 画質設定の初期適用と監視
+  const qualitySelect = document.getElementById("quality-select") as HTMLSelectElement | null;
+  if (qualitySelect) {
+    applyQualitySettings(qualitySelect.value);
+    qualitySelect.addEventListener("change", (e) => {
+      applyQualitySettings((e.target as HTMLSelectElement).value);
+    });
+  } else {
+    applyQualitySettings("medium"); // フォールバック
+  }
+
 
   // 写真追加時に枚数カウントを更新
   shutterSystem.setOnPhotoCapturedCallback(() => {
@@ -288,15 +295,16 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
 
   // ── #freeze-shoot-btn: 時止め・撮影の切り替わりボタン ──
   const freezeShootBtn = document.getElementById("freeze-shoot-btn") as HTMLButtonElement | null;
-  freezeShootBtn?.addEventListener("click", () => {
+  freezeShootBtn?.addEventListener("click", async () => {
     if (!isFrozen) {
       // 「時を止める」→ フリーズモードへ
       enterFreezeMode();
     } else {
-      // 「撮影」→ 決定的瞬間を撮影して自動再開
+      // 「撮影」→ 決安定瞬間を撮影して自動再開
       const lyric = document.getElementById("lyric-word")?.textContent ?? "";
       const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
-      shutterSystem?.shoot(lyric, rating);
+      
+      await shutterSystem?.shoot(currentPosition, lyric, rating);
       showRatingPopup(rating);
       exitFreezeMode();
     }
@@ -308,6 +316,10 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   // ⑦ 再生ボタン
   const playBtn = document.getElementById("play-btn");
   playBtn?.addEventListener("click", () => {
+    if (isFrozen) {
+      exitFreezeMode();
+      return;
+    }
     if (isPlaying) {
       taSync?.pause();
     } else {
@@ -335,19 +347,29 @@ async function startApp(mode: "ar" | "studio"): Promise<void> {
   });
 
   // ⑪ Fキーによるフィナーレ演出（舞い上がり）のデバッグ強制発火用ショートカット
-  document.addEventListener("keydown", (e) => {
-    if (e.code === "KeyF" && !e.repeat) {
-      console.log("[main] Debug key F: Triggering finale manually");
-      triggerFinale();
-    }
-  });
+  const DEBUG = false;
+  if (DEBUG) {
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "KeyF" && !e.repeat) {
+        console.log("[main] Debug key F: Triggering finale manually");
+        triggerFinale();
+      }
+    });
+  }
 
   // ⑩ AR起動ボタン（ARモード時）
   if (mode === "ar" && enterAR) {
     const arStartBtn = document.getElementById("ar-start-btn");
     if (arStartBtn) {
       arStartBtn.classList.remove("hidden");
-      arStartBtn.addEventListener("click", () => enterAR!());
+      arStartBtn.addEventListener("click", async () => {
+        try {
+          await enterAR!();
+        } catch (e) {
+          console.error("AR entry failed:", e);
+          setupFallbackBanner("ar-fallback-banner", AR_URL);
+        }
+      });
     }
   }
 }
@@ -372,8 +394,10 @@ function onTick(position: number): void {
       lastWordStartTime = wordInfo.startTime;
       const text = wordInfo.text.trim();
       if (text.length > 0) {
+        const phraseInfo = taSync.getCurrentPhraseInfo(position);
+        const phraseId = phraseInfo ? phraseInfo.startTime : 0;
         // 3D空間に単語を表示（表示時間は lyric3d 内部で管理）
-        lyric3d?.spawnWord(text, 0, isInChorus);
+        lyric3d?.spawnWord(text, 0, isInChorus, phraseId);
       }
     }
   } else {
@@ -419,7 +443,8 @@ function triggerFinale(): void {
   if (finaleTriggered) return;
   finaleTriggered = true;
   console.log("[main] Triggering Finale Lyric Rise...");
-  lyric3d?.triggerFinale();
+  const photos = shutterSystem ? shutterSystem.getPhotos() : [];
+  lyric3d?.triggerFinale(photos);
 }
 
 // ──────────────────────────────────────────────
@@ -552,21 +577,28 @@ function exitFreezeMode(): void {
 }
 
 /**
- * ウェルカムオーバーレイを表示し、3秒後に自動フェードアウト。
- * リリックアプリの世界観をひと言で伝える。
+ * ウェルカムオーバーレイを表示。
+ * リリックアプリの世界観をひと言で伝える。タップで閉じる、もしくは一定時間で自動フェードアウトする仕様。
  */
 function showWelcomeOverlay(): void {
   const el = document.getElementById("rule-overlay");
   if (!el) return;
   el.classList.remove("hidden");
-  el.classList.add("fade-in");
-  setTimeout(() => {
-    el.classList.add("fade-out");
-    setTimeout(() => {
-      el.classList.add("hidden");
-      el.classList.remove("fade-in", "fade-out");
-    }, 600);
-  }, 3000);
+
+  let timeoutId: any = null;
+
+  const dismiss = () => {
+    el.classList.add("hidden");
+    el.removeEventListener("click", dismiss);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  };
+  el.addEventListener("click", dismiss);
+
+  // デモモードなら3秒、通常モードなら5秒後に自動で閉じる
+  const delay = isDemoMode ? 3000 : 5000;
+  timeoutId = setTimeout(dismiss, delay);
 }
 
 function setStatusMessage(msg: string): void {
@@ -654,12 +686,12 @@ function updateDemoSequence(pos: number): void {
       enterFreezeMode();
 
       // 1.5秒後に自動撮影 & 再開
-      setTimeout(() => {
+      setTimeout(async () => {
         if (isDemoMode && isFrozen) {
           console.log("[Demo] Auto-shooting in chorus...");
           const lyric = document.getElementById("lyric-word")?.textContent ?? "";
           const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
-          shutterSystem?.shoot(lyric, rating);
+          await shutterSystem?.shoot(currentPosition, lyric, rating);
           showRatingPopup(rating);
           exitFreezeMode();
         }
@@ -676,12 +708,12 @@ function updateDemoSequence(pos: number): void {
       enterFreezeMode();
 
       // 1.5秒後に自動撮影 & 再開
-      setTimeout(() => {
+      setTimeout(async () => {
         if (isDemoMode && isFrozen) {
           console.log("[Demo] Auto-shooting at phrase climax...");
           const lyric = document.getElementById("lyric-word")?.textContent ?? "";
           const rating = taSync ? taSync.getShotRating(currentPosition) : "CAPTURED";
-          shutterSystem?.shoot(lyric, rating);
+          await shutterSystem?.shoot(currentPosition, lyric, rating);
           showRatingPopup(rating);
           exitFreezeMode();
         }
@@ -696,7 +728,48 @@ function updateDemoSequence(pos: number): void {
   }
 }
 
+/** 画質プリセット設定の反映 */
+function applyQualitySettings(preset: string): void {
+  const selectEl = document.getElementById("quality-select") as HTMLSelectElement | null;
+  if (selectEl && selectEl.value !== preset) {
+    selectEl.value = preset;
+  }
 
+  let shadows = false;
+  let glow = false;
+  let max_settled = 80;
+
+  if (preset === "high") {
+    shadows = true;
+    glow = true;
+    max_settled = 150;
+  } else if (preset === "medium") {
+    shadows = false;
+    glow = true;
+    max_settled = 80;
+  } else if (preset === "low") {
+    shadows = false;
+    glow = false;
+    max_settled = 30;
+  }
+
+  // 影の有効・無効切り替え
+  if (scene) {
+    scene.shadowsEnabled = shadows;
+  }
+
+  // GlowLayerの有効・無効切り替え
+  if (glowLayer) {
+    glowLayer.isEnabled = glow;
+  }
+
+  // 3D歌詞の最大堆積数の上限を更新
+  if (lyric3d) {
+    lyric3d.setMaxSettled(max_settled);
+  }
+
+  console.log(`[Quality] Preset applied: ${preset} (Shadows: ${shadows}, Glow: ${glow}, MaxSettled: ${max_settled})`);
+}
 
 // ──────────────────────────────────────────────
 // エントリ

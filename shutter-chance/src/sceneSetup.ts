@@ -7,7 +7,7 @@ import {
   Engine, Scene, ArcRotateCamera, Vector3,
   HemisphericLight, DirectionalLight, ShadowGenerator,
   Color4, MeshBuilder, StandardMaterial, Color3,
-  GlowLayer, WebXRState, TransformNode, Quaternion
+  WebXRState, TransformNode, Quaternion
 } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
 import "babylon-mmd/esm/Loader/pmxLoader";
@@ -17,6 +17,7 @@ export type SceneBundle = {
   engine: Engine;
   scene: Scene;
   shadowGenerator: ShadowGenerator;
+  contentRoot: TransformNode;
   enterAR?: () => Promise<void>;
 };
 
@@ -29,6 +30,9 @@ export async function createStudioScene(canvas: HTMLCanvasElement): Promise<Scen
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.03, 0.03, 0.12, 1.0);
+
+  // モデルや歌詞をグループ化して制御するためのルートノード
+  const contentRoot = new TransformNode("contentRoot", scene);
 
   // カメラ
   const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 3.5, new Vector3(0, 0.8, 0), scene);
@@ -52,26 +56,22 @@ export async function createStudioScene(canvas: HTMLCanvasElement): Promise<Scen
   // スタジオ床（グリッド）
   _buildStudioFloor(scene);
 
-  // グロー演出
-  const gl = new GlowLayer("glow", scene);
-  gl.intensity = 0.3;
-
   engine.runRenderLoop(() => scene.render());
   window.addEventListener("resize", () => engine.resize());
 
-  return { engine, scene, shadowGenerator };
+  return { engine, scene, shadowGenerator, contentRoot };
 }
 
 /** AR モード（WebXR immersive-ar）でシーンを構築する */
 export async function createARScene(canvas: HTMLCanvasElement): Promise<SceneBundle> {
-  const { engine, scene, shadowGenerator } = await createStudioScene(canvas);
+  const { engine, scene, shadowGenerator, contentRoot } = await createStudioScene(canvas);
 
   // WebXR セッションを開始する関数を返す
   const enterAR = async () => {
     try {
-      const arRoot = new TransformNode("arRoot", scene);
-      arRoot.scaling.setAll(0.15);
-      arRoot.setEnabled(false);
+      // contentRoot のスケールを AR 向けに縮小
+      contentRoot.scaling.setAll(0.15);
+      contentRoot.setEnabled(false); // 開始するまで非表示
 
       const xr = await scene.createDefaultXRExperienceAsync({
         uiOptions: { sessionMode: "immersive-ar", referenceSpaceType: "local-floor" },
@@ -85,15 +85,17 @@ export async function createARScene(canvas: HTMLCanvasElement): Promise<SceneBun
         element: document.getElementById("ar-overlay")!,
       });
 
-      (scene as any)._xrData = { xr, hitTest, arRoot };
+      (scene as any)._xrData = { xr, hitTest, contentRoot };
 
       xr.baseExperience.onStateChangedObservable.add((state) => {
         const arOverlay = document.getElementById("ar-overlay");
+        const guide = document.getElementById("ar-place-guide");
         if (state === WebXRState.IN_XR) {
           scene.clearColor = new Color4(0, 0, 0, 0);
-          arRoot.setEnabled(true);
+          contentRoot.setEnabled(false); // タップ配置されるまで非表示に
           // ar-overlay を有効化してタップ配置を受け付ける
           arOverlay?.classList.add("active");
+          guide?.classList.remove("placed"); // 配置ガイドをリセット
         } else if (state === WebXRState.NOT_IN_XR) {
           scene.clearColor = new Color4(0.03, 0.03, 0.12, 1.0);
           arOverlay?.classList.remove("active");
@@ -105,15 +107,21 @@ export async function createARScene(canvas: HTMLCanvasElement): Promise<SceneBun
       if (overlay) {
         overlay.addEventListener("pointerup", () => {
           if (xr.baseExperience.state !== WebXRState.IN_XR) return;
-          arRoot.setEnabled(true);
+          contentRoot.setEnabled(true);
           const camera = xr.baseExperience.camera;
           if (hitTest?.lastHitTestResults?.length) {
             const tmpQuat = new Quaternion();
-            hitTest.lastHitTestResults[0].transformationMatrix.decompose(undefined, tmpQuat, arRoot.position);
+            hitTest.lastHitTestResults[0].transformationMatrix.decompose(undefined, tmpQuat, contentRoot.position);
           } else {
             const fwd = camera.getForwardRay().direction;
-            arRoot.position.copyFrom(camera.position).addInPlace(fwd.scale(1.5));
-            arRoot.position.y -= 0.8;
+            contentRoot.position.copyFrom(camera.position).addInPlace(fwd.scale(1.5));
+            contentRoot.position.y -= 0.8;
+          }
+          
+          // 配置完了でガイドを消す
+          const guide = document.getElementById("ar-place-guide");
+          if (guide) {
+            guide.classList.add("placed");
           }
         });
       }
@@ -121,10 +129,11 @@ export async function createARScene(canvas: HTMLCanvasElement): Promise<SceneBun
       await xr.baseExperience.enterXRAsync("immersive-ar", "local-floor");
     } catch (e) {
       console.error("AR entry failed:", e);
+      throw e;
     }
   };
 
-  return { engine, scene, shadowGenerator, enterAR };
+  return { engine, scene, shadowGenerator, contentRoot, enterAR };
 }
 
 /** スタジオ用フロアを構築 */

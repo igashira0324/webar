@@ -1,3 +1,4 @@
+import { WebXRState } from "@babylonjs/core";
 import { appState } from "./state";
 import { generateCoolQRCode } from "./qrController";
 
@@ -27,6 +28,18 @@ export const setupModals = () => {
     const characterFab = document.getElementById("characterFab");
     const qrFab = document.getElementById("qrFab");
 
+    const showArError = (e: any) => {
+        const titleEl = document.getElementById("ar-error-title");
+        const msgEl = document.getElementById("ar-error-msg");
+        if (titleEl) titleEl.textContent = "AR 起動に失敗しました";
+        if (msgEl) {
+            msgEl.textContent = e?.message
+                ? `${e.name ?? "Error"}: ${e.message}`
+                : "お使いの端末が WebXR に対応していないか、許可が拒否されました。";
+        }
+        openModal("ar-unavailable-modal");
+    };
+
     document.getElementById("arLaunchBtn")?.addEventListener("click", async () => {
         const xr = appState.xrHelper;
         if (!xr || !xr.baseExperience) {
@@ -35,15 +48,25 @@ export const setupModals = () => {
             openModal("ar-unavailable-modal");
             return;
         }
+        const enterAr = () =>
+            xr.baseExperience.enterXRAsync("immersive-ar", "local-floor", xr.renderTarget);
         try {
-            await xr.baseExperience.enterXRAsync("immersive-ar", "local-floor", xr.renderTarget);
+            // 前回セッションの終了処理が完了していないと requestSession が失敗するため、先に終了を待つ
+            if (xr.baseExperience.state !== WebXRState.NOT_IN_XR) {
+                try { await xr.baseExperience.exitXRAsync(); } catch (e) { /* 既に終了済みなら無視 */ }
+                await new Promise((r) => setTimeout(r, 300));
+            }
+            await enterAr();
         } catch (e: any) {
-            console.error("AR起動失敗:", e);
-            const titleEl = document.getElementById("ar-error-title");
-            const msgEl = document.getElementById("ar-error-msg");
-            if (titleEl) titleEl.textContent = "AR 起動に失敗しました";
-            if (msgEl) msgEl.textContent = e.message || "お使いの端末が WebXR に対応していないか、許可が拒否されました。";
-            openModal("ar-unavailable-modal");
+            // セッション終了直後の再入室は一時的に失敗する端末があるため、少し待って1回だけ再試行する
+            console.warn("AR起動失敗（再試行します）:", e);
+            try {
+                await new Promise((r) => setTimeout(r, 800));
+                await enterAr();
+            } catch (e2: any) {
+                console.error("AR起動失敗:", e2);
+                showArError(e2);
+            }
         }
     });
 

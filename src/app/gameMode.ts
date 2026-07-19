@@ -289,7 +289,7 @@ const showMissPopup = (): void => showPopup("MISS…", "miss");
 const showFeverPopup = (): void => showPopup("🔥 FEVER TIME! 🔥", "golden");
 
 // シャッター音をWeb Audio APIで合成（外部音源不使用。shutter-chance/src/shutterSystem.tsから移植）
-const playShutterSound = (): void => {
+export const playShutterSound = (): void => {
     try {
         const ctx = new AudioContext();
         const buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);

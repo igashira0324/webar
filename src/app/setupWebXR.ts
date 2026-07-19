@@ -14,6 +14,7 @@ import {
 } from "./arFeatures";
 import { tryConsumeTap, setGameActive, setChanceReady, cancelActiveChance } from "./gameMode";
 import { togglePlayback } from "./audioController";
+import { setupArPhoto, requestArPhoto } from "./arPhoto";
 
 // ===== AR ルート管理 =====
 // モデルを arRoot 配下へ付け替え、セッション終了時に元の親子関係と変形へ戻す
@@ -253,47 +254,47 @@ const setupArGestures = (overlay: HTMLElement, ctx: GestureContext) => {
     overlay.addEventListener("touchcancel", end, { passive: true });
 };
 
-// AR セッションを終了するためのボタン（DOM Overlay 上に表示）
-// disableDefaultUI:true のためネイティブの退出ボタンが無く、これが唯一のアプリ内退出手段
-const createArExitButton = (overlay: HTMLElement) => {
-    const exitBtn = document.createElement("button");
-    exitBtn.id = "ar-exit-btn";
-    exitBtn.textContent = "✕ AR 終了";
-    exitBtn.style.cssText =
-        "position:absolute;top:14px;right:14px;z-index:20;padding:10px 16px;border:none;" +
-        "border-radius:22px;background:rgba(0,0,0,0.55);color:#fff;font-size:0.9rem;font-weight:600;" +
+// AR操作ボタンの共通生成（タッチはジェスチャー（回転/配置）に伝播させない）
+const makeArButton = (label: string, onClick: () => void): HTMLButtonElement => {
+    const btn = document.createElement("button");
+    btn.textContent = label;
+    btn.style.cssText =
+        "padding:12px 18px;border:1px solid rgba(0,229,255,0.5);border-radius:26px;" +
+        "background:rgba(0,0,0,0.55);color:#fff;font-size:0.95rem;font-weight:600;" +
         "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:auto;";
-    exitBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
+    btn.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+    btn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+    btn.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
+    return btn;
+};
+
+// 画面最下部の操作バー（停止 / 撮影 / AR終了）。
+// disableDefaultUI:true のためネイティブの退出ボタンが無く、終了ボタンが唯一のアプリ内退出手段
+const createArBottomBar = (overlay: HTMLElement) => {
+    const bar = document.createElement("div");
+    bar.id = "ar-bottom-bar";
+    bar.style.cssText =
+        "position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:20;" +
+        "display:flex;gap:10px;pointer-events:auto;";
+
+    const pauseBtn = makeArButton("⏸ 停止", async () => {
+        cancelActiveChance(); // 停止/再開の瞬間に開いていたチャンスは無効化する
+        await togglePlayback();
+        pauseBtn.textContent = appState.internalAudio?.paused ? "▶ 再生" : "⏸ 停止";
+    });
+    pauseBtn.id = "ar-pause-btn";
+
+    const photoBtn = makeArButton("📷 撮影", () => requestArPhoto());
+    photoBtn.id = "ar-photo-btn";
+
+    const exitBtn = makeArButton("✕ 終了", () => {
         try { appState.xrHelper?.baseExperience.exitXRAsync(); }
         catch (err) { console.warn("exitXR failed", err); }
     });
-    // ボタン上のタッチはジェスチャー（回転/配置）に伝播させない
-    exitBtn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
-    exitBtn.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
-    overlay.appendChild(exitBtn);
-};
+    exitBtn.id = "ar-exit-btn";
 
-// AR中でも確実にダンスを一時停止/再開できる専用ボタン（画面下部中央、タップ判定とは完全分離）
-const createArPauseButton = (overlay: HTMLElement) => {
-    const btn = document.createElement("button");
-    btn.id = "ar-pause-btn";
-    btn.textContent = "⏸ 停止";
-    btn.style.cssText =
-        "position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:20;" +
-        "padding:12px 28px;border:1px solid rgba(0,229,255,0.5);border-radius:26px;" +
-        "background:rgba(0,0,0,0.55);color:#fff;font-size:1rem;font-weight:600;" +
-        "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:auto;";
-    btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        cancelActiveChance(); // 停止/再開の瞬間に開いていたチャンスは無効化する
-        await togglePlayback();
-        const paused = !!appState.internalAudio?.paused;
-        btn.textContent = paused ? "▶ 再生" : "⏸ 停止";
-    });
-    btn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
-    btn.addEventListener("touchend", (e) => e.stopPropagation(), { passive: true });
-    overlay.appendChild(btn);
+    bar.append(pauseBtn, photoBtn, exitBtn);
+    overlay.appendChild(bar);
 };
 
 // ===== 2026 WebXR 拡張機能の有効化と結線 =====
@@ -305,6 +306,14 @@ const wireArFeatures = (
     const featuresManager = xr.baseExperience.featuresManager;
     const hitTest = featuresManager.enableFeature(WebXRFeatureName.HIT_TEST, "latest") as WebXRHitTest;
     featuresManager.enableFeature(WebXRFeatureName.DOM_OVERLAY, "latest", { element: ctx.overlay! });
+
+    // camera-access（撮影機能でカメラ映像を写真に合成するため）。未対応端末では自動フォールバック
+    try {
+        const rawCam = (WebXRFeatureName as any).RAW_CAMERA_ACCESS;
+        if (rawCam) featuresManager.enableFeature(rawCam, "latest", {}, true, false);
+    } catch (e) {
+        console.warn("camera-access 無効（写真は3D描画のみになります）:", e);
+    }
 
     const dirLight = (shadowGenerator?.getLight() as DirectionalLight) ?? null;
     ctx.lightEst = dirLight ? enableLightEstimation(xr, dirLight) : null;
@@ -411,9 +420,10 @@ export const setupWebXR = async (
         ctx.root.setTargets(newMeshes, ctx.inXR);
     };
 
+    setupArPhoto(scene);
+
     if (ctx.overlay) {
-        createArExitButton(ctx.overlay);
-        createArPauseButton(ctx.overlay);
+        createArBottomBar(ctx.overlay);
         setupArGestures(ctx.overlay, {
             isInXR: () => ctx.inXR,
             isPlaced: () => ctx.modelPlaced,

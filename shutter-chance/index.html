@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Lyric Spark AR ― 歌詞の海に入る体験 | マジカルミライ2026</title>
+  <meta name="description" content="マジカルミライ2026プログラミングコンテスト応募作品。TextAlive + WebAR + MMDで歌詞が降り積もる世界を体験。光のシャッターで歌詞の一瞬を永遠に。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00e5ff;
+      --pink: #ff2bd6;
+      --amber: #ffb347;
+      --bg: #04040f;
+      --bg2: #080818;
+      --text: #eeeeff;
+      --dim: #8888aa;
+      --glass: rgba(255,255,255,0.06);
+      --border: rgba(0,229,255,0.25);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(0,229,255,0.12), transparent 50%),
+        radial-gradient(circle at 85% 85%, rgba(255,43,214,0.10), transparent 50%);
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 9999;
+      display: flex; align-items: center; justify-content: space-between; padding: 0 18px;
+      background: rgba(4,4,15,0.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-title {
+      font-family: 'Orbitron', sans-serif; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 2px; color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+    .nav-back {
+      color: var(--dim); font-size: 0.8rem; text-decoration: none;
+      padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px;
+      transition: all 0.2s;
+    }
+    .nav-back:hover { color: var(--cyan); border-color: var(--cyan); }
+
+    /* ── Base layout ── */
+    #app { position: relative; width: 100%; height: 100%; padding-top: 52px; }
+    #renderCanvas {
+      position: absolute; inset: 52px 0 0 0;
+      width: 100%; height: calc(100% - 52px);
+      touch-action: none; outline: none;
+    }
+
+    /* ── hidden utility ── */
+    .hidden { display: none !important; }
+
+    /* ── Loading ── */
+    #loading {
+      position: absolute; inset: 52px 0 0 0;
+      background: var(--bg); z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+    .loading-logo {
+      font-family: 'Orbitron', sans-serif; font-size: 1.4rem; font-weight: 900;
+      background: linear-gradient(90deg, var(--cyan), var(--pink));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    #status-message { color: var(--dim); font-size: 0.85rem; min-height: 1.2em; }
+    #loading-bar {
+      width: 260px; height: 4px; background: rgba(255,255,255,0.1);
+      border-radius: 2px; overflow: hidden;
+    }
+    #loading-progress {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--pink));
+      transition: width 0.3s;
+    }
+
+    /* ── Mode select ── */
+    #mode-select {
+      position: absolute; inset: 52px 0 0 0; z-index: 80;
+      background: rgba(4,4,15,0.97); backdrop-filter: blur(20px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    }
+    #mode-select h2 {
+      font-family: 'Orbitron', sans-serif; font-size: 1.1rem; letter-spacing: 3px;
+      color: var(--cyan); text-shadow: 0 0 15px var(--cyan);
+    }
+    #mode-select p { color: var(--dim); font-size: 0.82rem; text-align: center; line-height: 1.7; }
+    .mode-btn {
+      width: 240px; padding: 16px 20px; border-radius: 16px; border: none; cursor: pointer;
+      font-family: 'Orbitron', sans-serif; font-size: 0.9rem; font-weight: 700; letter-spacing: 1px;
+      transition: transform 0.15s, box-shadow 0.2s;
+    }
+    .mode-btn:active { transform: scale(0.96); }
+    #btn-ar {
+      background: linear-gradient(135deg, var(--cyan), var(--pink));
+      color: #000; box-shadow: 0 0 24px rgba(0,229,255,0.5);
+    }
+    #btn-ar:hover { box-shadow: 0 0 36px rgba(0,229,255,0.7); }
+    #btn-studio {
+      background: var(--glass); color: var(--text);
+      border: 1px solid var(--border); box-shadow: 0 0 12px rgba(0,229,255,0.1);
+    }
+    #btn-studio:hover { background: rgba(0,229,255,0.1); }
+    #ar-status-area { min-height: 24px; }
+    .ar-badge {
+      display: inline-block; padding: 4px 14px; border-radius: 20px;
+      background: rgba(0,229,255,0.12); border: 1px solid var(--cyan);
+      color: var(--cyan); font-size: 0.78rem;
+    }
+
+    /* ── Main UI overlay ── */
+    #main-ui {
+      position: absolute; inset: 52px 0 0 0; pointer-events: none;
+      display: flex; flex-direction: column; justify-content: space-between; padding: 12px;
+      z-index: 50;
+      transition: bottom 0.3s ease;
+    }
+
+    /* If fallback banner is visible, lift the main UI controls up so they don't get covered */
+    body.has-fallback-banner #main-ui {
+      bottom: 96px;
+    }
+    body.has-fallback-banner #photo-stack {
+      bottom: 176px;
+    }
+
+    /* ── Lyrics ── */
+    #lyric-overlay {
+      pointer-events: none; text-align: center; padding: 12px 0;
+    }
+    #lyric-phrase {
+      font-size: 0.82rem; color: var(--dim); min-height: 1.2em;
+      transition: opacity 0.3s;
+    }
+    #lyric-word {
+      font-family: 'Orbitron', sans-serif; font-size: 2.2rem; font-weight: 900;
+      color: var(--cyan); min-height: 1.2em; letter-spacing: 4px;
+      text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,229,255,0.4);
+      filter: blur(0); transition: filter 0.1s;
+    }
+    #lyric-word.lyric-focus { animation: lyric-focus-in 0.3s ease-out forwards; }
+    @keyframes lyric-focus-in {
+      from { filter: blur(8px); opacity: 0.3; }
+      to   { filter: blur(0);   opacity: 1; }
+    }
+     .lyric-fade-out { opacity: 0 !important; transition: opacity 0.2s; }
+    .lyric-fade-in  { opacity: 1 !important; transition: opacity 0.3s; }
+
+    @keyframes beat-pulse {
+      0% { transform: scale(1); filter: brightness(1); }
+      20% { transform: scale(1.08); filter: brightness(1.25); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .beat-pulse {
+      animation: beat-pulse 0.2s ease-out forwards;
+    }
+
+    @keyframes beat-pulse-glow {
+      0% { box-shadow: 0 0 10px rgba(0,229,255,0.3); border-color: var(--cyan); }
+      15% { box-shadow: 0 0 35px rgba(0,229,255,0.8); border-color: #00ff88; }
+      100% { box-shadow: 0 0 10px rgba(0,229,255,0.3); border-color: var(--cyan); }
+    }
+    .beat-pulse-glow {
+      animation: beat-pulse-glow 0.3s ease-out forwards;
+    }
+
+    /* ── ルール説明オーバーレイ ── */
+    #rule-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(8px);
+      z-index: 900;
+      pointer-events: auto;
+    }
+    #rule-overlay.hidden { display: none; }
+
+    .gallery-rating { font-weight: bold; margin-right: 4px; }
+    .gallery-rating.perfect { color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
+    .gallery-rating.spark { color: var(--pink); text-shadow: 0 0 6px var(--pink); }
+    .gallery-rating.beat { color: var(--amber); text-shadow: 0 0 6px var(--amber); }
+    .gallery-rating.captured { color: var(--dim); }
+
+    #rule-overlay .rule-box {
+      max-width: 520px;
+      padding: 36px 40px;
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      border-radius: 20px;
+      background: rgba(10, 15, 30, 0.9);
+      box-shadow: 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(232, 121, 249, 0.1);
+      text-align: center;
+    }
+    #rule-overlay .rule-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      color: #22d3ee;
+      text-shadow: 0 0 12px #22d3ee;
+      margin-bottom: 16px;
+    }
+    #rule-overlay .rule-body {
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: #e0f0ff;
+    }
+    /* フェードアニメーション */
+    @keyframes ruleOverlayFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1.0); }
+    }
+    @keyframes ruleOverlayFadeOut {
+      from { opacity: 1; transform: scale(1.0); }
+      to   { opacity: 0; transform: scale(0.96); }
+    }
+    #rule-overlay.fade-in  { animation: ruleOverlayFadeIn  0.4s ease-out forwards; }
+    #rule-overlay.fade-out { animation: ruleOverlayFadeOut 0.6s ease-in  forwards; }
+
+    /* ── Controls ── */
+    #controls {
+      pointer-events: auto; display: flex; gap: 10px; align-items: center; justify-content: center;
+      flex-wrap: wrap; padding-bottom: 8px;
+    }
+    .ctrl-btn {
+      padding: 10px 20px; border-radius: 24px; border: 1px solid var(--border);
+      background: var(--glass); backdrop-filter: blur(10px);
+      color: var(--text); font-family: 'Orbitron', sans-serif; font-size: 0.75rem;
+      cursor: pointer; letter-spacing: 1px; transition: all 0.2s;
+    }
+    .ctrl-btn:hover { background: rgba(0,229,255,0.12); border-color: var(--cyan); color: var(--cyan); }
+    #play-btn {
+      background: linear-gradient(135deg, var(--cyan), var(--pink));
+      color: #000; border: none; font-weight: 700;
+      box-shadow: 0 0 16px rgba(0,229,255,0.4);
+    }
+    #play-btn:hover { box-shadow: 0 0 28px rgba(0,229,255,0.6); }
+    #ar-start-btn {
+      background: linear-gradient(135deg, var(--pink), var(--amber));
+      color: #000; border: none; font-weight: 700;
+    }
+
+    /* ── 時止め・撮影ボタン ── */
+    #freeze-shoot-btn {
+      /* 通常時: シアンネオンで「時を止める」 */
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0,229,255,0.35);
+      font-size: 0.8rem;
+      transition: all 0.25s;
+    }
+    #freeze-shoot-btn:hover {
+      background: rgba(0,229,255,0.12);
+      box-shadow: 0 0 22px rgba(0,229,255,0.6);
+    }
+    /* フリーズ中: マゼンタネオンで「撮影」 */
+    #freeze-shoot-btn.shooting {
+      border-color: var(--pink);
+      color: var(--pink);
+      box-shadow: 0 0 16px rgba(232,121,249,0.5);
+      animation: shootBtnPulse 0.9s ease-in-out infinite;
+    }
+    #freeze-shoot-btn.shooting:hover {
+      background: rgba(232,121,249,0.12);
+      box-shadow: 0 0 28px rgba(232,121,249,0.7);
+    }
+    @keyframes shootBtnPulse {
+      0%,100% { box-shadow: 0 0 14px rgba(232,121,249,0.4); }
+      50%      { box-shadow: 0 0 28px rgba(232,121,249,0.8), 0 0 6px rgba(255,255,255,0.3); }
+    }
+
+    /* ── Game HUD ── */
+    #game-hud {
+      position: absolute; top: 12px; right: 12px; z-index: 55; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; text-align: right;
+      background: var(--glass); padding: 8px 14px; border-radius: 12px;
+      border: 1px solid var(--border); backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    #game-hud.hidden { display: none; }
+    .hud-item { font-size: 1.1rem; font-weight: 900; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+    .hud-stats { font-size: 0.65rem; display: flex; gap: 8px; color: var(--text); }
+    /* ── Flash ── */
+    #flash {
+      position: absolute; inset: 0; z-index: 200; pointer-events: none;
+      background: white; opacity: 0; transition: opacity 0.05s;
+    }
+    #flash.active { opacity: 0.95; transition: opacity 0.4s ease-out; }
+
+    /* ── Photo stack ── */
+    #photo-stack {
+      position: absolute; bottom: 80px; right: 16px; z-index: 70;
+      width: 90px; pointer-events: none;
+    }
+    .polaroid {
+      width: 84px; background: #fff; padding: 6px 6px 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6); border-radius: 3px;
+      position: absolute; bottom: 0; right: 0;
+      animation: polaroid-land 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+    .polaroid:nth-child(1) { transform: rotate(2deg); }
+    .polaroid:nth-child(2) { transform: rotate(-3deg) translateY(4px); }
+    .polaroid:nth-child(3) { transform: rotate(1deg) translateY(8px); }
+    .polaroid:nth-child(n+4) { transform: rotate(-2deg) translateY(12px); }
+    @keyframes polaroid-land {
+      from { transform: translateY(-60px) rotate(15deg) scale(0.7); opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .polaroid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 1px; display: block; }
+    .polaroid-caption {
+      font-size: 0.45rem; text-align: center; color: #333; margin-top: 2px;
+      font-family: 'Orbitron', sans-serif; overflow: hidden; white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Fallback banner ── */
+    #ar-fallback-banner {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 80;
+      background: rgba(4,4,15,0.9); border-top: 1px solid var(--border);
+      padding: 8px 14px; display: none; pointer-events: auto;
+    }
+    #ar-fallback-banner.visible { display: block; }
+    .fallback-inner {
+      display: flex; align-items: center; gap: 10px; max-width: 600px; margin: 0 auto;
+    }
+    .fallback-icon { font-size: 1.4rem; }
+    .fallback-text { font-size: 0.72rem; color: var(--dim); line-height: 1.5; flex: 1; }
+    .fallback-text strong { color: var(--cyan); }
+    .fallback-qr { flex-shrink: 0; }
+
+    /* ── Gallery modal ── */
+    #gallery-modal {
+      position: absolute; inset: 52px 0 0 0; z-index: 150;
+      background: rgba(4,4,15,0.96); backdrop-filter: blur(16px);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 {
+      font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--cyan); letter-spacing: 2px;
+    }
+    .modal-close {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--glass);
+      border: 1px solid var(--border); color: var(--text); font-size: 1rem; cursor: pointer;
+    }
+    #gallery-grid {
+      flex: 1; overflow-y: auto; padding: 16px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px;
+    }
+    .gallery-item {
+      background: var(--glass); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .gallery-item img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+    .gallery-caption {
+      font-size: 0.65rem; color: var(--dim); padding: 4px 8px;
+      font-family: 'Orbitron', sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .save-btn {
+      display: block; text-align: center; padding: 6px;
+      background: rgba(0,229,255,0.1); color: var(--cyan); text-decoration: none;
+      font-size: 0.72rem; border-top: 1px solid var(--border); transition: background 0.2s;
+    }
+    .save-btn:hover { background: rgba(0,229,255,0.2); }
+
+    /* ── Credits modal ── */
+    #credits-modal {
+      position: absolute; inset: 52px 0 0 0; z-index: 150;
+      background: rgba(4,4,15,0.97); backdrop-filter: blur(16px);
+      display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .credits-body { padding: 24px; max-width: 520px; margin: 0 auto; }
+    .credits-body h3 {
+      font-family: 'Orbitron', sans-serif; color: var(--cyan); font-size: 0.9rem;
+      letter-spacing: 2px; margin: 20px 0 8px;
+    }
+    .credits-body p, .credits-body li {
+      font-size: 0.82rem; color: var(--dim); line-height: 1.8;
+    }
+    .credits-body ul { padding-left: 18px; }
+
+    #freeze-ui {
+      position: absolute; inset: 52px 0 0 0; z-index: 80;
+      pointer-events: none; display: flex;
+      flex-direction: column; align-items: center; justify-content: flex-end;
+      padding-bottom: 80px;
+    }
+    #freeze-ui.hidden { display: none !important; }
+    #freeze-overlay {
+      position: absolute; inset: 0;
+      border: 3px solid rgba(100,200,255,0.7);
+      box-shadow: inset 0 0 60px rgba(100,200,255,0.25), 0 0 40px rgba(100,200,255,0.3);
+      border-radius: 4px;
+      pointer-events: none;
+      animation: freezePulse 2s ease-in-out infinite;
+    }
+    @keyframes freezePulse {
+      0%,100% { border-color: rgba(100,200,255,0.5); box-shadow: inset 0 0 40px rgba(100,200,255,0.15); }
+      50%      { border-color: rgba(200,240,255,0.9); box-shadow: inset 0 0 80px rgba(180,230,255,0.4); }
+    }
+    #freeze-guide {
+      position: relative; z-index: 1; text-align: center;
+      background: rgba(4,8,20,0.75); backdrop-filter: blur(12px);
+      border: 1px solid rgba(100,200,255,0.4); border-radius: 12px;
+      padding: 12px 24px; margin-bottom: 16px;
+    }
+    #freeze-label {
+      font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 700;
+      color: #a5f3fc; letter-spacing: 3px;
+      animation: freezeLabelBlink 1.2s ease-in-out infinite;
+    }
+    @keyframes freezeLabelBlink {
+      0%,100% { opacity: 1; } 50% { opacity: 0.5; }
+    }
+    #freeze-hint {
+      font-size: 0.75rem; color: rgba(165,243,252,0.7); margin-top: 6px;
+      font-family: 'Orbitron', sans-serif;
+    }
+    #freeze-resume-btn {
+      position: relative; z-index: 1; pointer-events: auto;
+      padding: 10px 28px; border-radius: 24px;
+      background: rgba(100,200,255,0.15); backdrop-filter: blur(10px);
+      border: 1px solid rgba(100,200,255,0.6); color: #a5f3fc;
+      font-family: 'Orbitron', sans-serif; font-size: 0.78rem; cursor: pointer;
+      letter-spacing: 2px; transition: all 0.2s;
+    }
+    #freeze-resume-btn:hover { background: rgba(100,200,255,0.3); }
+
+
+    /* ── シャッターチャンス判定ポップアップ ── */
+    #shot-rating-pop {
+      position: absolute; top: 35%; left: 50%; transform: translateX(-50%) translateY(-50%) scale(0.6);
+      z-index: 500; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; font-weight: 900; letter-spacing: 4px;
+      text-align: center; white-space: nowrap;
+      opacity: 0; transition: opacity 0.1s, transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    #shot-rating-pop.show {
+      opacity: 1; transform: translateX(-50%) translateY(-50%) scale(1);
+    }
+    #shot-rating-pop.hide {
+      opacity: 0; transform: translateX(-50%) translateY(-50%) scale(1.2);
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+    #shot-rating-pop .rating-label {
+      display: block; font-size: 1.6rem;
+    }
+    #shot-rating-pop .rating-sub {
+      display: block; font-size: 0.7rem; letter-spacing: 5px; opacity: 0.8; margin-top: 4px;
+    }
+    #shot-rating-pop.perfect .rating-label { color: var(--cyan); text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,229,255,0.5); }
+    #shot-rating-pop.spark   .rating-label { color: var(--pink); text-shadow: 0 0 20px var(--pink), 0 0 40px rgba(255,43,214,0.5); }
+    #shot-rating-pop.beat    .rating-label { color: var(--amber); text-shadow: 0 0 20px var(--amber); }
+    #shot-rating-pop.captured .rating-label { color: var(--dim); }
+
+    /* ── AR overlay ── */
+    #ar-overlay {
+      position: absolute; inset: 52px 0 0 0; z-index: 55;
+      display: none; pointer-events: none;
+    }
+    #ar-overlay.active { display: block; pointer-events: auto; }
+    /* AR配置ガイド (未配置時のみ表示) */
+    #ar-place-guide {
+      position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%);
+      background: rgba(4,8,20,0.82); backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,229,255,0.4); border-radius: 20px;
+      padding: 10px 22px; pointer-events: none;
+      font-family: 'Orbitron', sans-serif; font-size: 0.78rem; color: var(--cyan);
+      letter-spacing: 1px; text-align: center; z-index: 56;
+      animation: guidePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes guidePulse {
+      0%,100% { opacity: 0.9; } 50% { opacity: 0.5; }
+    }
+    #ar-place-guide.placed { display: none; }
+
+    /* ── Hidden audio element for TextAlive ── */
+    #textalive-media { display: none; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-back">← もどる</a>
+  <span class="nav-title">✨ LYRIC SPARK AR</span>
+  <span style="font-size:0.65rem;color:var(--dim);">マジカルミライ2026</span>
+</nav>
+
+<div id="app">
+  <canvas id="renderCanvas"></canvas>
+
+  <!-- TextAlive media element (非表示) -->
+  <audio id="textalive-media"></audio>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="loading-logo">LYRIC SPARK AR</div>
+    <div id="status-message">初期化中...</div>
+    <div id="loading-bar"><div id="loading-progress"></div></div>
+  </div>
+
+  <!-- Mode select -->
+  <div id="mode-select" class="hidden">
+    <h2>✨ LYRIC SPARK AR</h2>
+    <p>「シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン」<br>歌詞が降り積もる世界に立ち、光のシャッターで<br>歌詞の一瞬を永遠に焼き付けよう。</p>
+    <div id="ar-status-area"></div>
+    <div style="margin: 12px 0; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.8rem; color: var(--dim);">
+      <span>画質設定:</span>
+      <select id="quality-select" style="background: var(--bg2); color: var(--text); border: 1px solid var(--border); padding: 5px 10px; border-radius: 8px; font-family: inherit; font-size: 0.78rem; outline: none; cursor: pointer;">
+        <option value="high">高画質 (影あり / Glowあり)</option>
+        <option value="medium" selected>標準 (影なし / Glowあり)</option>
+        <option value="low">軽量 (影なし / Glowなし)</option>
+      </select>
+    </div>
+    <button id="btn-ar" class="mode-btn">🥽 ARモードで体験する</button>
+    <button id="btn-studio" class="mode-btn">🎬 スタジオモードで見る</button>
+    <button id="btn-demo" class="mode-btn" style="background:var(--glass);color:var(--dim);border:1px solid var(--border);font-size:0.8rem;">🎥 デモを見る（自動再生）</button>
+  </div>
+
+  <!-- Main UI (visible after load) -->
+  <div id="main-ui" class="hidden">
+    <!-- Game HUD: コレクション枚数表示 -->
+    <div id="game-hud">
+      <div class="hud-item" id="photo-count">📷 0枚</div>
+    </div>
+
+    <!-- Lyrics overlay -->
+    <div id="lyric-overlay">
+      <div id="lyric-phrase"></div>
+      <div id="lyric-word"></div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+      <button id="play-btn" class="ctrl-btn">▶ 再生</button>
+      <!-- 時止め・撮影ボタン（状態によりラベル・アイコンが切り替わる） -->
+      <button id="freeze-shoot-btn" class="ctrl-btn hidden">⏳ 時を止める</button>
+      <button id="ar-start-btn" class="ctrl-btn hidden">🥽 AR起動</button>
+      <button id="gallery-btn" class="ctrl-btn">🖼 ギャラリー</button>
+      <button id="credits-btn" class="ctrl-btn">ℹ</button>
+    </div>
+  </div>
+
+  <!-- Flash overlay -->
+  <div id="flash"></div>
+
+  <!-- フリーズモード UI（時を止めている間だけ表示） -->
+  <div id="freeze-ui" class="hidden">
+    <div id="freeze-overlay"></div>
+    <div id="freeze-guide">
+      <div id="freeze-label">⏸ 時が止まった</div>
+      <div id="freeze-hint">アングルを変えて…もう一度タップで撮影</div>
+    </div>
+    <button id="freeze-resume-btn">▶ 再開</button>
+  </div>
+
+  <!-- ルール説明オーバーレイ: onReady後に表示され、タップで閉じる -->
+  <div id="rule-overlay" class="hidden">
+    <div class="rule-box">
+      <div class="rule-title">🎵 Lyric Spark AR</div>
+      <div class="rule-body" style="text-align: left; font-size: 0.8rem; line-height: 1.6; margin-top: 10px;">
+        1. <strong>「▶ 再生」</strong>を押すと音楽がスタートし、3Dの歌詞が降り積もります。<br>
+        2. 気に入ったアングルで<strong>「⏳ 時を止める」</strong>を押すと、撮影モード（フリーズ）になります。<br>
+        3. 画面をドラッグしてアングルを調整し、<strong>「📷 撮影」</strong>を押して記録します。<br>
+        4. 撮影した写真はギャラリーに保存され、音楽が自動で再開します。<br>
+        5. 床に積もった歌詞をタップすると、音楽記号がポップに弾けます！
+      </div>
+      <div style="font-size: 0.72rem; color: var(--dim); margin-top: 18px; text-align: center;">
+        (画面をタップして閉じる)
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo stack -->
+  <div id="photo-stack"></div>
+
+  <!-- AR fallback banner -->
+  <div id="ar-fallback-banner"></div>
+
+  <!-- AR DOM overlay (タップ配置ガイド含む) -->
+  <div id="ar-overlay">
+    <div id="ar-place-guide">📱 床を映してタップすると<br>ミクと歌詞が配置されます</div>
+  </div>
+
+  <!-- シャッターチャンス判定ポップアップ -->
+  <div id="shot-rating-pop" class="hidden">
+    <span class="rating-label"></span>
+    <span class="rating-sub"></span>
+  </div>
+
+  <!-- Gallery modal -->
+  <div id="gallery-modal" class="hidden">
+    <div class="modal-header">
+      <h2>🖼 PHOTO GALLERY</h2>
+      <button id="gallery-close" class="modal-close">✕</button>
+    </div>
+    <div id="gallery-grid"></div>
+  </div>
+
+  <!-- Credits modal -->
+  <div id="credits-modal" class="hidden">
+    <div class="modal-header">
+      <h2>ℹ CREDITS</h2>
+      <button id="credits-close" class="modal-close">✕</button>
+    </div>
+    <div class="credits-body">
+      <h3>🎵 楽曲</h3>
+      <p>シャッターチャンス / 夜未アガリ feat. 初音ミク、鏡音リン<br>
+      © 夜未アガリ / Piapro<br>
+      (ピアプロ楽曲利用規約に基づき非営利目的で利用)</p>
+
+      <h3>🎤 歌詞同期</h3>
+      <p>TextAlive App API<br>© AIST TextAlive Project / 産業技術総合研究所</p>
+
+      <h3>🔊 効果音</h3>
+      <p>シャッター効果音: Web Audio API によるプログラム合成音（外部音源素材不使用）</p>
+
+      <h3>🧊 3Dエンジン / ライブラリ</h3>
+      <p>Babylon.js (Apache License 2.0)<br>
+      babylon-mmd (MIT License)<br>
+      Havok Physics WASM (Copyright Microsoft / Autodesk / Unity)</p>
+
+      <h3>💃 3Dモデル・モーション</h3>
+      <ul style="padding-left:15px; font-size:0.78rem;">
+        <li><strong>MMD 3Dモデル</strong>:
+          <br>モデル名: 602e式初音ミク (GENTIANA MAXIMUM)
+          <br>作者: 602e
+          <br>配布元URL / 規約: <a href="https://note.com/602e3/" target="_blank" style="color:var(--cyan);">https://note.com/602e3/</a>
+        </li>
+        <li style="margin-top:8px;"><strong>MMD ダンスモーション</strong>:
+          <br>モーション名: ディンドンダン ダンスモーション (dindondan.vmd)
+          <br>作者: つるぺた (振付元: 【雛姫】)
+          <br>配布元URL / 規約: <a href="https://www.nicovideo.jp/watch/sm24707661" target="_blank" style="color:var(--cyan);">https://www.nicovideo.jp/watch/sm24707661</a>
+        </li>
+        <li style="margin-top:8px; color:var(--dim);">※ 本作品は各制作者様の二次創作利用規約およびコンテスト応募規約（非営利目的）に従って作成・構成されています。</li>
+      </ul>
+
+      <h3>📱 AR体験</h3>
+      <p>WebXR Device API + ARCore (Android)<br>
+      フル体験は ARCore 対応 Android 端末推奨</p>
+
+      <h3>🏆 コンテスト</h3>
+      <p>マジカルミライ2026 プログラミング・コンテスト 応募作品</p>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

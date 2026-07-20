@@ -11,6 +11,18 @@ MMD (PMX) モデルと VMD モーションをブラウザ上で再生し、WebAR
 - babylon-mmd
 - WebXR AR (ARCore / Android Chrome)
 
+## WebXR AR 機能 (v3.1)
+
+すべて optional feature として要求するため、未対応端末では自動的にフォールバックします。
+
+| 機能 | 内容 |
+|---|---|
+| Hit Test + 配置レティクル | 画面中央の床面にリングを表示し、タップした位置へモデルを配置 |
+| Light Estimation (照明推定) | 実空間の光の向き・色・強さをモデルの照明と影に反映 |
+| Depth Sensing (深度オクルージョン) | 手前の人や家具でモデルが隠れる。AR 画面左上のボタンで ON/OFF 切替可 |
+| Anchors (空間アンカー) | 配置位置を ARCore アンカーに固定し、歩き回った際の位置ずれを補正 |
+| DOM Overlay | AR 中のジェスチャー操作 (回転/ピンチ拡縮/タップ再配置) と各種ボタン表示 |
+
 ## セットアップ
 
 1.  **初期設定 (Makefile 推奨):**

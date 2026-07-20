@@ -1,0 +1,312 @@
+/**
+ * textAliveSync.ts
+ * TextAlive App API ラッパー
+ * 課題曲「シャッターチャンス」のバージョン固定IDを管理し、
+ * beat / chorus / lyric のタイミングをコールバックで提供する。
+ */
+import { Player, PlayerEventListener } from "textalive-app-api";
+
+// ──────────────────────────────────────────────
+// TextAlive App Token
+// コンテスト審査サイト経由で動作する場合はここにトークンを設定。
+// ローカル・Vercel 単体動作では空文字列でも onAppReady(!managed) 経由で楽曲ロード可能。
+// 取得先: https://developer.textalive.jp/profile
+// ──────────────────────────────────────────────
+const APP_TOKEN = "1NQ6doQkcHMm1MpI";
+
+// 楽曲バージョン固定値（変更しないこと）
+const SONG_URL = "https://piapro.jp/t/PNpQ/20251209170719";
+const VIDEO_CONFIG = {
+  beatId: 4827295,
+  chordId: 2963756,
+  repetitiveSegmentId: 3086263,
+  lyricId: 126542,
+  lyricDiffId: 28628,
+};
+
+export type TextAliveCallbacks = {
+  onReady: () => void;
+  onPlay: () => void;
+  onPause: () => void;
+  onStop: () => void;
+  onTimeUpdate: (position: number) => void;
+  onError: (error: Error) => void;
+};
+
+export class TextAliveSync {
+  private player: Player | null = null;
+  private callbacks: TextAliveCallbacks;
+  private _isReady = false;
+
+  constructor(callbacks: TextAliveCallbacks) {
+    this.callbacks = callbacks;
+  }
+
+  /** TextAlive Player を初期化して楽曲をロードする */
+  async init(mediaElement: HTMLElement): Promise<void> {
+    const listener: PlayerEventListener = {
+      onAppReady: (app) => {
+        // app.managed = true はコンテスト審査プレイヤー上での動作。
+        // ローカル・Vercel・通常ブラウザ実行では常に false なので、
+        // managed かどうかに関わらず楽曲を自分でロードする。
+        if (!app.managed) {
+          console.log("[TextAlive] onAppReady (standalone): loading song...");
+          this.player!.createFromSongUrl(SONG_URL, { video: VIDEO_CONFIG });
+        } else {
+          console.log("[TextAlive] onAppReady (managed): waiting for host player.");
+        }
+      },
+      onVideoReady: () => {
+        console.log("[TextAlive] Video ready, duration:", this.player?.video?.duration);
+        this._isReady = true;
+        this.callbacks.onReady();
+      },
+      onPlay: () => this.callbacks.onPlay(),
+      onPause: () => this.callbacks.onPause(),
+      onStop: () => this.callbacks.onStop(),
+      onTimeUpdate: (pos) => this.callbacks.onTimeUpdate(pos),
+      onError: (err) => this.callbacks.onError(new Error(String(err))),
+    };
+
+    this.player = new Player({
+      app: { token: APP_TOKEN },
+      mediaElement,
+    });
+    this.player.addListener(listener);
+  }
+
+  get isReady(): boolean {
+    return this._isReady;
+  }
+
+  play(): void {
+    this.player?.requestPlay();
+  }
+
+  pause(): void {
+    this.player?.requestPause();
+  }
+
+  /** 現在の発声中の単語テキストを返す（なければ null）*/
+  getCurrentWord(position: number): string | null {
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);  // findWord は player.video 経由が正しい
+    return word?.text ?? null;
+  }
+
+  /** 現在の発声中の単語のテキストと持続時間をオブジェクトで返す */
+  getCurrentWordObj(position: number): { text: string; duration: number } | null {
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);
+    if (!word) return null;
+    return {
+      text: word.text,
+      duration: word.duration
+    };
+  }
+
+  /** 現在の発声中のフレーズテキストを返す（なければ null）*/
+  getCurrentPhrase(position: number): string | null {
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);  // findPhrase は player.video 経由が正しい
+    return phrase?.text ?? null;
+  }
+
+  /** 現在の発声中のフレーズ情報（テキスト、開始・終了時間）を返す（なければ null）*/
+  getCurrentPhraseInfo(position: number): { text: string; startTime: number; endTime: number } | null {
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);
+    if (!phrase) return null;
+    return {
+      text: phrase.text,
+      startTime: phrase.startTime,
+      endTime: phrase.endTime,
+    };
+  }
+
+  /** 
+   * 現在発声中の単語情報（自立語に後ろの助詞・助動詞を結合した状態）を取得する。
+   * 自立語が発声されたタイミングでのみ返し、付属語単独が発声されたタイミングでは null を返すことで、
+   * 単語単位の pop と助詞の結合を両立させる。
+   */
+  getMergedWordInfo(position: number): { text: string; startTime: number; isChorus: boolean } | null {
+    if (!this.player?.video) return null;
+    const word = this.player.video.findWord(position);
+    if (!word) return null;
+
+    // 現在の単語が「付属語」である場合は null を返す（自立語のタイミングで結合されて spawn 済みのためスキップ）
+    if (this._isAuxiliaryWord(word)) {
+      return null;
+    }
+
+    // 自立語の場合、後ろに続く「付属語」をすべて連結する
+    let mergedText = word.text;
+    let nextWord = word.next;
+    while (nextWord && this._isAuxiliaryWord(nextWord)) {
+      mergedText += nextWord.text;
+      nextWord = nextWord.next;
+    }
+
+    const phrase = this.player.video.findPhrase(position);
+    const isChorus = phrase?.isChorus ?? false;
+
+    return {
+      text: mergedText,
+      startTime: word.startTime,
+      isChorus,
+    };
+  }
+
+  /** 単語が付属語（助詞・助動詞・接続助詞など）であるか判定する */
+  private _isAuxiliaryWord(word: any): boolean {
+    if (!word) return false;
+    const text = word.text.trim();
+    if (text.length === 0) return false;
+
+    // 1. 品詞による判定
+    const pos = (word.pos || "").toLowerCase();
+    const rawPos = (word.rawPos || "").toLowerCase();
+    if (
+      pos.includes("助詞") || pos.includes("助動詞") || pos.includes("接尾") ||
+      pos === "p" || pos === "m" || pos === "particle" || pos === "auxiliary-verb" ||
+      pos === "suffix" ||
+      rawPos.includes("助詞") || rawPos.includes("助動詞") || rawPos.includes("接尾")
+    ) {
+      return true;
+    }
+
+    // 2. 文字列パターンによる判定
+    // 品詞が明確に自立語（名詞、動詞、形容詞、副詞など）でない場合、ひらがな（＋っ、ー）で構成される1〜3文字を付属語と判定する
+    const isNounOrVerb = pos === "n" || pos === "v" || pos === "a" || pos === "av" ||
+                         pos.includes("名詞") || pos.includes("動詞") || pos.includes("形容") || pos.includes("副詞") ||
+                         rawPos.includes("名詞") || rawPos.includes("動詞") || rawPos.includes("形容") || rawPos.includes("副詞");
+
+    if (!isNounOrVerb) {
+      const hiraganaRegex = /^[ぁ-んーっ]{1,3}$/;
+      if (hiraganaRegex.test(text)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 現在フレーズの「決めの瞬間」時刻(ms)を返す。
+   * フレーズの最後の単語の startTime を「シャッターチャンス」と定義。
+   * フレーズが取れない・単語が無い場合は null を返す。
+   */
+  getPhraseClimaxTime(position: number): number | null {
+    if (!this.player?.video) return null;
+    const phrase = this.player.video.findPhrase(position);
+    if (!phrase) return null;
+
+    // IPhrase の単語リストを firstWord から next で辿り、最後の word を探す
+    let lastWord: any = null;
+    let word: any = phrase.firstWord;
+    while (word) {
+      lastWord = word;
+      word = word.next;
+    }
+    if (!lastWord) return null;
+    return lastWord.startTime as number;
+  }
+
+  /** 現在のビート情報を返す */
+  getCurrentBeat(position: number): { startTime: number; duration: number; index: number } | null {
+    if (!this.player) return null;
+    const beat = this.player.findBeat(position);  // player.video ではなく player 直接
+    if (!beat) return null;
+    return {
+      startTime: beat.startTime,
+      duration: beat.duration,
+      index: beat.position, // 小節内の拍番号
+    };
+  }
+
+  /** 現在サビ区間内かどうかを返す */
+  isInChorus(position: number): boolean {
+    if (!this.player) return false;
+    const choruses = this.player.getChoruses() || [];
+    for (const seg of choruses) {
+      if (position >= seg.startTime && position <= seg.endTime) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 現在のサビの開始時間(ms)を返す。サビ区間外なら -1 */
+  getCurrentChorusStart(position: number): number {
+    if (!this.player) return -1;
+    const choruses = this.player.getChoruses() || [];
+    for (const seg of choruses) {
+      if (position >= seg.startTime && position <= seg.endTime) {
+        return seg.startTime;
+      }
+    }
+    return -1;
+  }
+
+  /** 次のサビ開始時刻(ms)を返す。なければ Infinity */
+  getNextChorusStart(position: number): number {
+    if (!this.player) return Infinity;
+    const choruses = this.player.getChoruses() || [];
+    let nextStart = Infinity;
+    for (const seg of choruses) {
+      if (seg.startTime > position && seg.startTime < nextStart) {
+        nextStart = seg.startTime;
+      }
+    }
+    return nextStart;
+  }
+
+  /** 楽曲の総再生時間(ms)を返す */
+  getDuration(): number {
+    return this.player?.video?.duration ?? 0;
+  }
+
+  /** 現在の再生位置(ms)を返す */
+  getPosition(): number {
+    return this.player?.timer?.position ?? 0;
+  }
+
+  getPlayer(): Player | null {
+    return this.player;
+  }
+
+  /**
+   * 撮影タイミング評価を返す（シャッターチャンス判定）
+   * - PERFECT: フレーズclimaxタイミング ±400ms 以内
+   * - SPARK:   サビ区間内での撮影
+   * - BEAT:    ビート強拍（position=0の拍）±200ms 以内
+   * - CAPTURED: それ以外
+   */
+  getShotRating(position: number): "PERFECT" | "SPARK" | "BEAT" | "CAPTURED" {
+    if (!this.player) return "CAPTURED";
+
+    // PERFECT: フレーズ最後の単語タイミング ±400ms
+    const climaxTime = this.getPhraseClimaxTime(position);
+    if (climaxTime !== null && Math.abs(position - climaxTime) <= 400) {
+      return "PERFECT";
+    }
+
+    // SPARK: サビ区間内
+    if (this.isInChorus(position)) {
+      return "SPARK";
+    }
+
+    // BEAT: ビート強拍（小節の1拍目）±200ms
+    const beat = this.getCurrentBeat(position);
+    if (beat && beat.index === 0 && Math.abs(position - beat.startTime) <= 200) {
+      return "BEAT";
+    }
+
+    return "CAPTURED";
+  }
+
+  dispose(): void {
+    this.player?.dispose();
+    this.player = null;
+  }
+}

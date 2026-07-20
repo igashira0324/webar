@@ -30,7 +30,7 @@ export const setupUI = (
     const closeMarkerBtn = document.getElementById("closeQrBtn") as HTMLButtonElement | null;
 
     const S_BASE = 1.0;
-    const Y_BASE = -5.0;
+    const Y_BASE = 0.0; // スライダー値をそのまま position.y に対応させる（旧 -5.0 は初期 y=0.5 に到達不能だった）
 
     // ===== Play/Pause =====
     playPauseBtn?.addEventListener("click", () => {

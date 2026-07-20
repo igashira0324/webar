@@ -100,6 +100,7 @@ interface ArSessionContext {
     overlay: HTMLElement | null;
     controlPanel: HTMLElement | null;
     showSettingsBtn: HTMLElement | null;
+    debugOverlay: ArDebugOverlay | null;
     tmpQuat: Quaternion;
 }
 
@@ -254,6 +255,66 @@ const setupArGestures = (overlay: HTMLElement, ctx: GestureContext) => {
     overlay.addEventListener("touchcancel", end, { passive: true });
 };
 
+// ===== AR中の実機デバッグ用エラーオーバーレイ =====
+// デスクトップでは再現しない実機限定の不具合（フリーズ等）を調査するため、
+// USB接続でのリモートデバッグ無しでも例外内容を画面上で直接確認できるようにする
+interface ArDebugOverlay {
+    show: (message: string) => void;
+    /** 毎秒更新の生存表示。凍結時に「ループ停止」か「描画は生きている」かを画面上で判別する */
+    beat: (text: string) => void;
+    reset: () => void;
+}
+
+const createArDebugOverlay = (overlay: HTMLElement): ArDebugOverlay => {
+    const panel = document.createElement("div");
+    panel.id = "ar-debug-log";
+    panel.style.cssText =
+        "position:absolute;top:14px;right:14px;left:14px;z-index:40;" +
+        "max-height:34vh;overflow-y:auto;display:none;pointer-events:auto;" +
+        "background:rgba(120,0,0,0.8);border:1px solid rgba(255,80,80,0.6);" +
+        "border-radius:10px;padding:8px 10px;font-size:0.7rem;color:#fff;" +
+        "font-family:monospace;white-space:pre-wrap;word-break:break-word;";
+    for (const t of ["touchstart", "touchmove", "touchend"]) {
+        panel.addEventListener(t, (e) => e.stopPropagation(), { passive: true });
+    }
+    panel.addEventListener("click", (e) => { e.stopPropagation(); panel.style.display = "none"; });
+    overlay.appendChild(panel);
+
+    // 生存表示（描画フレーム数などの小さなカウンタ）。これが止まる＝レンダーループ停止
+    const beatEl = document.createElement("div");
+    beatEl.id = "ar-debug-beat";
+    beatEl.style.cssText =
+        "position:absolute;bottom:76px;right:14px;z-index:40;padding:2px 8px;border-radius:8px;" +
+        "background:rgba(0,0,0,0.45);color:#7fdcff;font-size:0.62rem;font-family:monospace;" +
+        "pointer-events:none;display:none;";
+    overlay.appendChild(beatEl);
+
+    const MAX_ENTRIES = 6;
+    let count = 0;
+
+    return {
+        show: (message: string) => {
+            count++;
+            if (count > MAX_ENTRIES) return; // 際限なく積み上がらないようにする
+            const line = document.createElement("div");
+            line.style.cssText = "margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.25);padding-bottom:6px;";
+            line.textContent = `[${count}] ${message}`;
+            panel.appendChild(line);
+            panel.style.display = "block";
+        },
+        beat: (text: string) => {
+            beatEl.style.display = "block";
+            beatEl.textContent = text;
+        },
+        reset: () => {
+            count = 0;
+            panel.replaceChildren();
+            panel.style.display = "none";
+            beatEl.style.display = "none";
+        },
+    };
+};
+
 // AR操作ボタンの共通生成（タッチはジェスチャー（回転/配置）に伝播させない）
 const makeArButton = (label: string, onClick: () => void): HTMLButtonElement => {
     const btn = document.createElement("button");
@@ -371,6 +432,7 @@ const onEnterXR = (ctx: ArSessionContext) => {
     // 深度データが実際に取得できる端末でのみトグルを表示（attach 完了を待つため遅延判定）
     ctx.occToggle?.reset();
     setTimeout(() => ctx.occToggle?.setVisible(isDepthOcclusionActive(ctx.depthSensing)), 600);
+    ctx.debugOverlay?.reset(); // 前回セッションのエラー表示を持ち越さない
 };
 
 const onExitXR = (ctx: ArSessionContext) => {
@@ -416,8 +478,39 @@ export const setupWebXR = async (
         overlay: document.getElementById("ar-overlay"),
         controlPanel: document.getElementById("control-panel"),
         showSettingsBtn: document.getElementById("showSettingsBtn"),
+        debugOverlay: null,
         tmpQuat: new Quaternion(),
     };
+
+    // AR中のみ、キャッチされなかった例外をオーバーレイに表示する（実機限定の不具合調査用）
+    if (ctx.overlay) {
+        ctx.debugOverlay = createArDebugOverlay(ctx.overlay);
+        window.addEventListener("error", (e) => {
+            if (!ctx.inXR) return;
+            ctx.debugOverlay?.show(`${e.message} @ ${e.filename?.split("/").pop() ?? "?"}:${e.lineno}`);
+        });
+        window.addEventListener("unhandledrejection", (e) => {
+            if (!ctx.inXR) return;
+            const reason: any = e.reason;
+            ctx.debugOverlay?.show(`Promise rejected: ${reason?.message ?? reason}`);
+        });
+
+        // 生存表示の更新。F=描画フレーム数 / M=MMDランタイムのフレーム時刻 / B=代表ボーンのY座標。
+        // F停止=レンダーループ死、Fのみ進行=アニメ更新停止、全部進行で見た目静止=スキニング/GPU系
+        let beatFrames = 0;
+        scene.onAfterRenderObservable.add(() => {
+            if (!ctx.inXR || !ctx.debugOverlay) return;
+            beatFrames++;
+            if (beatFrames % 15 !== 0) return;
+            const mf = (appState.mmdRuntime as any)?.currentFrameTime;
+            const bone = appState.currentModel?.skeleton?.bones?.[20] as any;
+            const by = bone?.getAbsoluteMatrix?.().m?.[13];
+            ctx.debugOverlay.beat(
+                `F${beatFrames} M${typeof mf === "number" ? mf.toFixed(0) : "-"} ` +
+                `B${typeof by === "number" ? by.toFixed(2) : "-"}`
+            );
+        });
+    }
 
     // ★ 外部から操作対象メッシュを更新できるようにする
     (window as any).__updateXRTargetMeshes = (newMeshes: AbstractMesh[]) => {
